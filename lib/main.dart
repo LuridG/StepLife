@@ -6,8 +6,10 @@ import 'core/theme/app_theme.dart';
 import 'features/profile/providers/profile_provider.dart';
 import 'features/step_tracker/providers/step_provider.dart';
 import 'features/chore_tracker/providers/chore_provider.dart';
+import 'features/store_journal/providers/store_provider.dart';
 import 'features/step_tracker/presentation/step_tracker_screen.dart';
 import 'features/chore_tracker/presentation/chore_tracker_screen.dart';
+import 'features/store_journal/presentation/store_journal_screen.dart';
 import 'features/about/presentation/about_screen.dart';
 
 void main() async {
@@ -25,6 +27,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => ProfileProvider()),
         ChangeNotifierProvider(create: (_) => StepProvider()),
         ChangeNotifierProvider(create: (_) => ChoreProvider()),
+        ChangeNotifierProvider(create: (_) => StoreProvider()),
       ],
       child: const StepLifeApp(),
     ),
@@ -37,7 +40,7 @@ class StepLifeApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'StepLife - 步量与家务追踪',
+      title: 'StepLife - 步履生活',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.darkTheme,
       home: const MainHomeScreen(),
@@ -78,6 +81,7 @@ class _MainHomeScreenState extends State<MainHomeScreen> with WidgetsBindingObse
         children: const [
           StepTrackerScreen(),
           ChoreTrackerScreen(),
+          StoreJournalScreen(),
           AboutScreen(),
         ],
       ),
@@ -95,6 +99,10 @@ class _MainHomeScreenState extends State<MainHomeScreen> with WidgetsBindingObse
           BottomNavigationBarItem(
             icon: Icon(Icons.check_circle_outline),
             label: '家务习惯',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.storefront_outlined),
+            label: '生活记录',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.info_outline),

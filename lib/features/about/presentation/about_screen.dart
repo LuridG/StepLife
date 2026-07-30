@@ -18,7 +18,7 @@ class AboutScreen extends StatelessWidget {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Row(
           children: [
             Icon(Icons.description, color: Color(0xFF10B981)),
@@ -58,7 +58,7 @@ class AboutScreen extends StatelessWidget {
           Container(
             decoration: const BoxDecoration(
               gradient: LinearGradient(
-                colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
+                colors: [Color(0xFF090D16), Color(0xFF111C38), Color(0xFF0F172A)],
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
               ),
@@ -70,7 +70,7 @@ class AboutScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 const SizedBox(height: 10),
-                // App 图标呈现 (无白边透明版本)
+                // App 图标呈现 (透明 3D 品牌图标)
                 Container(
                   width: 90,
                   height: 90,
@@ -78,7 +78,7 @@ class AboutScreen extends StatelessWidget {
                     borderRadius: BorderRadius.circular(22),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFF10B981).withAlpha(60),
+                        color: const Color(0xFF10B981).withAlpha(80),
                         blurRadius: 20,
                         spreadRadius: 2,
                       ),
@@ -91,7 +91,7 @@ class AboutScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 const Text(
-                  'StepLife - 步履家务',
+                  'StepLife - 步履生活',
                   style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 0.5),
                 ),
                 const SizedBox(height: 6),
@@ -103,13 +103,13 @@ class AboutScreen extends StatelessWidget {
                     border: Border.all(color: const Color(0xFF10B981).withAlpha(80)),
                   ),
                   child: const Text(
-                    '版本号: v1.0.0 (Build 1)',
+                    '版本号: v1.1.0 (Build 2)',
                     style: TextStyle(color: Color(0xFF10B981), fontSize: 12, fontWeight: FontWeight.bold),
                   ),
                 ),
                 const SizedBox(height: 12),
                 const Text(
-                  '结合路线步量换算与家务习惯登记的移动/桌面应用',
+                  '涵盖路线步量、家务习惯与生活打卡 (探店/影视/图书) 的全能生活管理应用',
                   textAlign: TextAlign.center,
                   style: TextStyle(color: Colors.white54, fontSize: 13),
                 ),
@@ -131,13 +131,23 @@ class AboutScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 14),
                         _buildVersionItem(
-                          version: 'v1.0.0 (2026-07-30)',
+                          version: 'v1.1.0 (2026-07-30)',
                           isLatest: true,
                           changes: [
-                            '🏃 步量客观路线资产拆分：路线属性与履约打卡解耦，纵向列表依序展示，支持锁定与编辑。',
-                            '🏠 uHabits 打卡风格：家务打卡支持日期矩阵，量化家务支持 1.2k/15k 智能缩写。',
+                            '🏷️ 应用品牌重塑：全量重命名为【步履生活】。',
+                            '🛍️ 生活记录大升级：支持探店、影视剧集、书籍阅读、景点场所等通用生活打卡与 1.0~5.0 星级评分。',
+                            '👁️ Card ↔ 紧凑列表双视图：支持一键切换视图模式，上次展示偏好自动记忆与重启还原。',
+                            '🗂️ 分类全量管理：侧边栏 Drawer 支持自定义分类重命名与安全平滑删除。',
+                          ],
+                        ),
+                        const Divider(color: Colors.white12, height: 24),
+                        _buildVersionItem(
+                          version: 'v1.0.0 (2026-07-30)',
+                          isLatest: false,
+                          changes: [
+                            '🏃 步量客观路线资产拆分：路线属性与履约打卡解耦，支持锁定防护与编辑。',
+                            '🏠 uHabits 打卡风格：家务打卡支持日期矩阵与 1.2k/15k 智能缩写。',
                             '👥 统一家庭成员系统：整合身高、体重、性别档案，按个人体貌精密推算距离与 MET 千卡。',
-                            '💻 Windows 原生适配：集成 SQLite FFI 桌面驱动与无白边透明 ICO 图标。',
                           ],
                         ),
                       ],
@@ -238,14 +248,14 @@ class AboutScreen extends StatelessWidget {
 
   Widget _buildGlassCard({required Widget child}) {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(20),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
         child: Container(
           decoration: BoxDecoration(
-            color: Colors.white.withAlpha(15),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.white.withAlpha(30), width: 1),
+            color: Colors.white.withAlpha(16),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.white.withAlpha(35), width: 1.2),
           ),
           child: child,
         ),

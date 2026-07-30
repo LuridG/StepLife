@@ -3,6 +3,7 @@ import 'package:sqflite/sqflite.dart';
 import '../../features/profile/domain/user_profile.dart';
 import '../../features/step_tracker/domain/step_models.dart';
 import '../../features/chore_tracker/domain/chore_models.dart';
+import '../../features/store_journal/domain/store_models.dart';
 
 class DatabaseService {
   static final DatabaseService instance = DatabaseService._internal();
@@ -18,18 +19,18 @@ class DatabaseService {
 
   Future<Database> _initDatabase() async {
     final dbPath = await getDatabasesPath();
-    final path = join(dbPath, 'steplife_v5.db');
+    final path = join(dbPath, 'steplife_v7.db');
 
     return await openDatabase(
       path,
-      version: 5,
+      version: 7,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
   }
 
   Future<void> _onCreate(Database db, int version) async {
-    // 个人身体参数表
+    // 个人身体参数与视图偏好表
     await db.execute('''
       CREATE TABLE user_profile (
         id INTEGER PRIMARY KEY DEFAULT 1,
@@ -37,7 +38,8 @@ class DatabaseService {
         weightKg REAL,
         gender TEXT,
         age INTEGER,
-        customStrideCm REAL
+        customStrideCm REAL,
+        preferredViewMode TEXT DEFAULT 'card'
       )
     ''');
 
@@ -70,7 +72,7 @@ class DatabaseService {
       )
     ''');
 
-    // 统一成员信息表 (整合生理参数)
+    // 统一成员信息表
     await db.execute('''
       CREATE TABLE members (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -111,7 +113,44 @@ class DatabaseService {
       )
     ''');
 
-    // 初始化预设成员 (含差异化体貌生理数据)
+    // 【生活记录】分类表
+    await db.execute('''
+      CREATE TABLE store_categories (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE,
+        iconName TEXT DEFAULT 'storefront'
+      )
+    ''');
+
+    // 【生活记录】通用生活打卡资产表 (影视/图书/餐饮/景点/场所)
+    await db.execute('''
+      CREATE TABLE store_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        category TEXT NOT NULL,
+        rating REAL NOT NULL DEFAULT 5.0,
+        imagesJson TEXT NOT NULL,
+        address TEXT,
+        avgCost REAL,
+        notes TEXT,
+        createdAt TEXT NOT NULL
+      )
+    ''');
+
+    // 【生活记录】打卡履约日志表
+    await db.execute('''
+      CREATE TABLE store_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        storeId INTEGER NOT NULL,
+        storeName TEXT NOT NULL,
+        cost REAL,
+        visitorName TEXT DEFAULT '自己',
+        memo TEXT,
+        timestamp TEXT NOT NULL
+      )
+    ''');
+
+    // 初始化预设家庭成员
     await db.insert('members', {
       'name': '成员A',
       'gender': '男',
@@ -148,14 +187,6 @@ class DatabaseService {
       'isLocked': 0,
       'createdAt': DateTime.now().toIso8601String(),
     });
-    await db.insert('routes', {
-      'name': '上下班地铁路线',
-      'description': '起点：家南门，终点：地铁A口',
-      'measuredBy': '成员B',
-      'refSteps': 3200,
-      'isLocked': 1,
-      'createdAt': DateTime.now().toIso8601String(),
-    });
 
     await db.insert('chore_items', {
       'title': '扫地拖地',
@@ -164,22 +195,61 @@ class DatabaseService {
       'isQuantifiable': 0,
       'unit': '次'
     });
-    await db.insert('chore_items', {
-      'title': '买菜记账',
-      'category': '日常消费',
-      'iconName': 'shopping_cart',
-      'isQuantifiable': 1,
-      'unit': '元'
+
+    // 默认通用生活分类 (支持影视、图书、餐饮、景点)
+    await db.insert('store_categories', {'name': '影视剧集', 'iconName': 'movie'});
+    await db.insert('store_categories', {'name': '书籍阅读', 'iconName': 'book'});
+    await db.insert('store_categories', {'name': '餐饮美食', 'iconName': 'restaurant'});
+    await db.insert('store_categories', {'name': '景点场所', 'iconName': 'place'});
+
+    // 预设默认探店/影视示例
+    await db.insert('store_items', {
+      'name': '流浪地球2 (4K IMAX)',
+      'category': '影视剧集',
+      'rating': 4.9,
+      'imagesJson': '[]',
+      'address': '万达影城 3号厅',
+      'avgCost': 45.0,
+      'notes': '视觉特效与宏大叙事极其震撼，硬核科幻巅峰',
+      'createdAt': DateTime.now().toIso8601String(),
+    });
+    await db.insert('store_items', {
+      'name': '川湘阁精品小炒',
+      'category': '餐饮美食',
+      'rating': 4.8,
+      'imagesJson': '[]',
+      'address': '中山路 128 号底商',
+      'avgCost': 68.0,
+      'notes': '招牌剁椒鱼头与小炒肉味道绝佳',
+      'createdAt': DateTime.now().toIso8601String(),
     });
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    if (oldVersion < 5) {
-      await db.execute('ALTER TABLE members ADD COLUMN gender TEXT DEFAULT "男"');
-      await db.execute('ALTER TABLE members ADD COLUMN heightCm REAL DEFAULT 170.0');
-      await db.execute('ALTER TABLE members ADD COLUMN weightKg REAL DEFAULT 65.0');
-      await db.execute('ALTER TABLE members ADD COLUMN age INTEGER DEFAULT 25');
-      await db.execute('ALTER TABLE members ADD COLUMN customStrideCm REAL');
+    if (oldVersion < 7) {
+      try {
+        await db.execute('ALTER TABLE user_profile ADD COLUMN preferredViewMode TEXT DEFAULT "card"');
+      } catch (_) {}
+    }
+  }
+
+  // --- View Mode Persistence ---
+  Future<String> getPreferredViewMode() async {
+    final db = await database;
+    final maps = await db.query('user_profile', columns: ['preferredViewMode'], limit: 1);
+    if (maps.isNotEmpty && maps.first['preferredViewMode'] != null) {
+      return maps.first['preferredViewMode'] as String;
+    }
+    return 'card';
+  }
+
+  Future<void> savePreferredViewMode(String mode) async {
+    final db = await database;
+    final existing = await db.query('user_profile', limit: 1);
+    if (existing.isNotEmpty) {
+      await db.update('user_profile', {'preferredViewMode': mode}, where: 'id = 1');
+    } else {
+      await db.insert('user_profile', {'id': 1, 'preferredViewMode': mode});
     }
   }
 
@@ -305,5 +375,73 @@ class DatabaseService {
   Future<void> deleteChoreLog(int logId) async {
     final db = await database;
     await db.delete('chore_logs', where: 'id = ?', whereArgs: [logId]);
+  }
+
+  // --- Store / Life Journal CRUD ---
+  Future<List<StoreCategory>> getStoreCategories() async {
+    final db = await database;
+    final maps = await db.query('store_categories', orderBy: 'id ASC');
+    return maps.map((e) => StoreCategory.fromMap(e)).toList();
+  }
+
+  Future<int> insertStoreCategory(StoreCategory category) async {
+    final db = await database;
+    return await db.insert('store_categories', category.toMap(), conflictAlgorithm: ConflictAlgorithm.ignore);
+  }
+
+  Future<void> updateStoreCategory(int catId, String newName, String oldName) async {
+    final db = await database;
+    await db.update('store_categories', {'name': newName}, where: 'id = ?', whereArgs: [catId]);
+    await db.update('store_items', {'category': newName}, where: 'category = ?', whereArgs: [oldName]);
+  }
+
+  Future<void> deleteStoreCategory(int catId, String catName) async {
+    final db = await database;
+    await db.delete('store_categories', where: 'id = ?', whereArgs: [catId]);
+    // 被删除的分类条目归类到 "通用未分类"
+    await db.update('store_items', {'category': '通用未分类'}, where: 'category = ?', whereArgs: [catName]);
+  }
+
+  Future<List<StoreItem>> getStoreItems() async {
+    final db = await database;
+    final maps = await db.query('store_items', orderBy: 'id DESC');
+    return maps.map((e) => StoreItem.fromMap(e)).toList();
+  }
+
+  Future<int> insertStoreItem(StoreItem item) async {
+    final db = await database;
+    return await db.insert('store_items', item.toMap());
+  }
+
+  Future<void> updateStoreItem(StoreItem item) async {
+    final db = await database;
+    await db.update(
+      'store_items',
+      item.toMap(),
+      where: 'id = ?',
+      whereArgs: [item.id],
+    );
+  }
+
+  Future<void> deleteStoreItem(int itemId) async {
+    final db = await database;
+    await db.delete('store_items', where: 'id = ?', whereArgs: [itemId]);
+    await db.delete('store_logs', where: 'storeId = ?', whereArgs: [itemId]);
+  }
+
+  Future<List<StoreLog>> getStoreLogs() async {
+    final db = await database;
+    final maps = await db.query('store_logs', orderBy: 'timestamp DESC');
+    return maps.map((e) => StoreLog.fromMap(e)).toList();
+  }
+
+  Future<int> insertStoreLog(StoreLog log) async {
+    final db = await database;
+    return await db.insert('store_logs', log.toMap());
+  }
+
+  Future<void> deleteStoreLog(int logId) async {
+    final db = await database;
+    await db.delete('store_logs', where: 'id = ?', whereArgs: [logId]);
   }
 }
