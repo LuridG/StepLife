@@ -6,7 +6,6 @@ import '../domain/chore_models.dart';
 import '../providers/chore_provider.dart';
 import '../../../core/utils/number_formatter.dart';
 import 'chore_detail_screen.dart';
-import 'member_dialog.dart';
 
 class ChoreTrackerScreen extends StatefulWidget {
   const ChoreTrackerScreen({super.key});
@@ -19,20 +18,6 @@ class _ChoreTrackerScreenState extends State<ChoreTrackerScreen>
     with AutomaticKeepAliveClientMixin {
   @override
   bool get wantKeepAlive => true;
-
-  void _showAddMemberDialog() {
-    showDialog(
-      context: context,
-      builder: (ctx) => const MemberDialog(),
-    );
-  }
-
-  void _showEditMemberDialog(Member member) {
-    showDialog(
-      context: context,
-      builder: (ctx) => MemberDialog(memberToEdit: member),
-    );
-  }
 
   void _showAddChoreDialog() {
     final titleController = TextEditingController();
@@ -138,6 +123,11 @@ class _ChoreTrackerScreenState extends State<ChoreTrackerScreen>
     final members = context.read<ChoreProvider>().members;
     final List<Member> selectedMembers = [];
 
+    final now = DateTime.now();
+    DateTime selectedDateTime = (targetDate.year == now.year && targetDate.month == now.month && targetDate.day == now.day)
+        ? now
+        : DateTime(targetDate.year, targetDate.month, targetDate.day, now.hour, now.minute);
+
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
@@ -196,6 +186,45 @@ class _ChoreTrackerScreenState extends State<ChoreTrackerScreen>
                     ),
                     maxLines: 2,
                   ),
+                  const SizedBox(height: 14),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.access_time_filled, color: Color(0xFF10B981)),
+                    title: Text(
+                      '打卡时刻: ${DateFormat('yyyy-MM-dd HH:mm').format(selectedDateTime)}',
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                    ),
+                    subtitle: const Text('支持精确到分钟的时间登记', style: TextStyle(fontSize: 11, color: Colors.white54)),
+                    trailing: TextButton(
+                      child: const Text('更改时刻'),
+                      onPressed: () async {
+                        final pickedDate = await showDatePicker(
+                          context: ctx,
+                          initialDate: selectedDateTime,
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime(2030),
+                        );
+                        if (pickedDate != null) {
+                          if (!ctx.mounted) return;
+                          final pickedTime = await showTimePicker(
+                            context: ctx,
+                            initialTime: TimeOfDay.fromDateTime(selectedDateTime),
+                          );
+                          if (pickedTime != null) {
+                            setModalState(() {
+                              selectedDateTime = DateTime(
+                                pickedDate.year,
+                                pickedDate.month,
+                                pickedDate.day,
+                                pickedTime.hour,
+                                pickedTime.minute,
+                              );
+                            });
+                          }
+                        }
+                      },
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -226,7 +255,7 @@ class _ChoreTrackerScreenState extends State<ChoreTrackerScreen>
                         selectedMembers: selectedMembers,
                         memo: memoController.text.trim(),
                         value: numVal,
-                        targetDate: targetDate,
+                        targetDate: selectedDateTime,
                       );
 
                   memoController.dispose();
@@ -258,13 +287,8 @@ class _ChoreTrackerScreenState extends State<ChoreTrackerScreen>
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('家务习惯打卡 (uHabits 风格)'),
+        title: const Text('家务习惯打卡'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.person_add_outlined),
-            tooltip: '登记成员档案',
-            onPressed: _showAddMemberDialog,
-          ),
           IconButton(
             icon: const Icon(Icons.playlist_add_outlined),
             tooltip: '新建家务Item',
@@ -289,35 +313,6 @@ class _ChoreTrackerScreenState extends State<ChoreTrackerScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      const Text('成员档案:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white70)),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            children: choreProvider.members.map((m) {
-                              return Padding(
-                                padding: const EdgeInsets.only(right: 8.0),
-                                child: ActionChip(
-                                  backgroundColor: Colors.white.withAlpha(15),
-                                  side: BorderSide(color: Color(m.colorValue).withAlpha(100)),
-                                  avatar: CircleAvatar(
-                                    backgroundColor: Color(m.colorValue),
-                                    child: Text(m.name[0], style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-                                  ),
-                                  label: Text('${m.name} (${m.heightCm.toInt()}cm/${m.weightKg.toInt()}kg)', style: const TextStyle(fontSize: 11, color: Colors.white)),
-                                  onPressed: () => _showEditMemberDialog(m),
-                                ),
-                              );
-                            }).toList(),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
 
                   // uHabits 标头栏
                   _buildGlassCard(
@@ -429,54 +424,74 @@ class _ChoreTrackerScreenState extends State<ChoreTrackerScreen>
                                             children: recentDates.map((date) {
                                               final logs = choreProvider.getLogsForChoreAndDate(item.id!, date);
                                               final isLogged = logs.isNotEmpty;
+                                              final hasMemo = logs.any((l) => l.memo != null && l.memo!.isNotEmpty);
 
                                               final double totalValForDate = logs.fold(0.0, (sum, l) => sum + (l.value ?? 1.0));
                                               final formattedVal = NumberFormatter.formatQuantifiableValue(totalValForDate);
 
                                               return GestureDetector(
                                                 onTap: () => _showLogDialogForDate(item, date),
-                                                child: AnimatedContainer(
-                                                  duration: const Duration(milliseconds: 200),
-                                                  width: 38,
-                                                  height: 38,
-                                                  decoration: BoxDecoration(
-                                                    shape: BoxShape.circle,
-                                                    color: isLogged
-                                                        ? (item.isQuantifiable ? const Color(0xFF059669) : const Color(0xFF4F46E5))
-                                                        : Colors.white.withAlpha(12),
-                                                    boxShadow: isLogged
-                                                        ? [
-                                                            BoxShadow(
-                                                              color: (item.isQuantifiable ? const Color(0xFF10B981) : const Color(0xFF6366F1)).withAlpha(100),
-                                                              blurRadius: 8,
-                                                              spreadRadius: 1,
-                                                            ),
-                                                          ]
-                                                        : [],
-                                                    border: Border.all(
-                                                      color: isLogged
-                                                          ? Colors.transparent
-                                                          : Colors.white.withAlpha(40),
-                                                      width: 1,
-                                                    ),
-                                                  ),
-                                                  child: Center(
-                                                    child: isLogged
-                                                        ? (item.isQuantifiable
-                                                            ? Text(
-                                                                formattedVal,
-                                                                style: const TextStyle(
-                                                                  fontSize: 10,
-                                                                  fontWeight: FontWeight.bold,
-                                                                  color: Colors.white,
+                                                child: Stack(
+                                                  clipBehavior: Clip.none,
+                                                  children: [
+                                                    AnimatedContainer(
+                                                      duration: const Duration(milliseconds: 200),
+                                                      width: 38,
+                                                      height: 38,
+                                                      decoration: BoxDecoration(
+                                                        shape: BoxShape.circle,
+                                                        color: isLogged
+                                                            ? (item.isQuantifiable ? const Color(0xFF059669) : const Color(0xFF4F46E5))
+                                                            : Colors.white.withAlpha(12),
+                                                        boxShadow: isLogged
+                                                            ? [
+                                                                BoxShadow(
+                                                                  color: (item.isQuantifiable ? const Color(0xFF10B981) : const Color(0xFF6366F1)).withAlpha(100),
+                                                                  blurRadius: 8,
+                                                                  spreadRadius: 1,
                                                                 ),
-                                                              )
-                                                            : const Icon(Icons.check, size: 20, color: Colors.white))
-                                                        : Text(
-                                                            '${date.day}',
-                                                            style: const TextStyle(fontSize: 11, color: Colors.white60),
+                                                              ]
+                                                            : [],
+                                                        border: Border.all(
+                                                          color: isLogged
+                                                              ? Colors.transparent
+                                                              : Colors.white.withAlpha(40),
+                                                          width: 1,
+                                                        ),
+                                                      ),
+                                                      child: Center(
+                                                        child: isLogged
+                                                            ? (item.isQuantifiable
+                                                                ? Text(
+                                                                    formattedVal,
+                                                                    style: const TextStyle(
+                                                                      fontSize: 10,
+                                                                      fontWeight: FontWeight.bold,
+                                                                      color: Colors.white,
+                                                                    ),
+                                                                  )
+                                                                : const Icon(Icons.check, size: 20, color: Colors.white))
+                                                            : Text(
+                                                                '${date.day}',
+                                                                style: const TextStyle(fontSize: 11, color: Colors.white60),
+                                                              ),
+                                                      ),
+                                                    ),
+                                                    if (isLogged && hasMemo)
+                                                      Positioned(
+                                                        top: -1,
+                                                        right: -1,
+                                                        child: Container(
+                                                          width: 9,
+                                                          height: 9,
+                                                          decoration: BoxDecoration(
+                                                            color: const Color(0xFFF59E0B),
+                                                            shape: BoxShape.circle,
+                                                            border: Border.all(color: const Color(0xFF0F172A), width: 1.5),
                                                           ),
-                                                  ),
+                                                        ),
+                                                      ),
+                                                  ],
                                                 ),
                                               );
                                             }).toList(),

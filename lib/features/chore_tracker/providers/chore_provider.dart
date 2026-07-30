@@ -29,36 +29,28 @@ class ChoreProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 新增统一家庭成员 (带专属体貌数据: 身高/体重/性别)
+  /// 新增统一家庭成员 (带专属体貌数据: 身高/体重/出生年月)
   Future<void> addMember({
     required String name,
     String gender = '男',
     double heightCm = 170.0,
     double weightKg = 65.0,
-    int age = 25,
+    DateTime? birthDate,
     double? customStrideCm,
     int colorValue = 0xFF6366F1,
   }) async {
+    final bDate = birthDate ?? DateTime(2001, 1, 1);
     final member = Member(
       name: name,
       gender: gender,
       heightCm: heightCm,
       weightKg: weightKg,
-      age: age,
+      birthDate: bDate,
       customStrideCm: customStrideCm,
       colorValue: colorValue,
     );
     final id = await DatabaseService.instance.insertMember(member);
-    _members.add(Member(
-      id: id,
-      name: name,
-      gender: gender,
-      heightCm: heightCm,
-      weightKg: weightKg,
-      age: age,
-      customStrideCm: customStrideCm,
-      colorValue: colorValue,
-    ));
+    _members.add(member.copyWith(id: id));
     notifyListeners();
   }
 
@@ -71,6 +63,14 @@ class ChoreProvider extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  /// 删除家庭成员
+  Future<void> deleteMember(int memberId) async {
+    await DatabaseService.instance.deleteMember(memberId);
+    _members.removeWhere((m) => m.id == memberId);
+    notifyListeners();
+  }
+
 
   /// 根据姓名匹配成员的专属身体数据
   Member? getMemberByName(String name) {

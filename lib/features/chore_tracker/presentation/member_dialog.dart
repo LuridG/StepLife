@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../domain/chore_models.dart';
 import '../providers/chore_provider.dart';
@@ -16,8 +17,8 @@ class _MemberDialogState extends State<MemberDialog> {
   late TextEditingController _nameController;
   late TextEditingController _heightController;
   late TextEditingController _weightController;
-  late TextEditingController _ageController;
   late TextEditingController _strideController;
+  late DateTime _birthDate;
   late String _gender;
 
   @override
@@ -27,8 +28,8 @@ class _MemberDialogState extends State<MemberDialog> {
     _nameController = TextEditingController(text: m?.name ?? '');
     _heightController = TextEditingController(text: (m?.heightCm ?? 170.0).toString());
     _weightController = TextEditingController(text: (m?.weightKg ?? 65.0).toString());
-    _ageController = TextEditingController(text: (m?.age ?? 25).toString());
     _strideController = TextEditingController(text: m?.customStrideCm != null ? m!.customStrideCm.toString() : '');
+    _birthDate = m?.birthDate ?? DateTime(1998, 5, 15);
     _gender = m?.gender ?? '男';
   }
 
@@ -37,7 +38,6 @@ class _MemberDialogState extends State<MemberDialog> {
     _nameController.dispose();
     _heightController.dispose();
     _weightController.dispose();
-    _ageController.dispose();
     _strideController.dispose();
     super.dispose();
   }
@@ -53,7 +53,6 @@ class _MemberDialogState extends State<MemberDialog> {
 
     final height = double.tryParse(_heightController.text) ?? 170.0;
     final weight = double.tryParse(_weightController.text) ?? 65.0;
-    final age = int.tryParse(_ageController.text) ?? 25;
     final customStride = double.tryParse(_strideController.text);
 
     if (widget.memberToEdit == null) {
@@ -62,7 +61,7 @@ class _MemberDialogState extends State<MemberDialog> {
             gender: _gender,
             heightCm: height,
             weightKg: weight,
-            age: age,
+            birthDate: _birthDate,
             customStrideCm: customStride,
           );
     } else {
@@ -71,7 +70,7 @@ class _MemberDialogState extends State<MemberDialog> {
         gender: _gender,
         heightCm: height,
         weightKg: weight,
-        age: age,
+        birthDate: _birthDate,
         customStrideCm: customStride,
       );
       context.read<ChoreProvider>().updateMember(updated);
@@ -83,6 +82,7 @@ class _MemberDialogState extends State<MemberDialog> {
   @override
   Widget build(BuildContext context) {
     final isEditing = widget.memberToEdit != null;
+    final calculatedAge = Member(name: '', birthDate: _birthDate).age;
 
     return AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -144,30 +144,41 @@ class _MemberDialogState extends State<MemberDialog> {
               ],
             ),
             const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _ageController,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: '年龄',
-                      suffixText: '岁',
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: TextField(
-                    controller: _strideController,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: const InputDecoration(
-                      labelText: '自定义步长(可选)',
-                      suffixText: 'cm',
-                    ),
-                  ),
-                ),
-              ],
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.cake_outlined, color: Color(0xFF10B981)),
+              title: Text(
+                '出生年月: ${DateFormat('yyyy年MM月dd日').format(_birthDate)}',
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+              ),
+              subtitle: Text(
+                '当前自动计算年龄: $calculatedAge 岁',
+                style: const TextStyle(fontSize: 11, color: Color(0xFF10B981)),
+              ),
+              trailing: TextButton(
+                child: const Text('选择日期'),
+                onPressed: () async {
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: _birthDate,
+                    firstDate: DateTime(1920),
+                    lastDate: DateTime.now(),
+                  );
+                  if (picked != null) {
+                    setState(() => _birthDate = picked);
+                  }
+                },
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _strideController,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(
+                labelText: '自定义步长(可选)',
+                hintText: '留空将根据身高与性别自动推算',
+                suffixText: 'cm',
+              ),
             ),
           ],
         ),

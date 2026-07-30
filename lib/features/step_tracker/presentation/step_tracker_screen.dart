@@ -4,7 +4,6 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../domain/step_models.dart';
 import '../providers/step_provider.dart';
-import '../../chore_tracker/domain/chore_models.dart';
 import '../../chore_tracker/providers/chore_provider.dart';
 import '../../chore_tracker/presentation/member_dialog.dart';
 import '../../profile/providers/profile_provider.dart';
@@ -26,13 +25,6 @@ class _StepTrackerScreenState extends State<StepTrackerScreen>
     showDialog(
       context: context,
       builder: (ctx) => const MemberDialog(),
-    );
-  }
-
-  void _showEditMemberDialog(Member member) {
-    showDialog(
-      context: context,
-      builder: (ctx) => MemberDialog(memberToEdit: member),
     );
   }
 
@@ -299,7 +291,7 @@ class _StepTrackerScreenState extends State<StepTrackerScreen>
     final choreProvider = context.read<ChoreProvider>();
     final members = choreProvider.members;
     String selectedWalker = members.isNotEmpty ? members.first.name : '自己';
-    DateTime selectedDate = DateTime.now();
+    DateTime selectedDateTime = DateTime.now();
 
     showDialog(
       context: context,
@@ -408,19 +400,35 @@ class _StepTrackerScreenState extends State<StepTrackerScreen>
                   const SizedBox(height: 12),
                   ListTile(
                     contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.calendar_today, color: Color(0xFF10B981)),
-                    title: Text('打卡日期: ${DateFormat('yyyy-MM-dd').format(selectedDate)}'),
+                    leading: const Icon(Icons.access_time_filled, color: Color(0xFF10B981)),
+                    title: Text('打卡时刻: ${DateFormat('yyyy-MM-dd HH:mm').format(selectedDateTime)}'),
+                    subtitle: const Text('支持精确到分钟的时间登记', style: TextStyle(fontSize: 11, color: Colors.white54)),
                     trailing: TextButton(
-                      child: const Text('更改日期'),
+                      child: const Text('更改时刻'),
                       onPressed: () async {
-                        final picked = await showDatePicker(
-                          context: context,
-                          initialDate: selectedDate,
+                        final pickedDate = await showDatePicker(
+                          context: ctx,
+                          initialDate: selectedDateTime,
                           firstDate: DateTime(2020),
                           lastDate: DateTime(2030),
                         );
-                        if (picked != null) {
-                          setModalState(() => selectedDate = picked);
+                        if (pickedDate != null) {
+                          if (!ctx.mounted) return;
+                          final pickedTime = await showTimePicker(
+                            context: ctx,
+                            initialTime: TimeOfDay.fromDateTime(selectedDateTime),
+                          );
+                          if (pickedTime != null) {
+                            setModalState(() {
+                              selectedDateTime = DateTime(
+                                pickedDate.year,
+                                pickedDate.month,
+                                pickedDate.day,
+                                pickedTime.hour,
+                                pickedTime.minute,
+                              );
+                            });
+                          }
                         }
                       },
                     ),
@@ -453,7 +461,7 @@ class _StepTrackerScreenState extends State<StepTrackerScreen>
                         timesCount: times,
                         steps: steps,
                         durationMinutes: duration,
-                        targetDate: selectedDate,
+                        targetDate: selectedDateTime,
                         walkerMember: walkerMember,
                         fallbackProfile: fallbackProfile,
                       );
@@ -532,11 +540,6 @@ class _StepTrackerScreenState extends State<StepTrackerScreen>
         title: const Text('路线资产与步量打卡'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.person_add_outlined),
-            tooltip: '新增成员档案',
-            onPressed: _showAddMemberDialog,
-          ),
-          IconButton(
             icon: const Icon(Icons.add_location_alt_outlined),
             tooltip: '新建客观路线资产',
             onPressed: _showAddRouteAssetDialog,
@@ -561,36 +564,6 @@ class _StepTrackerScreenState extends State<StepTrackerScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 1. 顶部成员档案 Pill 控件
-                  Row(
-                    children: [
-                      const Text('成员档案:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white70)),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            children: choreProvider.members.map((m) {
-                              return Padding(
-                                padding: const EdgeInsets.only(right: 8.0),
-                                child: ActionChip(
-                                  backgroundColor: Colors.white.withAlpha(15),
-                                  side: BorderSide(color: Color(m.colorValue).withAlpha(100)),
-                                  avatar: CircleAvatar(
-                                    backgroundColor: Color(m.colorValue),
-                                    child: Text(m.name[0], style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-                                  ),
-                                  label: Text('${m.name} (${m.heightCm.toInt()}cm/${m.weightKg.toInt()}kg)', style: const TextStyle(fontSize: 11, color: Colors.white)),
-                                  onPressed: () => _showEditMemberDialog(m),
-                                ),
-                              );
-                            }).toList(),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
 
                   // 2. 客观路线资产库 (纵向列表)
                   Row(
@@ -769,7 +742,7 @@ class _StepTrackerScreenState extends State<StepTrackerScreen>
                                             child: ElevatedButton.icon(
                                               onPressed: () => _showRecordLogDialog(preselectedRoute: route),
                                               icon: const Icon(Icons.flash_on, size: 14),
-                                              label: const Text('⚡ 记一次', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                              label: const Text('记一次', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                                               style: ElevatedButton.styleFrom(
                                                 backgroundColor: Colors.transparent,
                                                 shadowColor: Colors.transparent,

@@ -12,7 +12,7 @@
   <img src="https://img.shields.io/badge/Flutter-3.27+-02569B?logo=flutter" alt="Flutter" />
   <img src="https://img.shields.io/badge/Dart-3.6+-0175C2?logo=dart" alt="Dart" />
   <img src="https://img.shields.io/badge/Platform-Android%20%7C%20Windows-green" alt="Platform" />
-  <img src="https://img.shields.io/badge/Version-v1.1.0-emerald" alt="Version" />
+  <img src="https://img.shields.io/badge/Version-v1.2.0-emerald" alt="Version" />
   <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License" />
 </p>
 
@@ -27,7 +27,6 @@
 
 ## 📸 应用界面截图展示 (App Screenshots)
 
-> 💡 *提示：将你保存的程序截图放入项目的 `assets/screenshots/` 文件夹中（例如重命名为 `screenshot1.png` / `screenshot2.png` / `screenshot3.png`），GitHub 页面将自动亮丽呈现下列截图展示墙！*
 
 <p align="center">
   <img src="assets/screenshots/screenshot1.jpg" width="280" alt="步量路线界面" />

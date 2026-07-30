@@ -202,28 +202,28 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                   ),
                   const SizedBox(height: 14),
 
-                  Row(
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('星级评分:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                      const SizedBox(width: 8),
                       Row(
-                        children: List.generate(5, (index) {
-                          final starValue = index + 1.0;
-                          return IconButton(
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(),
-                            icon: Icon(
-                              starValue <= rating ? Icons.star : Icons.star_border,
-                              color: Colors.amber,
-                              size: 26,
-                            ),
-                            onPressed: () {
-                              setModalState(() => rating = starValue);
-                            },
-                          );
-                        }),
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('星级评分 (1-5分):', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                          Text('⭐ ${rating.toStringAsFixed(1)} 分', style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold, fontSize: 14)),
+                        ],
                       ),
-                      Text(' ${rating.toStringAsFixed(1)}分', style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold)),
+                      Slider(
+                        value: rating,
+                        min: 1.0,
+                        max: 5.0,
+                        divisions: 8,
+                        activeColor: Colors.amber,
+                        inactiveColor: Colors.amber.withAlpha(50),
+                        label: '${rating.toStringAsFixed(1)}分',
+                        onChanged: (val) {
+                          setModalState(() => rating = val);
+                        },
+                      ),
                     ],
                   ),
                   const SizedBox(height: 14),
@@ -545,7 +545,7 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('生活记录 (探店/影视/阅读)'),
+        title: const Text('生活记录'),
         actions: [
           IconButton(
             icon: Icon(storeProvider.isCardView ? Icons.view_headline : Icons.grid_view),
@@ -832,7 +832,7 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                     ElevatedButton.icon(
                       onPressed: () => _showCheckinDialog(store),
                       icon: const Icon(Icons.flash_on, size: 14),
-                      label: const Text('⚡ 记一次打卡', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      label: const Text('记一次打卡', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF10B981),
                         foregroundColor: Colors.white,

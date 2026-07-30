@@ -26,6 +26,11 @@ class DatabaseService {
       version: 8,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
+      onOpen: (db) async {
+        try {
+          await db.execute('ALTER TABLE members ADD COLUMN birthDate TEXT');
+        } catch (_) {}
+      },
     );
   }
 
@@ -366,6 +371,15 @@ class DatabaseService {
       member.toMap(),
       where: 'id = ?',
       whereArgs: [member.id],
+    );
+  }
+
+  Future<void> deleteMember(int id) async {
+    final db = await database;
+    await db.delete(
+      'members',
+      where: 'id = ?',
+      whereArgs: [id],
     );
   }
 

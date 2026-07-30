@@ -102,7 +102,7 @@ class AboutScreen extends StatelessWidget {
                     border: Border.all(color: const Color(0xFF10B981).withAlpha(80)),
                   ),
                   child: const Text(
-                    '版本号: v1.2.0 (Build 3)',
+                    '版本号: v1.3.0 (Build 4)',
                     style: TextStyle(color: Color(0xFF10B981), fontSize: 12, fontWeight: FontWeight.bold),
                   ),
                 ),
@@ -129,8 +129,20 @@ class AboutScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 14),
                         _buildVersionItem(
-                          version: 'v1.2.0 (2026-07-30)',
+                          version: 'v1.3.0 (2026-07-30)',
                           isLatest: true,
+                          changes: [
+                            '👥 独立成员管理 Tab：新增专属成员档案 Bottom Tab，支持全员查看、编辑、删除与新增。',
+                            '🎂 出生年月与动态年龄：成员档案引入出生日期登记，根据当前时间自动精准计算真实年龄。',
+                            '⭐ 星级评分滑杆化：生活记录新增项目评分改为 1.0~5.0 粒度滑杆，防止弹窗溢出。',
+                            '📝 家务打卡备注点标：针对写有打卡备注的格子添加琥珀色点标提示。',
+                            '⚡ 界面精简与体验优化：优化底部 Tab 导航文本为精简双字，去除重复闪电图标与冗余标题注释。',
+                          ],
+                        ),
+                        const Divider(color: Colors.white12, height: 24),
+                        _buildVersionItem(
+                          version: 'v1.2.0 (2026-07-30)',
+                          isLatest: false,
                           changes: [
                             '🛍️ 客观项目资产拆分：初次登记仅录入项目信息，移除初始消费设定。',
                             '🕒 分钟级打卡时刻：打卡时间精确定律至【yyyy-MM-dd HH:mm】，默认当前精确时刻，支持选历史分钟。',

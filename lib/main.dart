@@ -10,6 +10,7 @@ import 'features/store_journal/providers/store_provider.dart';
 import 'features/step_tracker/presentation/step_tracker_screen.dart';
 import 'features/chore_tracker/presentation/chore_tracker_screen.dart';
 import 'features/store_journal/presentation/store_journal_screen.dart';
+import 'features/profile/presentation/member_screen.dart';
 import 'features/about/presentation/about_screen.dart';
 
 void main() async {
@@ -82,11 +83,13 @@ class _MainHomeScreenState extends State<MainHomeScreen> with WidgetsBindingObse
           StepTrackerScreen(),
           ChoreTrackerScreen(),
           StoreJournalScreen(),
+          MemberScreen(),
           AboutScreen(),
         ],
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
+        type: BottomNavigationBarType.fixed,
         onTap: (index) {
           setState(() => _currentIndex = index);
           _pageController.jumpToPage(index);
@@ -94,19 +97,23 @@ class _MainHomeScreenState extends State<MainHomeScreen> with WidgetsBindingObse
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.directions_walk),
-            label: '步量路线',
+            label: '路线',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.check_circle_outline),
-            label: '家务习惯',
+            label: '家务',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.storefront_outlined),
-            label: '生活记录',
+            label: '生活',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.badge_outlined),
+            label: '成员',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.info_outline),
-            label: '关于程序',
+            label: '关于',
           ),
         ],
       ),
