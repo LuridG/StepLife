@@ -102,7 +102,7 @@ class AboutScreen extends StatelessWidget {
                     border: Border.all(color: const Color(0xFF10B981).withAlpha(80)),
                   ),
                   child: const Text(
-                    '版本号: v1.3.0 (Build 4)',
+                    '版本号: v1.3.0 (Build 20260730)',
                     style: TextStyle(color: Color(0xFF10B981), fontSize: 12, fontWeight: FontWeight.bold),
                   ),
                 ),
