@@ -17,10 +17,31 @@
 </p>
 
 ---
-## 纯Ai生成
-本人非码农专业，本程序根据本人需求高度量身定制（
-如果你也有类似的个人记录需求可以参考。
-纯AI纯AI，解决问题的能力几乎 = 0 
+
+## 🤖 纯 AI 打造与项目说明
+- **作者声明**：非码农专业，本程序根据个人需求高度量身定制。
+- 如果你也有类似的个人记录与生活打卡需求，欢迎参考或使用。
+- 纯 AI 独立迭代打造，解决问题的能力几乎 = 0（笑）。
+
+---
+
+## 📸 应用界面截图展示 (App Screenshots)
+
+> 💡 *提示：将你保存的程序截图放入项目的 `assets/screenshots/` 文件夹中（例如重命名为 `screenshot1.png` / `screenshot2.png` / `screenshot3.png`），GitHub 页面将自动亮丽呈现下列截图展示墙！*
+
+<p align="center">
+  <img src="assets/screenshots/screenshot1.png" width="280" alt="步量路线界面" />
+  &nbsp;&nbsp;&nbsp;&nbsp;
+  <img src="assets/screenshots/screenshot2.png" width="280" alt="uHabits 家务习惯界面" />
+  &nbsp;&nbsp;&nbsp;&nbsp;
+  <img src="assets/screenshots/screenshot3.png" width="280" alt="生活记录探店与打卡" />
+</p>
+
+| 🏃 步量路线打卡 | 🏠 uHabits 家务习惯 | 🛍️ 生活记录与打卡 |
+| :---: | :---: | :---: |
+| 客观路线资产、公里/千卡精准推算 | 5天近况矩阵、1.2k量化缩写 | 影视/图书/探店、Card与列表双视图 |
+
+---
 
 ## 🌟 核心功能亮点 (Features)
 
@@ -48,6 +69,19 @@
 
 ---
 
+## 📦 架构拆分包与版本构建产物 (Release APKs)
+
+针对 Android 不同 CPU 芯片架构，系统提供了 4 种规格的最终可执行构建产物（位于 `build/app/outputs/flutter-apk/`）：
+
+| 文件名 | 适用 CPU 架构 | 文件大小 | 推荐说明 |
+| :--- | :--- | :---: | :--- |
+| **`StepLife-v1.1.0-arm64-v8a.apk`** | 64 位 ARM (`arm64-v8a`) | **19.7 MB** | 🔥 **最推荐**！适配 99% 的现代 Android 手机 |
+| **`StepLife-v1.1.0-armeabi-v7a.apk`** | 32 位 ARM (`armeabi-v7a`) | 17.3 MB | 适配老旧 32 位 Android 机型 |
+| **`StepLife-v1.1.0-x86_64.apk`** | Intel/AMD (`x86_64`) | 21.1 MB | 适配 Android 模拟器与 x86 平板 |
+| **`StepLife-v1.1.0-universal.apk`** | 通用全架构胖包 | 55.7 MB | 整合全架构二进制，兼容任意设备 |
+
+---
+
 ## 🛠️ 技术栈与架构设计 (Tech Stack)
 
 - **核心框架**: Flutter (Dart) Material 3 & Google Fonts (`Outfit`)
@@ -58,20 +92,9 @@
 
 ---
 
-## 🚀 快速启动与构建指南 (Getting Started)
+## 🚀 快速启动与打包构建指南 (Getting Started)
 
-### 环境要求
-- Flutter SDK `>= 3.27.0`
-- Dart SDK `>= 3.6.0`
-
-### 1. 克隆仓库与安装依赖
-```bash
-git clone https://github.com/your-username/steplife.git
-cd steplife
-flutter pub get
-```
-
-### 2. 本地运行调试
+### 1. 本地运行调试
 - **Windows 桌面端运行**：
   ```bash
   flutter run -d windows
@@ -81,24 +104,21 @@ flutter pub get
   flutter run -d <android-device-id>
   ```
 
-### 3. 构建发布包 (Build Releases)
-- **构建 Android Release APK**：
-  ```bash
-  flutter build apk --release
-  ```
-  *产物路径：`build/app/outputs/flutter-apk/app-release.apk`*
+### 2. 构建架构拆分 Release APK 包
+```bash
+flutter build apk --release --split-per-abi
+```
 
-- **构建 Windows Release 桌面程序**：
-  ```bash
-  flutter build windows --release
-  ```
-  *产物路径：`build/windows/x64/runner/Release/`*
+### 3. 构建 Windows Release 桌面程序
+```bash
+flutter build windows --release
+```
 
 ---
 
 ## 📄 AI 协作规范与更新规则
 
-项目根目录下附带有 [update_rules.md](file:///g:/MiniProject2026/steplife/update_rules.md) 说明文档，包含详细的数据库 Upgrade 升版规则、桌面 FFI 适配规则、解耦与成员换算规则，方便任何 AI 助手无缝接续维护。
+项目根目录下附带有 [update_rules.md](file:///g:/MiniProject2026/steplife/update_rules.md) 说明文档，包含详细的数据库 Upgrade 升版规则、桌面 FFI 适配规则、解耦与成员换算规则，方便后续无缝接续维护。
 
 ---
 
