@@ -70,7 +70,6 @@ class AboutScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 const SizedBox(height: 10),
-                // App 图标呈现 (透明 3D 品牌图标)
                 Container(
                   width: 90,
                   height: 90,
@@ -103,19 +102,18 @@ class AboutScreen extends StatelessWidget {
                     border: Border.all(color: const Color(0xFF10B981).withAlpha(80)),
                   ),
                   child: const Text(
-                    '版本号: v1.1.0 (Build 2)',
+                    '版本号: v1.2.0 (Build 3)',
                     style: TextStyle(color: Color(0xFF10B981), fontSize: 12, fontWeight: FontWeight.bold),
                   ),
                 ),
                 const SizedBox(height: 12),
                 const Text(
-                  '涵盖路线步量、家务习惯与生活打卡 (探店/影视/图书) 的全能生活管理应用',
+                  '涵盖路线步量、家务习惯与生活记录 (探店/影视/图书) 的全能生活管理应用',
                   textAlign: TextAlign.center,
                   style: TextStyle(color: Colors.white54, fontSize: 13),
                 ),
                 const SizedBox(height: 24),
 
-                // 更新历史与版本日志
                 _buildGlassCard(
                   child: Padding(
                     padding: const EdgeInsets.all(16.0),
@@ -131,23 +129,24 @@ class AboutScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 14),
                         _buildVersionItem(
-                          version: 'v1.1.0 (2026-07-30)',
+                          version: 'v1.2.0 (2026-07-30)',
                           isLatest: true,
+                          changes: [
+                            '🛍️ 客观项目资产拆分：初次登记仅录入项目信息，移除初始消费设定。',
+                            '🕒 分钟级打卡时刻：打卡时间精确定律至【yyyy-MM-dd HH:mm】，默认当前精确时刻，支持选历史分钟。',
+                            '👥 成员同行复用：生活打卡可多选同行成员，共享统一家庭成员档案库并统计同行频率。',
+                            '📊 独立项目详情页：卡片支持点击跳转独立详情界面，直观呈现高清画廊、累计消费与履约历史时间线。',
+                          ],
+                        ),
+                        const Divider(color: Colors.white12, height: 24),
+                        _buildVersionItem(
+                          version: 'v1.1.0 (2026-07-30)',
+                          isLatest: false,
                           changes: [
                             '🏷️ 应用品牌重塑：全量重命名为【步履生活】。',
                             '🛍️ 生活记录大升级：支持探店、影视剧集、书籍阅读、景点场所等通用生活打卡与 1.0~5.0 星级评分。',
                             '👁️ Card ↔ 紧凑列表双视图：支持一键切换视图模式，上次展示偏好自动记忆与重启还原。',
                             '🗂️ 分类全量管理：侧边栏 Drawer 支持自定义分类重命名与安全平滑删除。',
-                          ],
-                        ),
-                        const Divider(color: Colors.white12, height: 24),
-                        _buildVersionItem(
-                          version: 'v1.0.0 (2026-07-30)',
-                          isLatest: false,
-                          changes: [
-                            '🏃 步量客观路线资产拆分：路线属性与履约打卡解耦，支持锁定防护与编辑。',
-                            '🏠 uHabits 打卡风格：家务打卡支持日期矩阵与 1.2k/15k 智能缩写。',
-                            '👥 统一家庭成员系统：整合身高、体重、性别档案，按个人体貌精密推算距离与 MET 千卡。',
                           ],
                         ),
                       ],
@@ -156,7 +155,6 @@ class AboutScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 20),
 
-                // 架构与文档查看
                 _buildGlassCard(
                   child: Padding(
                     padding: const EdgeInsets.all(16.0),

@@ -19,11 +19,11 @@ class DatabaseService {
 
   Future<Database> _initDatabase() async {
     final dbPath = await getDatabasesPath();
-    final path = join(dbPath, 'steplife_v7.db');
+    final path = join(dbPath, 'steplife_v8.db');
 
     return await openDatabase(
       path,
-      version: 7,
+      version: 8,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -122,7 +122,7 @@ class DatabaseService {
       )
     ''');
 
-    // 【生活记录】通用生活打卡资产表 (影视/图书/餐饮/景点/场所)
+    // 【生活记录】通用生活项目表 (仅客观属性，初次登记不设消费)
     await db.execute('''
       CREATE TABLE store_items (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -131,20 +131,20 @@ class DatabaseService {
         rating REAL NOT NULL DEFAULT 5.0,
         imagesJson TEXT NOT NULL,
         address TEXT,
-        avgCost REAL,
         notes TEXT,
         createdAt TEXT NOT NULL
       )
     ''');
 
-    // 【生活记录】打卡履约日志表
+    // 【生活记录】打卡履约日志表 (含分钟级时间、消费金额、同行成员列表)
     await db.execute('''
       CREATE TABLE store_logs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         storeId INTEGER NOT NULL,
         storeName TEXT NOT NULL,
         cost REAL,
-        visitorName TEXT DEFAULT '自己',
+        visitorIdsJson TEXT NOT NULL DEFAULT '[]',
+        visitorNamesJson TEXT NOT NULL DEFAULT '[]',
         memo TEXT,
         timestamp TEXT NOT NULL
       )
@@ -196,39 +196,58 @@ class DatabaseService {
       'unit': '次'
     });
 
-    // 默认通用生活分类 (支持影视、图书、餐饮、景点)
+    // 默认通用生活分类
     await db.insert('store_categories', {'name': '影视剧集', 'iconName': 'movie'});
     await db.insert('store_categories', {'name': '书籍阅读', 'iconName': 'book'});
     await db.insert('store_categories', {'name': '餐饮美食', 'iconName': 'restaurant'});
     await db.insert('store_categories', {'name': '景点场所', 'iconName': 'place'});
 
-    // 预设默认探店/影视示例
-    await db.insert('store_items', {
+    // 预设默认探店/影视示例项目 (客观属性)
+    final store1Id = await db.insert('store_items', {
       'name': '流浪地球2 (4K IMAX)',
       'category': '影视剧集',
       'rating': 4.9,
       'imagesJson': '[]',
       'address': '万达影城 3号厅',
-      'avgCost': 45.0,
       'notes': '视觉特效与宏大叙事极其震撼，硬核科幻巅峰',
       'createdAt': DateTime.now().toIso8601String(),
     });
-    await db.insert('store_items', {
+    final store2Id = await db.insert('store_items', {
       'name': '川湘阁精品小炒',
       'category': '餐饮美食',
       'rating': 4.8,
       'imagesJson': '[]',
       'address': '中山路 128 号底商',
-      'avgCost': 68.0,
       'notes': '招牌剁椒鱼头与小炒肉味道绝佳',
       'createdAt': DateTime.now().toIso8601String(),
+    });
+
+    // 预设初次打卡履约数据 (分钟级时间 + 消费 + 成员)
+    await db.insert('store_logs', {
+      'storeId': store1Id,
+      'storeName': '流浪地球2 (4K IMAX)',
+      'cost': 90.0,
+      'visitorIdsJson': '[1, 2]',
+      'visitorNamesJson': '["成员A", "成员B"]',
+      'memo': '影院双人观影，效果拔群',
+      'timestamp': DateTime.now().subtract(const Duration(days: 2)).toIso8601String(),
+    });
+    await db.insert('store_logs', {
+      'storeId': store2Id,
+      'storeName': '川湘阁精品小炒',
+      'cost': 136.0,
+      'visitorIdsJson': '[1, 2, 3]',
+      'visitorNamesJson': '["成员A", "成员B", "成员C"]',
+      'memo': '家庭聚餐，剁椒鱼头非常地道',
+      'timestamp': DateTime.now().subtract(const Duration(days: 5)).toIso8601String(),
     });
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    if (oldVersion < 7) {
+    if (oldVersion < 8) {
       try {
-        await db.execute('ALTER TABLE user_profile ADD COLUMN preferredViewMode TEXT DEFAULT "card"');
+        await db.execute('ALTER TABLE store_logs ADD COLUMN visitorIdsJson TEXT NOT NULL DEFAULT "[]"');
+        await db.execute('ALTER TABLE store_logs ADD COLUMN visitorNamesJson TEXT NOT NULL DEFAULT "[]"');
       } catch (_) {}
     }
   }
@@ -398,7 +417,6 @@ class DatabaseService {
   Future<void> deleteStoreCategory(int catId, String catName) async {
     final db = await database;
     await db.delete('store_categories', where: 'id = ?', whereArgs: [catId]);
-    // 被删除的分类条目归类到 "通用未分类"
     await db.update('store_items', {'category': '通用未分类'}, where: 'category = ?', whereArgs: [catName]);
   }
 

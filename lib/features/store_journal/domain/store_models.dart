@@ -33,10 +33,9 @@ class StoreItem {
   final String name;
   final String category;
   final double rating;
-  final List<String> images; // 至多 3 张照片路径
-  final String? address;
-  final double? avgCost;
-  final String? notes;
+  final List<String> images; // 至多 3 张照片/剧照路径
+  final String? address; // 位置/来源/平台
+  final String? notes; // 特色/说明/备忘
   final DateTime createdAt;
 
   StoreItem({
@@ -46,7 +45,6 @@ class StoreItem {
     this.rating = 5.0,
     required this.images,
     this.address,
-    this.avgCost,
     this.notes,
     DateTime? createdAt,
   }) : createdAt = createdAt ?? DateTime.now();
@@ -58,7 +56,6 @@ class StoreItem {
     double? rating,
     List<String>? images,
     String? address,
-    double? avgCost,
     String? notes,
     DateTime? createdAt,
   }) {
@@ -69,7 +66,6 @@ class StoreItem {
       rating: rating ?? this.rating,
       images: images ?? this.images,
       address: address ?? this.address,
-      avgCost: avgCost ?? this.avgCost,
       notes: notes ?? this.notes,
       createdAt: createdAt ?? this.createdAt,
     );
@@ -83,7 +79,6 @@ class StoreItem {
       'rating': rating,
       'imagesJson': jsonEncode(images),
       'address': address,
-      'avgCost': avgCost,
       'notes': notes,
       'createdAt': createdAt.toIso8601String(),
     };
@@ -100,11 +95,10 @@ class StoreItem {
     return StoreItem(
       id: map['id'] as int?,
       name: map['name'] as String,
-      category: map['category'] as String? ?? '餐饮美食',
+      category: map['category'] as String? ?? '通用未分类',
       rating: (map['rating'] as num?)?.toDouble() ?? 5.0,
       images: imgs,
       address: map['address'] as String?,
-      avgCost: (map['avgCost'] as num?)?.toDouble(),
       notes: map['notes'] as String?,
       createdAt: DateTime.parse(map['createdAt'] as String),
     );
@@ -115,17 +109,19 @@ class StoreLog {
   final int? id;
   final int storeId;
   final String storeName;
-  final double? cost;
-  final String visitorName;
-  final String? memo;
-  final DateTime timestamp;
+  final double? cost; // 本次打卡消费
+  final List<int> visitorIds; // 参与/同行成员 ID 列表
+  final List<String> visitorNames; // 参与/同行成员 姓名 列表
+  final String? memo; // 打卡体验心得
+  final DateTime timestamp; // 分钟级打卡时刻 (yyyy-MM-dd HH:mm)
 
   StoreLog({
     this.id,
     required this.storeId,
     required this.storeName,
     this.cost,
-    this.visitorName = '自己',
+    this.visitorIds = const [],
+    this.visitorNames = const ['自己'],
     this.memo,
     DateTime? timestamp,
   }) : timestamp = timestamp ?? DateTime.now();
@@ -136,19 +132,37 @@ class StoreLog {
       'storeId': storeId,
       'storeName': storeName,
       'cost': cost,
-      'visitorName': visitorName,
+      'visitorIdsJson': jsonEncode(visitorIds),
+      'visitorNamesJson': jsonEncode(visitorNames),
       'memo': memo,
       'timestamp': timestamp.toIso8601String(),
     };
   }
 
   factory StoreLog.fromMap(Map<String, dynamic> map) {
+    List<int> vIds = [];
+    List<String> vNames = [];
+    if (map['visitorIdsJson'] != null) {
+      vIds = (jsonDecode(map['visitorIdsJson'] as String) as List)
+          .map((e) => (e as num).toInt())
+          .toList();
+    }
+    if (map['visitorNamesJson'] != null) {
+      vNames = (jsonDecode(map['visitorNamesJson'] as String) as List)
+          .map((e) => e.toString())
+          .toList();
+    }
+    if (vNames.isEmpty && map['visitorName'] != null) {
+      vNames = [map['visitorName'] as String];
+    }
+
     return StoreLog(
       id: map['id'] as int?,
       storeId: map['storeId'] as int,
       storeName: map['storeName'] as String,
       cost: (map['cost'] as num?)?.toDouble(),
-      visitorName: map['visitorName'] as String? ?? '自己',
+      visitorIds: vIds,
+      visitorNames: vNames.isNotEmpty ? vNames : ['自己'],
       memo: map['memo'] as String?,
       timestamp: DateTime.parse(map['timestamp'] as String),
     );

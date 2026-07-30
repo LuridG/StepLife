@@ -6,7 +6,9 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../domain/store_models.dart';
 import '../providers/store_provider.dart';
+import '../../chore_tracker/domain/chore_models.dart';
 import '../../chore_tracker/providers/chore_provider.dart';
+import 'store_detail_screen.dart';
 
 class StoreJournalScreen extends StatefulWidget {
   const StoreJournalScreen({super.key});
@@ -22,7 +24,6 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
 
   final ImagePicker _picker = ImagePicker();
 
-  // 新增分类
   void _showAddCategoryDialog() {
     final catController = TextEditingController();
     showDialog(
@@ -66,7 +67,6 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
     );
   }
 
-  // 编辑分类
   void _showEditCategoryDialog(StoreCategory category) {
     final catController = TextEditingController(text: category.name);
     showDialog(
@@ -97,7 +97,6 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
     );
   }
 
-  // 删除分类
   void _confirmDeleteCategory(StoreCategory category) {
     showDialog(
       context: context,
@@ -120,12 +119,11 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
     );
   }
 
-  // 通用生活打卡表单弹窗 (适用于影视/图书/餐饮/景点/场所)
+  // 客观资产登记表单 (只登记客观信息，初次登记无消费)
   void _showStoreFormDialog({StoreItem? storeToEdit}) {
     final isEditing = storeToEdit != null;
     final nameController = TextEditingController(text: storeToEdit?.name ?? '');
     final addressController = TextEditingController(text: storeToEdit?.address ?? '');
-    final avgCostController = TextEditingController(text: storeToEdit?.avgCost != null ? storeToEdit!.avgCost.toString() : '');
     final notesController = TextEditingController(text: storeToEdit?.notes ?? '');
 
     double rating = storeToEdit?.rating ?? 5.0;
@@ -167,7 +165,7 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
               children: [
                 Icon(isEditing ? Icons.edit_note : Icons.auto_awesome, color: const Color(0xFF10B981)),
                 const SizedBox(width: 8),
-                Text(isEditing ? '编辑打卡记录' : '新增生活打卡记录'),
+                Text(isEditing ? '编辑客观项目' : '新建客观项目'),
               ],
             ),
             content: SingleChildScrollView(
@@ -204,7 +202,6 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                   ),
                   const SizedBox(height: 14),
 
-                  // 1-5 星级 Rate 选择器
                   Row(
                     children: [
                       const Text('星级评分:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
@@ -231,7 +228,6 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                   ),
                   const SizedBox(height: 14),
 
-                  // 图片/剧照/海报上传 (至多3张)
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -287,28 +283,14 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                     ),
                   const SizedBox(height: 14),
 
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: addressController,
-                          decoration: const InputDecoration(labelText: '位置 / 平台 / 来源说明'),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: TextField(
-                          controller: avgCostController,
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                          decoration: const InputDecoration(labelText: '花费金额(可选)', suffixText: '元'),
-                        ),
-                      ),
-                    ],
+                  TextField(
+                    controller: addressController,
+                    decoration: const InputDecoration(labelText: '位置 / 平台 / 来源说明'),
                   ),
                   const SizedBox(height: 12),
                   TextField(
                     controller: notesController,
-                    decoration: const InputDecoration(labelText: '影评 / 书评 / 心得感悟 / 备忘'),
+                    decoration: const InputDecoration(labelText: '特色说明 / 推荐好菜 / 备忘'),
                     maxLines: 2,
                   ),
                 ],
@@ -319,7 +301,6 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                 onPressed: () {
                   nameController.dispose();
                   addressController.dispose();
-                  avgCostController.dispose();
                   notesController.dispose();
                   Navigator.of(dialogCtx).pop();
                 },
@@ -335,8 +316,6 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                     return;
                   }
 
-                  final avgCost = double.tryParse(avgCostController.text);
-
                   if (isEditing) {
                     final updated = storeToEdit.copyWith(
                       name: name,
@@ -344,7 +323,6 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                       rating: rating,
                       images: images,
                       address: addressController.text.trim(),
-                      avgCost: avgCost,
                       notes: notesController.text.trim(),
                     );
                     context.read<StoreProvider>().updateStoreItem(updated);
@@ -355,19 +333,17 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                           rating: rating,
                           images: images,
                           address: addressController.text.trim(),
-                          avgCost: avgCost,
                           notes: notesController.text.trim(),
                         );
                   }
 
                   nameController.dispose();
                   addressController.dispose();
-                  avgCostController.dispose();
                   notesController.dispose();
                   Navigator.of(dialogCtx).pop();
                 },
                 style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981), foregroundColor: Colors.white),
-                child: Text(isEditing ? '保存修改' : '创建打卡项'),
+                child: Text(isEditing ? '保存修改' : '创建项目'),
               ),
             ],
           );
@@ -376,13 +352,17 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
     );
   }
 
-  // 打卡履约
+  // ⚡ 分钟级打卡履约弹窗 (录入消费金额 + 多选参与成员 + 精确到分钟时刻)
   void _showCheckinDialog(StoreItem store) {
     final costController = TextEditingController();
     final memoController = TextEditingController();
     final members = context.read<ChoreProvider>().members;
-    String selectedVisitor = members.isNotEmpty ? members.first.name : '自己';
-    DateTime selectedDate = DateTime.now();
+
+    DateTime selectedDateTime = DateTime.now(); // 默认精准当前时刻 yyyy-MM-dd HH:mm
+    final List<Member> selectedMembers = [];
+    if (members.isNotEmpty) {
+      selectedMembers.add(members.first);
+    }
 
     showDialog(
       context: context,
@@ -394,7 +374,7 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
               children: [
                 const Icon(Icons.flash_on, color: Color(0xFF10B981)),
                 const SizedBox(width: 8),
-                Text('打卡履约: ${store.name}'),
+                Text('打卡: ${store.name}'),
               ],
             ),
             content: SingleChildScrollView(
@@ -402,53 +382,90 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: costController,
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                          decoration: const InputDecoration(labelText: '本次消费/支出', suffixText: '元'),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: DropdownButtonFormField<String>(
-                          initialValue: selectedVisitor,
-                          decoration: const InputDecoration(labelText: '打卡人员'),
-                          items: [
-                            const DropdownMenuItem(value: '自己', child: Text('自己')),
-                            ...members.map((m) => DropdownMenuItem(value: m.name, child: Text(m.name))),
-                          ],
-                          onChanged: (val) {
-                            if (val != null) setModalState(() => selectedVisitor = val);
-                          },
-                        ),
-                      ),
-                    ],
+                  TextField(
+                    controller: costController,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(
+                      labelText: '本次打卡消费金额',
+                      hintText: '例: 45 元 (不涉及消费可留空或填 0)',
+                      prefixIcon: Icon(Icons.attach_money),
+                      border: OutlineInputBorder(),
+                    ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 14),
+
+                  // 多选同行/参与人员 (复用统一 Member 系统)
+                  const Text('参与/同行人员 (可多选):', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  const SizedBox(height: 8),
+                  members.isEmpty
+                      ? const Text('暂无成员信息，可先在【家务习惯】顶栏增加成员档案', style: TextStyle(fontSize: 11, color: Colors.white54))
+                      : Wrap(
+                          spacing: 8,
+                          children: members.map((m) {
+                            final isSelected = selectedMembers.contains(m);
+                            return FilterChip(
+                              label: Text(m.name),
+                              selected: isSelected,
+                              selectedColor: Color(m.colorValue).withAlpha(80),
+                              onSelected: (selected) {
+                                setModalState(() {
+                                  if (selected) {
+                                    selectedMembers.add(m);
+                                  } else {
+                                    selectedMembers.remove(m);
+                                  }
+                                });
+                              },
+                            );
+                          }).toList(),
+                        ),
+                  const SizedBox(height: 14),
+
                   TextField(
                     controller: memoController,
-                    decoration: const InputDecoration(labelText: '打卡心得 / 观影感受 / 备忘'),
+                    decoration: const InputDecoration(
+                      labelText: '打卡心得 / 体验感受 / 点的菜品',
+                      border: OutlineInputBorder(),
+                    ),
                     maxLines: 2,
                   ),
                   const SizedBox(height: 12),
+
+                  // 分钟级时间选择器 (默认当前时刻 yyyy-MM-dd HH:mm)
                   ListTile(
                     contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.calendar_today, color: Color(0xFF10B981)),
-                    title: Text('打卡日期: ${DateFormat('yyyy-MM-dd').format(selectedDate)}'),
+                    leading: const Icon(Icons.access_time_filled, color: Color(0xFF10B981)),
+                    title: Text(
+                      '打卡时刻: ${DateFormat('yyyy-MM-dd HH:mm').format(selectedDateTime)}',
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                    ),
+                    subtitle: const Text('默认当前时刻，可选历史时刻', style: TextStyle(fontSize: 11, color: Colors.white54)),
                     trailing: TextButton(
-                      child: const Text('更改日期'),
+                      child: const Text('更改时刻'),
                       onPressed: () async {
-                        final picked = await showDatePicker(
+                        final pickedDate = await showDatePicker(
                           context: dialogCtx,
-                          initialDate: selectedDate,
+                          initialDate: selectedDateTime,
                           firstDate: DateTime(2020),
                           lastDate: DateTime(2030),
                         );
-                        if (picked != null) {
-                          setModalState(() => selectedDate = picked);
+                        if (pickedDate != null) {
+                          if (!dialogCtx.mounted) return;
+                          final pickedTime = await showTimePicker(
+                            context: dialogCtx,
+                            initialTime: TimeOfDay.fromDateTime(selectedDateTime),
+                          );
+                          if (pickedTime != null) {
+                            setModalState(() {
+                              selectedDateTime = DateTime(
+                                pickedDate.year,
+                                pickedDate.month,
+                                pickedDate.day,
+                                pickedTime.hour,
+                                pickedTime.minute,
+                              );
+                            });
+                          }
                         }
                       },
                     ),
@@ -468,13 +485,17 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
               ElevatedButton(
                 onPressed: () {
                   final cost = double.tryParse(costController.text);
+                  final vIds = selectedMembers.map((m) => m.id ?? 0).toList();
+                  final vNames = selectedMembers.map((m) => m.name).toList();
+
                   context.read<StoreProvider>().recordStoreCheckin(
                         storeId: store.id!,
                         storeName: store.name,
                         cost: cost,
-                        visitorName: selectedVisitor,
+                        visitorIds: vIds,
+                        visitorNames: vNames.isNotEmpty ? vNames : ['自己'],
                         memo: memoController.text.trim(),
-                        targetDate: selectedDate,
+                        targetDate: selectedDateTime,
                       );
 
                   costController.dispose();
@@ -482,7 +503,7 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                   Navigator.of(dialogCtx).pop();
 
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('已完成【${store.name}】打卡！'), backgroundColor: const Color(0xFF10B981)),
+                    SnackBar(content: Text('已完成【${store.name}】打卡记录！'), backgroundColor: const Color(0xFF10B981)),
                   );
                 },
                 style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981), foregroundColor: Colors.white),
@@ -526,7 +547,6 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
       appBar: AppBar(
         title: const Text('生活记录 (探店/影视/阅读)'),
         actions: [
-          // 1. 视图模式切换按钮 (Card 模式 ↔ 紧凑列表 模式，并自动持久化上次选择)
           IconButton(
             icon: Icon(storeProvider.isCardView ? Icons.view_headline : Icons.grid_view),
             tooltip: storeProvider.isCardView ? '切换为紧凑列表模式' : '切换为 Card 卡片模式',
@@ -539,7 +559,6 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
           ),
         ],
       ),
-      // 侧边栏 Drawer (包含分类重命名与删除管理)
       drawer: Drawer(
         backgroundColor: const Color(0xFF0F172A),
         child: SafeArea(
@@ -630,7 +649,6 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 分类 Filter Chips 滚动栏
                   SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: Row(
@@ -658,7 +676,6 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                   ),
                   const SizedBox(height: 16),
 
-                  // 根据用户偏好呈现：Card 模式 还是 紧凑列表 模式
                   storeProvider.filteredStoreItems.isEmpty
                       ? _buildEmptyStoreCard()
                       : ListView.builder(
@@ -668,10 +685,11 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                           itemBuilder: (context, index) {
                             final store = storeProvider.filteredStoreItems[index];
                             final checkinCount = storeProvider.getCheckinCountForStore(store.id!);
+                            final totalCost = storeProvider.getTotalCostForStore(store.id!);
 
                             return storeProvider.isCardView
-                                ? _buildStoreGlassCard(store, checkinCount)
-                                : _buildStoreCompactListItem(store, checkinCount);
+                                ? _buildStoreGlassCard(store, checkinCount, totalCost)
+                                : _buildStoreCompactListItem(store, checkinCount, totalCost);
                           },
                         ),
                 ],
@@ -683,150 +701,165 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
     );
   }
 
-  // 1. 经典 Card 模式卡片 (含 3D 玻璃质感与图片画廊)
-  Widget _buildStoreGlassCard(StoreItem store, int checkinCount) {
+  // Card 模式 (支持点击翻转/跳转至独立 StoreDetailScreen 详情页)
+  Widget _buildStoreGlassCard(StoreItem store, int checkinCount, double totalCost) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 14.0),
       child: _buildGlassCard(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF10B981).withAlpha(40),
-                                borderRadius: BorderRadius.circular(8),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => StoreDetailScreen(storeItem: store)),
+            );
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF10B981).withAlpha(40),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(store.category, style: const TextStyle(fontSize: 11, color: Color(0xFF10B981), fontWeight: FontWeight.bold)),
                               ),
-                              child: Text(store.category, style: const TextStyle(fontSize: 11, color: Color(0xFF10B981), fontWeight: FontWeight.bold)),
-                            ),
-                            const SizedBox(width: 8),
-                            Flexible(
-                              child: Text(
-                                store.name,
-                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
-                                overflow: TextOverflow.ellipsis,
+                              const SizedBox(width: 8),
+                              Flexible(
+                                child: Text(
+                                  store.name,
+                                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            Row(
-                              children: List.generate(5, (sIdx) {
-                                return Icon(
-                                  sIdx < store.rating.floor() ? Icons.star : Icons.star_border,
-                                  color: Colors.amber,
-                                  size: 16,
-                                );
-                              }),
-                            ),
-                            const SizedBox(width: 6),
-                            Text(store.rating.toStringAsFixed(1), style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold, fontSize: 13)),
-                            if (store.avgCost != null) ...[
-                              const SizedBox(width: 12),
-                              Text('¥${store.avgCost!.toInt()}', style: const TextStyle(color: Colors.white70, fontSize: 12)),
                             ],
-                          ],
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Row(
+                                children: List.generate(5, (sIdx) {
+                                  return Icon(
+                                    sIdx < store.rating.floor() ? Icons.star : Icons.star_border,
+                                    color: Colors.amber,
+                                    size: 16,
+                                  );
+                                }),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(store.rating.toStringAsFixed(1), style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold, fontSize: 13)),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.edit_outlined, color: Colors.lightBlueAccent, size: 18),
+                          onPressed: () => _showStoreFormDialog(storeToEdit: store),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 18),
+                          onPressed: () => _confirmDeleteStore(store),
                         ),
                       ],
                     ),
-                  ),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.edit_outlined, color: Colors.lightBlueAccent, size: 18),
-                        onPressed: () => _showStoreFormDialog(storeToEdit: store),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 18),
-                        onPressed: () => _confirmDeleteStore(store),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
+                  ],
+                ),
+                const SizedBox(height: 10),
 
-              if (store.images.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 10.0),
-                  child: SizedBox(
-                    height: 80,
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: store.images.length,
-                      itemBuilder: (ctx, iIdx) {
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 8.0),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(10),
-                            child: Image.file(
-                              File(store.images[iIdx]),
-                              width: 100,
-                              height: 80,
-                              fit: BoxFit.cover,
-                              errorBuilder: (c, e, s) => Container(
+                if (store.images.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10.0),
+                    child: SizedBox(
+                      height: 80,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: store.images.length,
+                        itemBuilder: (ctx, iIdx) {
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 8.0),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(10),
+                              child: Image.file(
+                                File(store.images[iIdx]),
                                 width: 100,
                                 height: 80,
-                                color: Colors.white10,
-                                child: const Icon(Icons.image, color: Colors.white38),
+                                fit: BoxFit.cover,
+                                errorBuilder: (c, e, s) => Container(
+                                  width: 100,
+                                  height: 80,
+                                  color: Colors.white10,
+                                  child: const Icon(Icons.image, color: Colors.white38),
+                                ),
                               ),
                             ),
-                          ),
-                        );
-                      },
+                          );
+                        },
+                      ),
                     ),
                   ),
+
+                if (store.address != null && store.address!.isNotEmpty)
+                  Text('📍 ${store.address}', style: const TextStyle(fontSize: 12, color: Colors.white70)),
+                if (store.notes != null && store.notes!.isNotEmpty)
+                  Text('📝 ${store.notes}', style: const TextStyle(fontSize: 12, color: Colors.white54, fontStyle: FontStyle.italic)),
+
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('累计打卡: $checkinCount 次', style: const TextStyle(fontSize: 12, color: Colors.white54)),
+                        Text('累计消费: ¥${totalCost.toStringAsFixed(1)}', style: const TextStyle(fontSize: 12, color: Color(0xFF10B981), fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                    ElevatedButton.icon(
+                      onPressed: () => _showCheckinDialog(store),
+                      icon: const Icon(Icons.flash_on, size: 14),
+                      label: const Text('⚡ 记一次打卡', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF10B981),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      ),
+                    ),
+                  ],
                 ),
-
-              if (store.address != null && store.address!.isNotEmpty)
-                Text('📍 ${store.address}', style: const TextStyle(fontSize: 12, color: Colors.white70)),
-              if (store.notes != null && store.notes!.isNotEmpty)
-                Text('📝 ${store.notes}', style: const TextStyle(fontSize: 12, color: Colors.white54, fontStyle: FontStyle.italic)),
-
-              const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('累计打卡: $checkinCount 次', style: const TextStyle(fontSize: 12, color: Colors.white54)),
-                  ElevatedButton.icon(
-                    onPressed: () => _showCheckinDialog(store),
-                    icon: const Icon(Icons.flash_on, size: 14),
-                    label: const Text('⚡ 记一次打卡', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF10B981),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    ),
-                  ),
-                ],
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  // 2. 紧凑列表模式项 (适合快速单行扫描与一键打卡)
-  Widget _buildStoreCompactListItem(StoreItem store, int checkinCount) {
+  // 紧凑列表模式项 (支持点击跳转至独立 StoreDetailScreen 详情页)
+  Widget _buildStoreCompactListItem(StoreItem store, int checkinCount, double totalCost) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8.0),
       child: _buildGlassCard(
         child: ListTile(
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => StoreDetailScreen(storeItem: store)),
+            );
+          },
           contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
           leading: Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
@@ -862,7 +895,7 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
             ],
           ),
           subtitle: Text(
-            '${store.address ?? "无位置"} · 累计打卡 $checkinCount 次',
+            '累计 $checkinCount 次 · 总消费 ¥${totalCost.toStringAsFixed(1)}',
             style: const TextStyle(fontSize: 11, color: Colors.white54),
             overflow: TextOverflow.ellipsis,
           ),

@@ -7,7 +7,7 @@ class StoreProvider extends ChangeNotifier {
   List<StoreItem> _storeItems = [];
   List<StoreLog> _storeLogs = [];
   String _selectedCategory = '全部分类';
-  bool _isCardView = true; // Card 视图 ↔ 紧凑 List 视图
+  bool _isCardView = true;
   bool _isLoading = true;
 
   List<StoreCategory> get categories => _categories;
@@ -43,7 +43,6 @@ class StoreProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 切换并持久化 Card / 紧凑列表 视图模式
   Future<void> toggleViewMode() async {
     _isCardView = !_isCardView;
     notifyListeners();
@@ -70,7 +69,6 @@ class StoreProvider extends ChangeNotifier {
     if (index != -1) {
       _categories[index] = StoreCategory(id: catId, name: newName, iconName: _categories[index].iconName);
     }
-    // 同步更新 storeItems 中的分类属性
     for (int i = 0; i < _storeItems.length; i++) {
       if (_storeItems[i].category == oldName) {
         _storeItems[i] = _storeItems[i].copyWith(category: newName);
@@ -86,7 +84,6 @@ class StoreProvider extends ChangeNotifier {
     await DatabaseService.instance.deleteStoreCategory(catId, catName);
     _categories.removeWhere((c) => c.id == catId);
 
-    // 将原属于该分类的记录划归为 "通用未分类"
     for (int i = 0; i < _storeItems.length; i++) {
       if (_storeItems[i].category == catName) {
         _storeItems[i] = _storeItems[i].copyWith(category: '通用未分类');
@@ -105,7 +102,6 @@ class StoreProvider extends ChangeNotifier {
     double rating = 5.0,
     required List<String> images,
     String? address,
-    double? avgCost,
     String? notes,
   }) async {
     final item = StoreItem(
@@ -114,7 +110,6 @@ class StoreProvider extends ChangeNotifier {
       rating: rating,
       images: images,
       address: address,
-      avgCost: avgCost,
       notes: notes,
     );
 
@@ -128,7 +123,6 @@ class StoreProvider extends ChangeNotifier {
         rating: rating,
         images: images,
         address: address,
-        avgCost: avgCost,
         notes: notes,
         createdAt: item.createdAt,
       ),
@@ -148,6 +142,7 @@ class StoreProvider extends ChangeNotifier {
   Future<void> deleteStoreItem(int itemId) async {
     await DatabaseService.instance.deleteStoreItem(itemId);
     _storeItems.removeWhere((i) => i.id == itemId);
+    _storeLogs.removeWhere((l) => l.storeId == itemId);
     notifyListeners();
   }
 
@@ -155,7 +150,8 @@ class StoreProvider extends ChangeNotifier {
     required int storeId,
     required String storeName,
     double? cost,
-    String visitorName = '自己',
+    required List<int> visitorIds,
+    required List<String> visitorNames,
     String? memo,
     DateTime? targetDate,
   }) async {
@@ -163,7 +159,8 @@ class StoreProvider extends ChangeNotifier {
       storeId: storeId,
       storeName: storeName,
       cost: cost,
-      visitorName: visitorName,
+      visitorIds: visitorIds,
+      visitorNames: visitorNames,
       memo: memo,
       timestamp: targetDate ?? DateTime.now(),
     );
@@ -176,7 +173,8 @@ class StoreProvider extends ChangeNotifier {
         storeId: storeId,
         storeName: storeName,
         cost: cost,
-        visitorName: visitorName,
+        visitorIds: visitorIds,
+        visitorNames: visitorNames,
         memo: memo,
         timestamp: log.timestamp,
       ),
@@ -190,7 +188,16 @@ class StoreProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  List<StoreLog> getLogsForStore(int storeId) {
+    return _storeLogs.where((l) => l.storeId == storeId).toList();
+  }
+
   int getCheckinCountForStore(int storeId) {
     return _storeLogs.where((l) => l.storeId == storeId).length;
+  }
+
+  double getTotalCostForStore(int storeId) {
+    final logs = getLogsForStore(storeId);
+    return logs.fold(0.0, (sum, log) => sum + (log.cost ?? 0.0));
   }
 }
