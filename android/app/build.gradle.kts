@@ -33,7 +33,17 @@ android {
         }
     }
 
-    // 自动重命名输出 APK 为: StepLife-v1.1.0-arm64-v8a.apk 规范名称
+    // 自动配置 ABI 分包 (arm64-v8a, armeabi-v7a, x86_64 及 Universal 通用包)
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("armeabi-v7a", "arm64-v8a", "x86_64")
+            isUniversalApk = true
+        }
+    }
+
+    // 自动重命名输出 APK 为规范名称: StepLife-v1.3.0-arm64-v8a.apk / StepLife-v1.3.0-universal.apk
     applicationVariants.all {
         val variant = this
         variant.outputs.all {
