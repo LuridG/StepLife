@@ -30,11 +30,11 @@
 > 💡 *提示：将你保存的程序截图放入项目的 `assets/screenshots/` 文件夹中（例如重命名为 `screenshot1.png` / `screenshot2.png` / `screenshot3.png`），GitHub 页面将自动亮丽呈现下列截图展示墙！*
 
 <p align="center">
-  <img src="assets/screenshots/screenshot1.png" width="280" alt="步量路线界面" />
+  <img src="assets/screenshots/screenshot1.jpg" width="280" alt="步量路线界面" />
   &nbsp;&nbsp;&nbsp;&nbsp;
-  <img src="assets/screenshots/screenshot2.png" width="280" alt="uHabits 家务习惯界面" />
+  <img src="assets/screenshots/screenshot2.jpg" width="280" alt="uHabits 家务习惯界面" />
   &nbsp;&nbsp;&nbsp;&nbsp;
-  <img src="assets/screenshots/screenshot3.png" width="280" alt="生活记录探店与打卡" />
+  <img src="assets/screenshots/screenshot3.jpg" width="280" alt="生活记录探店与打卡" />
 </p>
 
 | 🏃 步量路线打卡 | 🏠 uHabits 家务习惯 | 🛍️ 生活记录与打卡 |
