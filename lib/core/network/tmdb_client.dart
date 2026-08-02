@@ -13,6 +13,7 @@ class TmdbMovie {
   final int? runtime; // 分钟
   final List<String> directors;
   final List<String> cast;
+  final bool isTv; // true = 电视剧/综艺，false = 电影
 
   const TmdbMovie({
     required this.id,
@@ -24,6 +25,7 @@ class TmdbMovie {
     this.runtime,
     this.directors = const [],
     this.cast = const [],
+    this.isTv = false,
   });
 
   int? get year {
@@ -117,6 +119,86 @@ class TmdbClient {
       posterPath: json['poster_path'] as String?,
       genres: genres,
       runtime: (json['runtime'] as num?)?.toInt(),
+      directors: directors,
+      cast: cast
+          .whereType<Map>()
+          .take(5)
+          .map((c) => c['name'] as String? ?? '')
+          .where((n) => n.isNotEmpty)
+          .toList(),
+    );
+  }
+
+  /// 搜索电视剧/综艺（中文优先）
+  Future<List<TmdbMovie>> searchTv(String query) async {
+    final uri = Uri.parse('$_base/search/tv').replace(queryParameters: {
+      ..._authParams,
+      'query': query,
+      'language': 'zh-CN',
+      'include_adult': 'false',
+      'page': '1',
+    });
+    final resp = await _client.get(uri, headers: _authHeaders);
+    if (resp.statusCode != 200) {
+      throw Exception('TMDB 电视剧搜索失败: HTTP ${resp.statusCode}');
+    }
+    final json = jsonDecode(resp.body) as Map<String, dynamic>;
+    final results = json['results'] as List? ?? [];
+    return results
+        .whereType<Map>()
+        .map((e) => TmdbMovie(
+              id: (e['id'] as num?)?.toInt() ?? 0,
+              title: e['name'] as String? ?? e['original_name'] as String? ?? '',
+              releaseDate: e['first_air_date'] as String?,
+              overview: e['overview'] as String?,
+              posterPath: e['poster_path'] as String?,
+              isTv: true,
+            ))
+        .where((m) => m.id > 0)
+        .toList();
+  }
+
+  /// 电视剧/综艺详情 + 演职员（导演/主演/类型/单集时长）
+  Future<TmdbMovie> tvDetails(int id) async {
+    final uri = Uri.parse('$_base/tv/$id').replace(queryParameters: {
+      ..._authParams,
+      'language': 'zh-CN',
+      'append_to_response': 'credits',
+    });
+    final resp = await _client.get(uri, headers: _authHeaders);
+    if (resp.statusCode != 200) {
+      throw Exception('TMDB 电视剧详情失败: HTTP ${resp.statusCode}');
+    }
+    final json = jsonDecode(resp.body) as Map<String, dynamic>;
+    final credits = json['credits'] as Map<String, dynamic>? ?? {};
+    final crew = credits['crew'] as List? ?? [];
+    final cast = credits['cast'] as List? ?? [];
+    final directors = crew
+        .whereType<Map>()
+        .where((c) => c['job'] == 'Director')
+        .map((c) => c['name'] as String? ?? '')
+        .where((n) => n.isNotEmpty)
+        .toList();
+    final genres = (json['genres'] as List? ?? [])
+        .whereType<Map>()
+        .map((g) => g['name'] as String? ?? '')
+        .where((n) => n.isNotEmpty)
+        .toList();
+    // episode_run_time 是数组（可能多集时长），取第一个
+    final runtimes = (json['episode_run_time'] as List? ?? [])
+        .whereType<num>()
+        .map((n) => n.toInt())
+        .toList();
+
+    return TmdbMovie(
+      id: id,
+      isTv: true,
+      title: json['name'] as String? ?? json['original_name'] as String? ?? '',
+      releaseDate: json['first_air_date'] as String?,
+      overview: json['overview'] as String?,
+      posterPath: json['poster_path'] as String?,
+      genres: genres,
+      runtime: runtimes.isNotEmpty ? runtimes.first : null,
       directors: directors,
       cast: cast
           .whereType<Map>()

@@ -1,4 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 必需：正式包联网（TMDB 搜索、海报下载、WebDAV 同步等） -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="步履生活"
         android:name="${applicationName}"

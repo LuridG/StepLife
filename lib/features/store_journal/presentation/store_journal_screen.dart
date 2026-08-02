@@ -374,11 +374,26 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
             }
             final client = TmdbClient(settings.tmdbApiKey);
             try {
-              final results = await client.searchMovies(query);
+              // 电影 + 电视剧/综艺 合并搜索，任一失败不影响另一类
+              final results = <TmdbMovie>[];
+              String? searchError;
+              try {
+                results.addAll(await client.searchMovies(query));
+              } catch (e) {
+                searchError = e.toString();
+              }
+              try {
+                results.addAll(await client.searchTv(query));
+              } catch (e) {
+                searchError = e.toString();
+              }
               if (!dialogCtx.mounted) return;
               if (results.isEmpty) {
                 ScaffoldMessenger.of(dialogCtx).showSnackBar(
-                  const SnackBar(content: Text('TMDB 未找到相关影片')),
+                  SnackBar(
+                    content: Text(searchError == null ? 'TMDB 未找到相关影片/剧集' : 'TMDB 搜索失败: $searchError'),
+                    backgroundColor: Colors.redAccent,
+                  ),
                 );
                 return;
               }
@@ -386,12 +401,12 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                 context: dialogCtx,
                 builder: (sc) => SimpleDialog(
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                  title: const Text('选择影片（数据来源 TMDB）'),
+                  title: const Text('选择影片/剧集（数据来源 TMDB）'),
                   children: results
                       .map((m) => SimpleDialogOption(
                             onPressed: () => Navigator.of(sc).pop(m),
                             child: Text(
-                              m.title + (m.year != null ? ' (${m.year})' : ''),
+                              '${m.isTv ? "📺" : "🎬"} ${m.title}${m.year != null ? ' (${m.year})' : ''}${m.isTv ? ' 电视剧/综艺' : ' 电影'}',
                               style: const TextStyle(fontSize: 14),
                             ),
                           ))
@@ -399,16 +414,18 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                 ),
               );
               if (selected == null || !dialogCtx.mounted) return;
-              final details = await client.movieDetails(selected.id);
+              final details = selected.isTv
+                  ? await client.tvDetails(selected.id)
+                  : await client.movieDetails(selected.id);
               if (!dialogCtx.mounted) return;
               setModalState(() {
                 nameController.text = details.title;
                 extrasValues['year'] = details.year?.toString() ?? '';
                 extrasValues['director'] = (details.directors + details.cast).join(' / ');
                 extrasValues['duration'] = details.runtime;
-                extrasValues['type'] = mapTmdbGenreToType(
-                  details.genres.isNotEmpty ? details.genres.first : null,
-                );
+                extrasValues['type'] = details.genres.isNotEmpty
+                    ? mapTmdbGenreToType(details.genres.first)
+                    : (details.isTv ? '电视剧' : '电影');
                 extrasValues['synopsis'] = details.overview ?? '';
               });
               if (details.posterFullUrl.isNotEmpty) {
@@ -432,8 +449,20 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
               }
             } catch (e) {
               if (!dialogCtx.mounted) return;
+              final err = e.toString();
+              final isNetIssue = err.contains('SocketException') ||
+                  err.contains('ClientException') ||
+                  err.contains('Failed host lookup') ||
+                  err.contains('Connection');
               ScaffoldMessenger.of(dialogCtx).showSnackBar(
-                SnackBar(content: Text('TMDB 导入失败: $e'), backgroundColor: Colors.redAccent),
+                SnackBar(
+                  content: Text(
+                    isNetIssue
+                        ? '网络无法访问 TMDB 服务：请检查手机网络/代理/VPN（themoviedb.org 部分地区需要代理）'
+                        : 'TMDB 导入失败: $e',
+                  ),
+                  backgroundColor: Colors.redAccent,
+                ),
               );
             }
           }
