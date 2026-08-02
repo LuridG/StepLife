@@ -14,12 +14,34 @@ enum TemplateFieldType {
   tags, // 标签列表
 }
 
-/// 影视类型/题材选项：粗分类 + TMDB 常用题材（保证 TMDB 导入的类型可直接落选）
-const List<String> kMovieTypeOptions = [
+/// 影视一级分类：媒体类型
+const List<String> kMovieMediaTypeOptions = [
   '电影', '电视剧', '动漫', '纪录片', '综艺',
+];
+
+/// 影视二级分类：题材（TMDB 常用题材，导入时自动落选）
+const List<String> kMovieGenreOptions = [
   '动作', '冒险', '动画', '喜剧', '犯罪', '剧情', '家庭', '奇幻', '恐怖',
   '悬疑', '音乐', '爱情', '科幻', '惊悚', '战争', '西部', '真人秀', '脱口秀',
 ];
+
+/// 从店铺 extras 解析媒体类型（兼容旧字段 type）
+String resolveMediaType(Map<String, dynamic> extras) {
+  final direct = extras['mediaType']?.toString() ?? '';
+  if (direct.isNotEmpty) return direct;
+  final legacy = extras['type']?.toString() ?? '';
+  if (kMovieMediaTypeOptions.contains(legacy)) return legacy;
+  return '电影';
+}
+
+/// 从店铺 extras 解析题材（兼容旧字段 type）
+String resolveGenre(Map<String, dynamic> extras) {
+  final direct = extras['genre']?.toString() ?? '';
+  if (direct.isNotEmpty) return direct;
+  final legacy = extras['type']?.toString() ?? '';
+  if (kMovieGenreOptions.contains(legacy)) return legacy;
+  return '';
+}
 
 /// 模板字段定义（内建模板字段 + 用户自定义字段共用）
 class TemplateField {
@@ -101,7 +123,8 @@ class LifeTemplates {
       itemNameLabel: '片名',
       itemNameHint: '例: 《流浪地球2》',
       itemFields: [
-        TemplateField(key: 'type', label: '类型', type: TemplateFieldType.choice, options: kMovieTypeOptions, defaultValue: '电影'),
+        TemplateField(key: 'mediaType', label: '媒体类型', type: TemplateFieldType.choice, options: kMovieMediaTypeOptions, defaultValue: '电影'),
+        TemplateField(key: 'genre', label: '题材', type: TemplateFieldType.choice, options: kMovieGenreOptions, hint: '可选：科幻 / 动作 / 喜剧…'),
         TemplateField(key: 'year', label: '年份', type: TemplateFieldType.text, hint: '例: 2023'),
         TemplateField(key: 'director', label: '导演 / 主演', type: TemplateFieldType.text, hint: '例: 郭帆 / 吴京'),
         TemplateField(key: 'duration', label: '片长（分钟）', type: TemplateFieldType.number, hint: '例: 173'),

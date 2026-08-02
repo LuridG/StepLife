@@ -59,6 +59,8 @@ class StoreDetailScreen extends StatelessWidget {
     ];
     final presentFields = itemFields
         .where((f) =>
+            f.key != 'mediaType' &&
+            f.key != 'genre' &&
             storeItem.extras[f.key] != null &&
             storeItem.extras[f.key].toString().isNotEmpty)
         .toList();
@@ -67,6 +69,7 @@ class StoreDetailScreen extends StatelessWidget {
     final looseExtras = storeItem.extras.entries
         .where((e) =>
             !knownKeys.contains(e.key) &&
+            !(tpl.key == 'movie' && e.key == 'type') &&
             e.value != null &&
             e.value.toString().isNotEmpty)
         .map((e) => MapEntry(e.key, e.value.toString()))
@@ -127,16 +130,19 @@ class StoreDetailScreen extends StatelessWidget {
                             padding: const EdgeInsets.only(right: 12.0),
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(16),
-                              child: Image.file(
-                                File(storeItem.images[idx]),
-                                width: 260,
-                                height: 180,
-                                fit: BoxFit.cover,
-                                errorBuilder: (c, e, s) => Container(
+                              child: Container(
+                                color: Colors.black38,
+                                child: Image.file(
+                                  File(storeItem.images[idx]),
                                   width: 260,
                                   height: 180,
-                                  color: Colors.white10,
-                                  child: const Icon(Icons.broken_image, color: Colors.white38),
+                                  fit: tpl.key == 'movie' ? BoxFit.contain : BoxFit.cover,
+                                  errorBuilder: (c, e, s) => Container(
+                                    width: 260,
+                                    height: 180,
+                                    color: Colors.white10,
+                                    child: const Icon(Icons.broken_image, color: Colors.white38),
+                                  ),
                                 ),
                               ),
                             ),
@@ -163,6 +169,38 @@ class StoreDetailScreen extends StatelessWidget {
                               ),
                               child: Text(storeItem.category, style: const TextStyle(fontSize: 12, color: Color(0xFF10B981), fontWeight: FontWeight.bold)),
                             ),
+                            if (tpl.key == 'movie') ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.indigo.withAlpha(60),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: Colors.indigoAccent.withAlpha(110)),
+                                ),
+                                child: Text(
+                                  resolveMediaType(storeItem.extras) == '电影'
+                                      ? '🎬 电影'
+                                      : '📺 ${resolveMediaType(storeItem.extras)}',
+                                  style: const TextStyle(fontSize: 12, color: Colors.lightBlueAccent, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                              if (resolveGenre(storeItem.extras).isNotEmpty) ...[
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.purple.withAlpha(50),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: Colors.purpleAccent.withAlpha(90)),
+                                  ),
+                                  child: Text(
+                                    '${resolveGenre(storeItem.extras)} 题材',
+                                    style: const TextStyle(fontSize: 12, color: Colors.purpleAccent, fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                              ],
+                            ],
                             const SizedBox(width: 10),
                             Expanded(
                               child: Text(

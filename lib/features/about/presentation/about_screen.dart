@@ -106,7 +106,7 @@ class AboutScreen extends StatelessWidget {
                     border: Border.all(color: const Color(0xFF10B981).withAlpha(80)),
                   ),
                   child: const Text(
-                    '版本号: v1.4.2 (Build 20260804)',
+                    '版本号: v1.4.3 (Build 20260805)',
                     style: TextStyle(color: Color(0xFF10B981), fontSize: 12, fontWeight: FontWeight.bold),
                   ),
                 ),
@@ -133,7 +133,7 @@ class AboutScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 14),
                         _buildVersionItem(
-                          version: 'v1.4.2 (2026-08-04)',
+                          version: 'v1.4.3 (2026-08-05)',
                           isLatest: true,
                           changes: [
                             '🧩 生活模板化：影视/餐饮/书籍/景点/购物/通用 6 大模板，分类自动绑定，表单各有针对性。',

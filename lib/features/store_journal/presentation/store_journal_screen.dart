@@ -333,6 +333,22 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
       currentTemplateKey = catOf(selectedCategory)?.templateKey ?? LifeTemplates.matchTemplateKey(selectedCategory);
     }
 
+    // 旧数据迁移：影视模板的 type 字段拆分为 媒体类型(mediaType) + 题材(genre)
+    if (currentTemplateKey == 'movie' && isEditing) {
+      final legacyType = extrasValues['type']?.toString() ?? '';
+      if (legacyType.isNotEmpty) {
+        if (extrasValues['mediaType'] == null && kMovieMediaTypeOptions.contains(legacyType)) {
+          extrasValues['mediaType'] = legacyType;
+        } else if (extrasValues['genre'] == null && kMovieGenreOptions.contains(legacyType)) {
+          extrasValues['genre'] = legacyType;
+        } else if (extrasValues['mediaType'] == null && extrasValues['genre'] == null) {
+          // 未知值兜底：当作题材保留，媒体类型走默认“电影”
+          extrasValues['genre'] = legacyType;
+        }
+        extrasValues.remove('type');
+      }
+    }
+
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
@@ -348,14 +364,6 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
           }
           final mergedFields = [...tpl.itemFields, ...customFields];
           final nameLabel = tpl.itemNameLabel.isEmpty ? '名称' : tpl.itemNameLabel;
-
-          /// TMDB 返回的类型直接落到下拉选项；仅当不在选项列表时兜底为“电影”
-          String mapTmdbGenreToType(String? genre) {
-            final g = genre ?? '';
-            if (g.isEmpty) return '电影';
-            if (kMovieTypeOptions.contains(g)) return g;
-            return '电影';
-          }
 
           Future<void> searchTmdbAndFill() async {
             final settings = context.read<SettingsProvider>();
@@ -423,9 +431,8 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                 extrasValues['year'] = details.year?.toString() ?? '';
                 extrasValues['director'] = (details.directors + details.cast).join(' / ');
                 extrasValues['duration'] = details.runtime;
-                extrasValues['type'] = details.genres.isNotEmpty
-                    ? mapTmdbGenreToType(details.genres.first)
-                    : (details.isTv ? '电视剧' : '电影');
+                extrasValues['mediaType'] = details.isTv ? '电视剧' : '电影';
+                extrasValues['genre'] = details.genres.isNotEmpty ? details.genres.first : '';
                 extrasValues['synopsis'] = details.overview ?? '';
               });
               if (details.posterFullUrl.isNotEmpty) {
@@ -1389,6 +1396,23 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                                 ),
                                 child: Text(store.category, style: const TextStyle(fontSize: 11, color: Color(0xFF10B981), fontWeight: FontWeight.bold)),
                               ),
+                              if (LifeTemplates.matchTemplateKey(store.category) == 'movie') ...[
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: Colors.indigo.withAlpha(50),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: Colors.indigoAccent.withAlpha(90)),
+                                  ),
+                                  child: Text(
+                                    resolveMediaType(store.extras) == '电影'
+                                        ? '🎬 电影'
+                                        : '📺 ${resolveMediaType(store.extras)}',
+                                    style: const TextStyle(fontSize: 10, color: Colors.lightBlueAccent, fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                              ],
                               const SizedBox(width: 8),
                               Flexible(
                                 child: Text(
@@ -1448,16 +1472,19 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                             padding: const EdgeInsets.only(right: 8.0),
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(10),
-                              child: Image.file(
-                                File(store.images[iIdx]),
-                                width: 100,
-                                height: 80,
-                                fit: BoxFit.cover,
-                                errorBuilder: (c, e, s) => Container(
+                              child: Container(
+                                color: Colors.black38,
+                                child: Image.file(
+                                  File(store.images[iIdx]),
                                   width: 100,
                                   height: 80,
-                                  color: Colors.white10,
-                                  child: const Icon(Icons.image, color: Colors.white38),
+                                  fit: LifeTemplates.matchTemplateKey(store.category) == 'movie' ? BoxFit.contain : BoxFit.cover,
+                                  errorBuilder: (c, e, s) => Container(
+                                    width: 100,
+                                    height: 80,
+                                    color: Colors.white10,
+                                    child: const Icon(Icons.image, color: Colors.white38),
+                                  ),
                                 ),
                               ),
                             ),
@@ -1546,6 +1573,20 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                 decoration: BoxDecoration(color: const Color(0xFF10B981).withAlpha(40), borderRadius: BorderRadius.circular(6)),
                 child: Text(store.category, style: const TextStyle(fontSize: 10, color: Color(0xFF10B981), fontWeight: FontWeight.bold)),
               ),
+              if (LifeTemplates.matchTemplateKey(store.category) == 'movie') ...[
+                const SizedBox(width: 5),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: Colors.indigo.withAlpha(50),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    resolveMediaType(store.extras) == '电影' ? '🎬 电影' : '📺 ${resolveMediaType(store.extras)}',
+                    style: const TextStyle(fontSize: 9, color: Colors.lightBlueAccent, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -1619,7 +1660,7 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
   String _storeExtraSummary(StoreItem store) {
     if (store.extras.isEmpty) return '';
     final tpl = LifeTemplates.byKey(LifeTemplates.matchTemplateKey(store.category));
-    const priority = ['director', 'year', 'signature', 'author', 'bestSeason', 'brand', 'sku'];
+    const priority = ['director', 'year', 'genre', 'signature', 'author', 'bestSeason', 'brand', 'sku'];
     final parts = <String>[];
     for (final k in priority) {
       final v = store.extras[k];
