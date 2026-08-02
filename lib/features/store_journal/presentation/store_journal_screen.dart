@@ -516,6 +516,7 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                     decoration: InputDecoration(
                       labelText: '$nameLabel (必填)',
                       hintText: tpl.itemNameHint,
+                      hintStyle: const TextStyle(color: Colors.white60, fontSize: 12),
                       suffixIcon: (tpl.key == 'movie' && context.read<SettingsProvider>().tmdbEnabled)
                           ? IconButton(
                               icon: const Icon(Icons.search, color: Color(0xFF10B981)),
@@ -906,6 +907,7 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                 decoration: const InputDecoration(
                   labelText: '字段名称',
                   hintText: '例如: 产地 / 口味 / 座位号',
+                  hintStyle: TextStyle(color: Colors.white60, fontSize: 12),
                 ),
               ),
               const SizedBox(height: 12),
@@ -1025,6 +1027,7 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                     decoration: const InputDecoration(
                       labelText: '菜名',
                       hintText: '例如: 招牌红烧肉 / 冰美式',
+                      hintStyle: TextStyle(color: Colors.white60, fontSize: 12),
                       prefixIcon: Icon(Icons.restaurant_menu),
                       border: OutlineInputBorder(),
                     ),
@@ -1036,6 +1039,7 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                     decoration: const InputDecoration(
                       labelText: '固定价格 (元)',
                       hintText: '例如: 38',
+                      hintStyle: TextStyle(color: Colors.white60, fontSize: 12),
                       prefixIcon: Icon(Icons.attach_money),
                       border: OutlineInputBorder(),
                     ),

@@ -552,7 +552,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       contentPadding: EdgeInsets.zero,
                       leading: Icon(Icons.info_outline, color: Color(0xFF06B6D4)),
                       title: Text('StepLife 步履生活', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
-                      subtitle: Text('v1.4.1+20260803 · 数据来源 TMDB', style: TextStyle(fontSize: 12, color: Colors.white54)),
+                      subtitle: Text('v1.4.2+20260804 · 数据来源 TMDB', style: TextStyle(fontSize: 12, color: Colors.white54)),
                     ),
                     const SizedBox(height: 4),
                     if (settings.backupWarning.isNotEmpty)

@@ -7,7 +7,10 @@ import '../../../core/settings/settings_provider.dart';
 import '../domain/life_templates.dart';
 
 /// 按模板字段类型渲染动态表单控件（受控：value + onChanged）
-class TemplateFieldWidget extends StatelessWidget {
+///
+/// 注意：文本类控件必须持有持久的 TextEditingController，
+/// 否则每次 rebuild 重建控制器会导致输入时光标跳位/文字错乱。
+class TemplateFieldWidget extends StatefulWidget {
   final TemplateField field;
   final dynamic value;
   final ValueChanged<dynamic> onChanged;
@@ -19,6 +22,68 @@ class TemplateFieldWidget extends StatelessWidget {
     required this.onChanged,
   });
 
+  @override
+  State<TemplateFieldWidget> createState() => _TemplateFieldWidgetState();
+}
+
+class _TemplateFieldWidgetState extends State<TemplateFieldWidget> {
+  late final TextEditingController _textController;
+
+  /// 标记本次重建是否由本组件自身输入触发（避免覆盖正在输入的内容）
+  bool _selfChange = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _textController = TextEditingController(text: _textOf(widget.value));
+  }
+
+  @override
+  void didUpdateWidget(covariant TemplateFieldWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_selfChange) {
+      // 自己输入引起的重建：保留用户正在输入的内容
+      _selfChange = false;
+      return;
+    }
+    final newText = _textOf(widget.value);
+    if (newText != _textController.text) {
+      _textController.text = newText;
+    }
+  }
+
+  @override
+  void dispose() {
+    _textController.dispose();
+    super.dispose();
+  }
+
+  /// 把字段值转成文本框文本
+  String _textOf(dynamic value) {
+    if (widget.field.type == TemplateFieldType.tags) {
+      final tags = (value is List) ? value.cast<String>() : <String>[];
+      return tags.join('、');
+    }
+    if (widget.field.type == TemplateFieldType.number) {
+      if (value is num) {
+        final n = value.toDouble();
+        return n == n.roundToDouble() ? n.toStringAsFixed(0) : n.toString();
+      }
+      return '';
+    }
+    return value?.toString() ?? '';
+  }
+
+  /// 数字解析：仅当可解析时回传数字；不可解析（如输入 45. 中间态）不更新值，
+  /// 避免 didUpdateWidget 用格式化后的文本覆盖用户输入。
+  void _onNumberChanged(String v) {
+    _selfChange = true;
+    final parsed = double.tryParse(v.trim());
+    if (parsed != null) {
+      widget.onChanged(parsed);
+    }
+  }
+
   Future<void> _pickImage(BuildContext context, {required bool tmdb}) async {
     final picker = ImagePicker();
     final quality = context.read<SettingsProvider>().imageQuality;
@@ -29,7 +94,7 @@ class TemplateFieldWidget extends StatelessWidget {
     if (img == null) return;
     try {
       final saved = await CacheManager.instance.copyToCache(img.path, tmdb: tmdb);
-      onChanged(saved);
+      widget.onChanged(saved);
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -39,26 +104,40 @@ class TemplateFieldWidget extends StatelessWidget {
     }
   }
 
+  static const TextStyle _hintStyle = TextStyle(color: Colors.white60, fontSize: 12);
+
   @override
   Widget build(BuildContext context) {
+    final field = widget.field;
     final type = field.type;
     switch (type) {
       case TemplateFieldType.multiline:
         return TextField(
-          controller: TextEditingController(text: value?.toString() ?? ''),
+          controller: _textController,
           maxLines: 3,
-          decoration: InputDecoration(labelText: field.label, hintText: field.hint),
-          onChanged: onChanged,
+          decoration: InputDecoration(
+            labelText: field.label,
+            hintText: field.hint,
+            hintStyle: _hintStyle,
+          ),
+          onChanged: (v) {
+            _selfChange = true;
+            widget.onChanged(v);
+          },
         );
       case TemplateFieldType.number:
         return TextField(
-          controller: TextEditingController(text: value?.toString() ?? ''),
+          controller: _textController,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: InputDecoration(labelText: field.label, hintText: field.hint),
-          onChanged: (v) => onChanged(double.tryParse(v)),
+          decoration: InputDecoration(
+            labelText: field.label,
+            hintText: field.hint,
+            hintStyle: _hintStyle,
+          ),
+          onChanged: _onNumberChanged,
         );
       case TemplateFieldType.rating:
-        final rating = (value is num) ? (value as num).toDouble() : 5.0;
+        final rating = (widget.value is num) ? (widget.value as num).toDouble() : 5.0;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -77,22 +156,27 @@ class TemplateFieldWidget extends StatelessWidget {
               activeColor: Colors.amber,
               inactiveColor: Colors.amber.withAlpha(50),
               label: '${rating.toStringAsFixed(1)}分',
-              onChanged: (v) => onChanged(v),
+              onChanged: (v) => widget.onChanged(v),
             ),
           ],
         );
       case TemplateFieldType.choice:
         final options = field.options ?? const [];
         // 安全兜底：值不在选项中时回退到第一个选项，绝不因脏数据崩溃
-        var current = value?.toString() ?? field.defaultValue ?? (options.isNotEmpty ? options.first : '');
+        var current = widget.value?.toString() ??
+            field.defaultValue ??
+            (options.isNotEmpty ? options.first : '');
         if (options.isNotEmpty && !options.contains(current)) {
           current = options.first;
         }
         if (options.isEmpty) {
           return TextField(
-            controller: TextEditingController(text: current),
-            decoration: InputDecoration(labelText: field.label),
-            onChanged: onChanged,
+            controller: _textController,
+            decoration: InputDecoration(labelText: field.label, hintStyle: _hintStyle),
+            onChanged: (v) {
+              _selfChange = true;
+              widget.onChanged(v);
+            },
           );
         }
         return DropdownButtonFormField<String>(
@@ -102,7 +186,7 @@ class TemplateFieldWidget extends StatelessWidget {
               .map((o) => DropdownMenuItem(value: o, child: Text(o)))
               .toList(),
           onChanged: (v) {
-            if (v != null) onChanged(v);
+            if (v != null) widget.onChanged(v);
           },
         );
       case TemplateFieldType.date:
@@ -110,7 +194,7 @@ class TemplateFieldWidget extends StatelessWidget {
           contentPadding: EdgeInsets.zero,
           leading: const Icon(Icons.event_outlined, color: Color(0xFF10B981)),
           title: Text(
-            value?.toString() ?? '选择日期',
+            widget.value?.toString() ?? '选择日期',
             style: const TextStyle(fontSize: 14),
           ),
           subtitle: Text(field.label, style: const TextStyle(fontSize: 12, color: Colors.white54)),
@@ -123,12 +207,12 @@ class TemplateFieldWidget extends StatelessWidget {
               lastDate: DateTime(2035),
             );
             if (picked != null) {
-              onChanged(picked.toIso8601String().substring(0, 10));
+              widget.onChanged(picked.toIso8601String().substring(0, 10));
             }
           },
         );
       case TemplateFieldType.image:
-        final path = value?.toString();
+        final path = widget.value?.toString();
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -146,7 +230,7 @@ class TemplateFieldWidget extends StatelessWidget {
                   Positioned(
                     top: 2, right: 2,
                     child: GestureDetector(
-                      onTap: () => onChanged(''),
+                      onTap: () => widget.onChanged(''),
                       child: Container(
                         decoration: const BoxDecoration(color: Colors.black87, shape: BoxShape.circle),
                         child: const Icon(Icons.close, color: Colors.white, size: 16),
@@ -165,7 +249,7 @@ class TemplateFieldWidget extends StatelessWidget {
           ],
         );
       case TemplateFieldType.images:
-        final list = (value is List) ? List<String>.from(value) : <String>[];
+        final list = (widget.value is List) ? List<String>.from(widget.value) : <String>[];
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -182,7 +266,7 @@ class TemplateFieldWidget extends StatelessWidget {
                       if (img == null) return;
                       try {
                         final saved = await CacheManager.instance.copyToCache(img.path);
-                        onChanged([...list, saved]);
+                        widget.onChanged([...list, saved]);
                       } catch (e) {
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -214,7 +298,7 @@ class TemplateFieldWidget extends StatelessWidget {
                       Positioned(
                         top: 2, right: 2,
                         child: GestureDetector(
-                          onTap: () => onChanged(list.where((x) => x != p).toList()),
+                          onTap: () => widget.onChanged(list.where((x) => x != p).toList()),
                           child: Container(
                             decoration: const BoxDecoration(color: Colors.black87, shape: BoxShape.circle),
                             child: const Icon(Icons.close, color: Colors.white, size: 16),
@@ -231,21 +315,34 @@ class TemplateFieldWidget extends StatelessWidget {
         return SwitchListTile(
           contentPadding: EdgeInsets.zero,
           title: Text(field.label, style: const TextStyle(fontSize: 14)),
-          value: value == true,
-          onChanged: (v) => onChanged(v),
+          value: widget.value == true,
+          onChanged: (v) => widget.onChanged(v),
         );
       case TemplateFieldType.tags:
-        final tags = (value is List) ? (value).cast<String>() : <String>[];
         return TextField(
-          controller: TextEditingController(text: tags.join('、')),
-          decoration: InputDecoration(labelText: field.label, hintText: '用、分隔多个标签'),
-          onChanged: (v) => onChanged(v.split('、').map((e) => e.trim()).where((e) => e.isNotEmpty).toList()),
+          controller: _textController,
+          decoration: InputDecoration(
+            labelText: field.label,
+            hintText: '用、分隔多个标签',
+            hintStyle: _hintStyle,
+          ),
+          onChanged: (v) {
+            _selfChange = true;
+            widget.onChanged(v.split('、').map((e) => e.trim()).where((e) => e.isNotEmpty).toList());
+          },
         );
       case TemplateFieldType.text:
         return TextField(
-          controller: TextEditingController(text: value?.toString() ?? ''),
-          decoration: InputDecoration(labelText: field.label, hintText: field.hint),
-          onChanged: onChanged,
+          controller: _textController,
+          decoration: InputDecoration(
+            labelText: field.label,
+            hintText: field.hint,
+            hintStyle: _hintStyle,
+          ),
+          onChanged: (v) {
+            _selfChange = true;
+            widget.onChanged(v);
+          },
         );
     }
   }

@@ -184,6 +184,7 @@ class StoreCheckinDialog extends StatelessWidget {
                   decoration: const InputDecoration(
                     labelText: '本次打卡消费金额',
                     hintText: '例: 45 元 (不涉及消费可留空或填 0)',
+                    hintStyle: TextStyle(color: Colors.white60, fontSize: 12),
                     prefixIcon: Icon(Icons.attach_money),
                     border: OutlineInputBorder(),
                   ),
@@ -232,6 +233,7 @@ class StoreCheckinDialog extends StatelessWidget {
                   decoration: const InputDecoration(
                     labelText: '点评 / 体验感受',
                     hintText: '记录本次体验、口味评价等 (选填)',
+                    hintStyle: TextStyle(color: Colors.white60, fontSize: 12),
                     border: OutlineInputBorder(),
                   ),
                   maxLines: 2,
