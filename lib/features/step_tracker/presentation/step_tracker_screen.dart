@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import '../../../core/settings/settings_button.dart';
 import '../domain/step_models.dart';
 import '../providers/step_provider.dart';
 import '../../chore_tracker/providers/chore_provider.dart';
@@ -539,6 +540,7 @@ class _StepTrackerScreenState extends State<StepTrackerScreen>
       appBar: AppBar(
         title: const Text('路线资产与步量打卡'),
         actions: [
+          const SettingsButton(),
           IconButton(
             icon: const Icon(Icons.add_location_alt_outlined),
             tooltip: '新建客观路线资产',

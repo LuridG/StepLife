@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../domain/store_models.dart';
+import '../domain/life_templates.dart';
 import '../providers/store_provider.dart';
+import 'store_checkin_dialog.dart';
 
 class StoreDetailScreen extends StatelessWidget {
   final StoreItem storeItem;
@@ -41,6 +43,40 @@ class StoreDetailScreen extends StatelessWidget {
     final storeProvider = context.watch<StoreProvider>();
     final logs = storeProvider.getLogsForStore(storeItem.id!);
     final totalCost = storeProvider.getTotalCostForStore(storeItem.id!);
+
+    // 模板专属字段（概览展示）
+    StoreCategory? cat;
+    for (final c in storeProvider.categories) {
+      if (c.name == storeItem.category) {
+        cat = c;
+        break;
+      }
+    }
+    final tpl = LifeTemplates.byKey(cat?.templateKey ?? LifeTemplates.matchTemplateKey(storeItem.category));
+    final itemFields = [
+      ...tpl.itemFields,
+      ...(cat?.extraFields ?? const []).map((m) => TemplateField.fromJson(m)),
+    ];
+    final presentFields = itemFields
+        .where((f) =>
+            storeItem.extras[f.key] != null &&
+            storeItem.extras[f.key].toString().isNotEmpty)
+        .toList();
+    // 通用模板在表单内自由添加的自定义字段：按 key 兜底渲染
+    final knownKeys = itemFields.map((f) => f.key).toSet();
+    final looseExtras = storeItem.extras.entries
+        .where((e) =>
+            !knownKeys.contains(e.key) &&
+            e.value != null &&
+            e.value.toString().isNotEmpty)
+        .map((e) => MapEntry(e.key, e.value.toString()))
+        .toList();
+    final menuItems = storeProvider.getMenuItemsForStore(storeItem.id ?? 0);
+
+    final logFieldLabels = {
+      for (final f in [...tpl.checkinFields, ...(cat?.extraFields ?? const []).map((m) => TemplateField.fromJson(m))])
+        f.key: f.label,
+    };
 
     // 计算同行成员频率
     final Map<String, int> visitorCounts = {};
@@ -152,6 +188,32 @@ class StoreDetailScreen extends StatelessWidget {
                             Text('${storeItem.rating.toStringAsFixed(1)} 分', style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold, fontSize: 15)),
                           ],
                         ),
+                        if (presentFields.isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          ...presentFields.map((f) => Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    SizedBox(width: 92, child: Text(f.label, style: const TextStyle(fontSize: 12, color: Colors.white54))),
+                                    Expanded(child: Text(_formatFieldValue(f, storeItem.extras[f.key]), style: const TextStyle(fontSize: 12, color: Colors.white))),
+                                  ],
+                                ),
+                              )),
+                        ],
+                        if (looseExtras.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          ...looseExtras.map((en) => Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    SizedBox(width: 92, child: Text(en.key, style: const TextStyle(fontSize: 12, color: Colors.white54))),
+                                    Expanded(child: Text(en.value, style: const TextStyle(fontSize: 12, color: Colors.white))),
+                                  ],
+                                ),
+                              )),
+                        ],
                         const SizedBox(height: 14),
                         const Divider(color: Colors.white12),
                         const SizedBox(height: 10),
@@ -207,6 +269,84 @@ class StoreDetailScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 20),
 
+                // 餐饮菜单：固定菜品与价格（打卡点菜自动合计）
+                if (tpl.key == 'dining') ...[
+                  const SizedBox(height: 20),
+                  const Row(
+                    children: [
+                      Icon(Icons.restaurant_menu, color: Color(0xFF10B981), size: 20),
+                      SizedBox(width: 8),
+                      Text('店铺菜单', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  menuItems.isEmpty
+                      ? _buildGlassCard(
+                          child: const Padding(
+                            padding: EdgeInsets.all(20.0),
+                            child: Center(
+                              child: Text('暂无菜单，编辑店铺时可添加固定菜品与价格，之后打卡点菜自动统计消费。', style: TextStyle(color: Colors.white54, fontSize: 13)),
+                            ),
+                          ),
+                        )
+                      : _buildGlassCard(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                            child: Column(
+                              children: [
+                                for (int i = 0; i < menuItems.length; i++) ...[
+                                  if (i > 0) const Divider(color: Colors.white12, height: 1),
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 10),
+                                    child: Row(
+                                      children: [
+                                        if (menuItems[i].imagePath != null && menuItems[i].imagePath!.isNotEmpty)
+                                          ClipRRect(
+                                            borderRadius: BorderRadius.circular(10),
+                                            child: Image.file(
+                                              File(menuItems[i].imagePath!),
+                                              width: 46,
+                                              height: 46,
+                                              fit: BoxFit.cover,
+                                              errorBuilder: (c, e, s) => Container(
+                                                width: 46,
+                                                height: 46,
+                                                color: Colors.white10,
+                                                child: const Icon(Icons.restaurant, color: Colors.white38, size: 22),
+                                              ),
+                                            ),
+                                          )
+                                        else
+                                          Container(
+                                            width: 46,
+                                            height: 46,
+                                            decoration: BoxDecoration(
+                                              color: Colors.white10,
+                                              borderRadius: BorderRadius.circular(10),
+                                            ),
+                                            child: const Icon(Icons.restaurant_menu, color: Colors.white38, size: 22),
+                                          ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Text(
+                                            menuItems[i].name,
+                                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white),
+                                          ),
+                                        ),
+                                        Text(
+                                          '¥${_fmtPrice(menuItems[i].price)}',
+                                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF10B981)),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ),
+                ],
+
                 // 分钟级打卡履约历史时间线 (Timeline)
                 const Row(
                   children: [
@@ -257,6 +397,19 @@ class StoreDetailScreen extends StatelessWidget {
                                             if (log.cost != null && log.cost! > 0)
                                               Text('¥${log.cost!.toStringAsFixed(1)}', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF10B981), fontSize: 14)),
                                             IconButton(
+                                              icon: const Icon(Icons.edit_outlined, color: Colors.lightBlueAccent, size: 18),
+                                              tooltip: '修改打卡',
+                                              onPressed: () {
+                                                showDialog(
+                                                  context: context,
+                                                  builder: (ctx) => StoreCheckinDialog(
+                                                    store: storeItem,
+                                                    existingLog: log,
+                                                  ),
+                                                );
+                                              },
+                                            ),
+                                            IconButton(
                                               icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 18),
                                               onPressed: () => _confirmDeleteLog(context, log),
                                             ),
@@ -264,6 +417,36 @@ class StoreDetailScreen extends StatelessWidget {
                                         ),
                                       ],
                                     ),
+                                    if (log.extras.isNotEmpty) ...[
+                                      const SizedBox(height: 6),
+                                      ..._formatLogExtras(log, logFieldLabels),
+                                    ],
+                                    if (log.menuNames.isNotEmpty) ...[
+                                      const SizedBox(height: 6),
+                                      Row(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          const Text('点菜: ', style: TextStyle(fontSize: 12, color: Colors.white54)),
+                                          Expanded(
+                                            child: Wrap(
+                                              spacing: 6,
+                                              runSpacing: 4,
+                                              children: log.menuNames.map((n) {
+                                                return Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                  decoration: BoxDecoration(
+                                                    color: const Color(0xFF10B981).withAlpha(25),
+                                                    borderRadius: BorderRadius.circular(6),
+                                                    border: Border.all(color: const Color(0xFF10B981).withAlpha(60)),
+                                                  ),
+                                                  child: Text(n, style: const TextStyle(fontSize: 11, color: Color(0xFF10B981))),
+                                                );
+                                              }).toList(),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
                                     if (log.visitorNames.isNotEmpty) ...[
                                       const SizedBox(height: 6),
                                       Row(
@@ -302,6 +485,55 @@ class StoreDetailScreen extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  /// 金额格式化：整数不带小数，非整数保留 1 位小数
+  String _fmtPrice(double v) {
+    if (v == v.roundToDouble()) {
+      return v.toStringAsFixed(0);
+    }
+    return v.toStringAsFixed(1);
+  }
+
+  String _formatFieldValue(TemplateField f, dynamic value) {
+    if (value == null) return '';
+    switch (f.type) {
+      case TemplateFieldType.switchField:
+        return value == true ? '是' : '否';
+      case TemplateFieldType.images:
+        return (value is List) ? '${value.length} 张图片' : value.toString();
+      case TemplateFieldType.image:
+        return '已添加图片';
+      case TemplateFieldType.rating:
+        return '⭐ ${value is num ? value.toStringAsFixed(1) : value.toString()}';
+      default:
+        return value.toString();
+    }
+  }
+
+  /// 打卡记录中的模板字段摘要
+  List<Widget> _formatLogExtras(StoreLog log, Map<String, String> labels) {
+    final widgets = <Widget>[];
+    log.extras.forEach((key, value) {
+      if (value == null) return;
+      final str = value.toString();
+      if (str.isEmpty || str == 'false') return;
+      final display = value == true ? '是' : str;
+      final label = labels[key] ?? key;
+      widgets.add(Padding(
+        padding: const EdgeInsets.only(bottom: 4),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('$label: ', style: const TextStyle(fontSize: 12, color: Colors.white54)),
+            Expanded(
+              child: Text(display, style: const TextStyle(fontSize: 12, color: Colors.white70)),
+            ),
+          ],
+        ),
+      ));
+    });
+    return widgets;
   }
 
   Widget _buildGlassCard({required Widget child}) {

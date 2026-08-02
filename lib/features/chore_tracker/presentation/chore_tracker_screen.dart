@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import '../../../core/settings/settings_button.dart';
 import '../domain/chore_models.dart';
 import '../providers/chore_provider.dart';
 import '../../../core/utils/number_formatter.dart';
@@ -282,13 +283,14 @@ class _ChoreTrackerScreenState extends State<ChoreTrackerScreen>
 
     final now = DateTime.now();
     final recentDates = List.generate(5, (index) {
-      return DateTime(now.year, now.month, now.day).subtract(Duration(days: 4 - index));
+      return DateTime(now.year, now.month, now.day).subtract(Duration(days: index));
     });
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('家务习惯打卡'),
         actions: [
+          const SettingsButton(),
           IconButton(
             icon: const Icon(Icons.playlist_add_outlined),
             tooltip: '新建家务Item',

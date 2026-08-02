@@ -1,0 +1,265 @@
+import 'dart:convert';
+
+/// 模板字段类型
+enum TemplateFieldType {
+  text, // 单行文本
+  multiline, // 多行文本
+  number, // 数字
+  rating, // 星级评分（1-5）
+  choice, // 单选
+  date, // 日期
+  image, // 单张图片
+  images, // 图片集（最多 3 张）
+  switchField, // 开关（是/否）
+  tags, // 标签列表
+}
+
+/// 影视类型/题材选项：粗分类 + TMDB 常用题材（保证 TMDB 导入的类型可直接落选）
+const List<String> kMovieTypeOptions = [
+  '电影', '电视剧', '动漫', '纪录片', '综艺',
+  '动作', '冒险', '动画', '喜剧', '犯罪', '剧情', '家庭', '奇幻', '恐怖',
+  '悬疑', '音乐', '爱情', '科幻', '惊悚', '战争', '西部', '真人秀', '脱口秀',
+];
+
+/// 模板字段定义（内建模板字段 + 用户自定义字段共用）
+class TemplateField {
+  final String key; // 'director' / 'custom_1'
+  final String label; // 显示名
+  final TemplateFieldType type;
+  final String hint;
+  final bool required;
+  final List<String>? options; // choice 类型用
+  final String? defaultValue;
+
+  const TemplateField({
+    required this.key,
+    required this.label,
+    required this.type,
+    this.hint = '',
+    this.required = false,
+    this.options,
+    this.defaultValue,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'key': key,
+        'label': label,
+        'type': type.name,
+        'hint': hint,
+        'required': required,
+        'options': options,
+        'defaultValue': defaultValue,
+      };
+
+  factory TemplateField.fromJson(Map<String, dynamic> json) {
+    return TemplateField(
+      key: json['key'] as String? ?? '',
+      label: json['label'] as String? ?? '',
+      type: TemplateFieldType.values.firstWhere(
+        (t) => t.name == json['type'],
+        orElse: () => TemplateFieldType.text,
+      ),
+      hint: json['hint'] as String? ?? '',
+      required: json['required'] as bool? ?? false,
+      options: (json['options'] as List?)?.map((e) => e.toString()).toList(),
+      defaultValue: json['defaultValue'] as String?,
+    );
+  }
+}
+
+/// 生活模板定义：新建项目表单字段 + 打卡表单字段
+class LifeTemplate {
+  final String key; // 'movie'
+  final String name; // '影视观影'
+  final String iconName; // 用于模板画廊展示
+  final String description;
+  final String itemNameLabel; // '片名'
+  final String itemNameHint;
+  final List<TemplateField> itemFields; // 新建项目字段
+  final List<TemplateField> checkinFields; // 打卡字段
+
+  const LifeTemplate({
+    required this.key,
+    required this.name,
+    required this.iconName,
+    required this.description,
+    required this.itemNameLabel,
+    required this.itemNameHint,
+    this.itemFields = const [],
+    this.checkinFields = const [],
+  });
+}
+
+/// 内置模板注册表
+class LifeTemplates {
+  static const List<LifeTemplate> all = [
+    LifeTemplate(
+      key: 'movie',
+      name: '影视观影',
+      iconName: 'movie',
+      description: '电影 / 电视剧 / 动漫 / 纪录片，支持 TMDB 导入',
+      itemNameLabel: '片名',
+      itemNameHint: '例: 《流浪地球2》',
+      itemFields: [
+        TemplateField(key: 'type', label: '类型', type: TemplateFieldType.choice, options: kMovieTypeOptions, defaultValue: '电影'),
+        TemplateField(key: 'year', label: '年份', type: TemplateFieldType.text, hint: '例: 2023'),
+        TemplateField(key: 'director', label: '导演 / 主演', type: TemplateFieldType.text, hint: '例: 郭帆 / 吴京'),
+        TemplateField(key: 'duration', label: '片长（分钟）', type: TemplateFieldType.number, hint: '例: 173'),
+        TemplateField(key: 'platform', label: '观看平台', type: TemplateFieldType.text, hint: '例: 电影院 / 爱奇艺'),
+        TemplateField(key: 'synopsis', label: '剧情简介', type: TemplateFieldType.multiline, hint: '影片剧情梗概（TMDB 导入自动填充）'),
+        TemplateField(key: 'reason', label: '种草理由', type: TemplateFieldType.multiline, hint: '为什么想看'),
+      ],
+      checkinFields: [
+        TemplateField(key: 'channel', label: '观影渠道', type: TemplateFieldType.choice, options: ['影院', '线上平台', 'DVD/下载', '其他']),
+        TemplateField(key: 'rewatch', label: '是否二刷', type: TemplateFieldType.switchField),
+        TemplateField(key: 'review', label: '观后感', type: TemplateFieldType.multiline, hint: '值得看吗？最打动你的点'),
+      ],
+    ),
+    LifeTemplate(
+      key: 'dining',
+      name: '餐饮探店',
+      iconName: 'restaurant',
+      description: '餐厅 / 小吃 / 咖啡甜品 / 日常小店',
+      itemNameLabel: '店名',
+      itemNameHint: '例: 川湘阁',
+      itemFields: [
+        TemplateField(key: 'cuisine', label: '品类', type: TemplateFieldType.choice, options: ['中餐', '西餐', '日料', '火锅', '烧烤', '小吃', '咖啡甜品', '奶茶', '其他']),
+        TemplateField(key: 'avgCost', label: '人均参考（元）', type: TemplateFieldType.number, hint: '例: 80'),
+        TemplateField(key: 'signature', label: '招牌推荐菜', type: TemplateFieldType.multiline, hint: '例: 剁椒鱼头、辣子鸡'),
+        TemplateField(key: 'queueTip', label: '排队提示', type: TemplateFieldType.text, hint: '例: 晚饭需等位 40 分钟'),
+        TemplateField(key: 'bestTime', label: '最佳时段', type: TemplateFieldType.text, hint: '例: 周二晚 7 点人少'),
+      ],
+      checkinFields: [
+        TemplateField(key: 'dishes', label: '点了哪些菜', type: TemplateFieldType.multiline, hint: '例: 毛血旺、冰粉'),
+        TemplateField(key: 'taste', label: '口味评价', type: TemplateFieldType.choice, options: ['惊艳', '不错', '一般', '踩雷']),
+        TemplateField(key: 'ambience', label: '环境服务', type: TemplateFieldType.choice, options: ['很好', '尚可', '一般', '较差']),
+        TemplateField(key: 'recommend', label: '推荐指数', type: TemplateFieldType.rating),
+      ],
+    ),
+    LifeTemplate(
+      key: 'book',
+      name: '书籍阅读',
+      iconName: 'menu_book',
+      description: '小说 / 社科 / 工具书阅读记录',
+      itemNameLabel: '书名',
+      itemNameHint: '例: 《三体》',
+      itemFields: [
+        TemplateField(key: 'author', label: '作者', type: TemplateFieldType.text, hint: '例: 刘慈欣'),
+        TemplateField(key: 'publisher', label: '出版社', type: TemplateFieldType.text),
+        TemplateField(key: 'pages', label: '页数', type: TemplateFieldType.number),
+        TemplateField(key: 'status', label: '阅读状态', type: TemplateFieldType.choice, options: ['想读', '在读', '读完', '弃读'], defaultValue: '想读'),
+        TemplateField(key: 'summary', label: '简介', type: TemplateFieldType.multiline, hint: '一句话介绍这本书'),
+      ],
+      checkinFields: [
+        TemplateField(key: 'progress', label: '阅读进度', type: TemplateFieldType.text, hint: '例: 读到第 180 页 / 43%'),
+        TemplateField(key: 'duration', label: '本次阅读时长（分钟）', type: TemplateFieldType.number),
+        TemplateField(key: 'note', label: '摘抄 / 感想', type: TemplateFieldType.multiline),
+      ],
+    ),
+    LifeTemplate(
+      key: 'place',
+      name: '景点游玩',
+      iconName: 'landscape',
+      description: '景点 / 公园 / 展馆 / 演出',
+      itemNameLabel: '地点名称',
+      itemNameHint: '例: 西湖',
+      itemFields: [
+        TemplateField(key: 'ticket', label: '门票参考（元）', type: TemplateFieldType.number, hint: '例: 0 免费'),
+        TemplateField(key: 'suggestDuration', label: '建议游玩时长', type: TemplateFieldType.text, hint: '例: 半天'),
+        TemplateField(key: 'transport', label: '交通方式', type: TemplateFieldType.text, hint: '例: 地铁 1 号线'),
+        TemplateField(key: 'bestSeason', label: '最佳季节', type: TemplateFieldType.text, hint: '例: 秋季'),
+        TemplateField(key: 'tips', label: '游玩攻略', type: TemplateFieldType.multiline, hint: '注意事项 / 必打卡点'),
+      ],
+      checkinFields: [
+        TemplateField(key: 'hours', label: '游玩时长（小时）', type: TemplateFieldType.number),
+        TemplateField(key: 'highlights', label: '亮点项目', type: TemplateFieldType.multiline),
+        TemplateField(key: 'feeling', label: '游玩感受', type: TemplateFieldType.multiline),
+      ],
+    ),
+    LifeTemplate(
+      key: 'shopping',
+      name: '购物好物',
+      iconName: 'shopping_bag',
+      description: '百货 / 数码 / 生鲜 / 服饰好物',
+      itemNameLabel: '商品名称',
+      itemNameHint: '例: 无线降噪耳机',
+      itemFields: [
+        TemplateField(key: 'brand', label: '品牌', type: TemplateFieldType.text),
+        TemplateField(key: 'sku', label: '规格型号', type: TemplateFieldType.text, hint: '例: 256G 黑色'),
+        TemplateField(key: 'refPrice', label: '参考价（元）', type: TemplateFieldType.number),
+        TemplateField(key: 'buyReason', label: '购买理由', type: TemplateFieldType.multiline, hint: '为什么想买'),
+      ],
+      checkinFields: [
+        TemplateField(key: 'actualCost', label: '实付金额（元）', type: TemplateFieldType.number),
+        TemplateField(key: 'detail', label: '购买明细', type: TemplateFieldType.multiline, hint: '渠道 / 优惠 / 赠品'),
+        TemplateField(key: 'experience', label: '使用体验', type: TemplateFieldType.multiline),
+      ],
+    ),
+    LifeTemplate(
+      key: 'generic',
+      name: '通用（自定义）',
+      iconName: 'dashboard_customize',
+      description: '通用骨架，支持自由追加自定义字段',
+      itemNameLabel: '名称',
+      itemNameHint: '例: 任何想记录的事',
+      itemFields: [],
+      checkinFields: [],
+    ),
+  ];
+
+  static LifeTemplate byKey(String key) {
+    return all.firstWhere(
+      (t) => t.key == key,
+      orElse: () => all.last,
+    );
+  }
+
+  /// 根据分类名称智能匹配模板（关键词命中，不区分大小写）
+  static String matchTemplateKey(String categoryName) {
+    final name = categoryName.toLowerCase();
+    const rules = <String, List<String>>{
+      'movie': ['电影', '影视', '剧', '动漫', '纪录', 'movie', 'film'],
+      'dining': ['餐厅', '小吃', '咖啡', '甜品', '小店', '奶茶', '美食', '餐饮', '饭店', '馆', '食堂'],
+      'book': ['书', '阅读', '小说', '工具书', 'book'],
+      'place': ['景点', '公园', '展馆', '演出', '旅行', '游玩', '旅游', '博物馆'],
+      'shopping': ['购物', '百货', '数码', '生鲜', '服饰', '好物', '家电'],
+    };
+    for (final entry in rules.entries) {
+      for (final kw in entry.value) {
+        if (name.contains(kw.toLowerCase())) {
+          return entry.key;
+        }
+      }
+    }
+    return 'generic';
+  }
+
+  /// 将 TemplateField 列表编码为 JSON 字符串
+  static String encodeFields(List<TemplateField> fields) {
+    return jsonEncode(fields.map((f) => f.toJson()).toList());
+  }
+
+  /// 解析分类自定义字段 JSON 字符串
+  static List<TemplateField> decodeFields(String? jsonStr) {
+    if (jsonStr == null || jsonStr.isEmpty) return [];
+    try {
+      final decoded = jsonDecode(jsonStr);
+      if (decoded is List) {
+        return decoded
+            .whereType<Map>()
+            .map((e) => TemplateField.fromJson(Map<String, dynamic>.from(e)))
+            .toList();
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  /// 合并模板内建字段 + 分类自定义字段（内建在前，自定义在后）
+  static List<TemplateField> mergedItemFields(LifeTemplate tpl, List<TemplateField> custom) {
+    return [...tpl.itemFields, ...custom];
+  }
+
+  static List<TemplateField> mergedCheckinFields(LifeTemplate tpl, List<TemplateField> custom) {
+    return [...tpl.checkinFields, ...custom];
+  }
+}

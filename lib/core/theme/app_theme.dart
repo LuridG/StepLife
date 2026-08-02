@@ -8,6 +8,59 @@ class AppTheme {
   static const Color backgroundColor = Color(0xFF0B1329); // Deep Midnight
   static const Color cardBgColor = Color(0x1AFFFFFF);
 
+
+  /// 浅色主题：页面背景保留品牌深色渐变，对话框保持深色毛玻璃以兼容现有硬编码文字
+  static ThemeData get lightTheme {
+    return ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.light,
+      scaffoldBackgroundColor: const Color(0xFFEFF3FA),
+      primaryColor: primaryColor,
+      colorScheme: const ColorScheme.light(
+        primary: primaryColor,
+        secondary: secondaryColor,
+        surface: Color(0xFFFFFFFF),
+        onSurface: Color(0xFF1A2333),
+      ),
+      textTheme: GoogleFonts.outfitTextTheme(ThemeData.light().textTheme),
+      appBarTheme: AppBarTheme(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        centerTitle: true,
+        titleTextStyle: GoogleFonts.outfit(
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
+          color: const Color(0xFF1A2333),
+          letterSpacing: 0.5,
+        ),
+        iconTheme: const IconThemeData(color: Color(0xFF334155)),
+      ),
+      cardTheme: CardThemeData(
+        color: Colors.white,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(color: Colors.black.withAlpha(15), width: 1),
+        ),
+      ),
+      // 对话框保留深色毛玻璃，保证现有白色文字可读
+      dialogTheme: DialogThemeData(
+        backgroundColor: const Color(0xFF0F172A),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(color: Colors.white.withAlpha(35), width: 1),
+        ),
+      ),
+      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+        backgroundColor: Color(0xFFFFFFFF),
+        selectedItemColor: primaryColor,
+        unselectedItemColor: Color(0xFF94A3B8),
+        elevation: 10,
+        type: BottomNavigationBarType.fixed,
+      ),
+    );
+  }
+
   static ThemeData get darkTheme {
     return ThemeData(
       useMaterial3: true,

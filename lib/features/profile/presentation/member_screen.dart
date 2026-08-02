@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import '../../../core/settings/settings_button.dart';
 import '../../chore_tracker/domain/chore_models.dart';
 import '../../chore_tracker/providers/chore_provider.dart';
 import '../../chore_tracker/presentation/member_dialog.dart';
@@ -25,6 +26,7 @@ class _MemberScreenState extends State<MemberScreen> with AutomaticKeepAliveClie
       appBar: AppBar(
         title: const Text('成员档案'),
         actions: [
+          const SettingsButton(),
           IconButton(
             icon: const Icon(Icons.person_add_outlined),
             tooltip: '新增成员档案',

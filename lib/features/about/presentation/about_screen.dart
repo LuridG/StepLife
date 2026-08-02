@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../../core/settings/settings_button.dart';
 
 class AboutScreen extends StatelessWidget {
   const AboutScreen({super.key});
@@ -52,6 +53,9 @@ class AboutScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('关于本程序'),
         centerTitle: true,
+        actions: [
+          const SettingsButton(),
+        ],
       ),
       body: Stack(
         children: [
@@ -102,7 +106,7 @@ class AboutScreen extends StatelessWidget {
                     border: Border.all(color: const Color(0xFF10B981).withAlpha(80)),
                   ),
                   child: const Text(
-                    '版本号: v1.3.0 (Build 20260730)',
+                    '版本号: v1.4.0 (Build 20260802)',
                     style: TextStyle(color: Color(0xFF10B981), fontSize: 12, fontWeight: FontWeight.bold),
                   ),
                 ),
@@ -129,8 +133,22 @@ class AboutScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 14),
                         _buildVersionItem(
-                          version: 'v1.3.0 (2026-07-30)',
+                          version: 'v1.4.0 (2026-08-02)',
                           isLatest: true,
+                          changes: [
+                            '🧩 生活模板化：影视/餐饮/书籍/景点/购物/通用 6 大模板，分类自动绑定，表单各有针对性。',
+                            '🛠️ 自定义字段：每个分类可追加文本/数字/单选/日期/图片/开关/标签等专属字段。',
+                            '🎬 TMDB 影视导入：填 Key 后影视模板支持搜索自动填充片名、导演、海报等信息。',
+                            '⚙️ 设置中心：右上角齿轮全局入口，收纳主题、视图、缓存、同步等全部选项。',
+                            '🖼️ 缓存管理：选图复制入应用目录、上限自动清理、压缩质量可调。',
+                            '☁️ WebDAV 同步：坚果云/Nextcloud 手动备份与恢复（数据库 + 图片增量）。',
+                            '🔒 非破坏数据迁移：升级前自动备份旧库，全程事务增量迁移与行数对账，零数据丢失。',
+                          ],
+                        ),
+                        const Divider(color: Colors.white12, height: 24),
+                        _buildVersionItem(
+                          version: 'v1.3.0 (2026-07-30)',
+                          isLatest: false,
                           changes: [
                             '👥 独立成员管理 Tab：新增专属成员档案 Bottom Tab，支持全员查看、编辑、删除与新增。',
                             '🎂 出生年月与动态年龄：成员档案引入出生日期登记，根据当前时间自动精准计算真实年龄。',

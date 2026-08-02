@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'core/theme/app_theme.dart';
+import 'core/settings/settings_provider.dart';
 import 'features/profile/providers/profile_provider.dart';
 import 'features/step_tracker/providers/step_provider.dart';
 import 'features/chore_tracker/providers/chore_provider.dart';
@@ -29,6 +30,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => StepProvider()),
         ChangeNotifierProvider(create: (_) => ChoreProvider()),
         ChangeNotifierProvider(create: (_) => StoreProvider()),
+        ChangeNotifierProvider(create: (_) => SettingsProvider()..load()),
       ],
       child: const StepLifeApp(),
     ),
@@ -40,11 +42,28 @@ class StepLifeApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'StepLife - 步履生活',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.darkTheme,
-      home: const MainHomeScreen(),
+    return Consumer<SettingsProvider>(
+      builder: (context, settings, _) {
+        final ThemeMode themeMode;
+        switch (settings.themeMode) {
+          case 'light':
+            themeMode = ThemeMode.light;
+            break;
+          case 'system':
+            themeMode = ThemeMode.system;
+            break;
+          default:
+            themeMode = ThemeMode.dark;
+        }
+        return MaterialApp(
+          title: 'StepLife - 步履生活',
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.darkTheme,
+          darkTheme: AppTheme.darkTheme,
+          themeMode: themeMode,
+          home: const MainHomeScreen(),
+        );
+      },
     );
   }
 }
