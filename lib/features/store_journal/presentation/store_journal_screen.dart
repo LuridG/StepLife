@@ -1372,6 +1372,34 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
       }
     }
 
+    // 影视二级筛选选项（媒体类型 / 题材 / 上映年份，按现有数据动态生成）
+    final mediaTypeOptions = <String>[];
+    final genreOptions = <String>[];
+    final yearOptions = <String>[];
+    for (final it in storeProvider.storeItems) {
+      if (LifeTemplates.matchTemplateKey(it.category) != 'movie') continue;
+      final mt = resolveMediaType(it.extras);
+      if (!mediaTypeOptions.contains(mt)) mediaTypeOptions.add(mt);
+      final g = it.extras['genre']?.toString() ?? '';
+      if (g.isNotEmpty && !genreOptions.contains(g)) genreOptions.add(g);
+      final y = it.extras['year']?.toString() ?? '';
+      if (y.isNotEmpty && int.tryParse(y) != null && !yearOptions.contains(y)) {
+        yearOptions.add(y);
+      }
+    }
+    mediaTypeOptions.sort(
+      (a, b) => kMovieMediaTypeOptions.indexOf(a).compareTo(kMovieMediaTypeOptions.indexOf(b)),
+    );
+    genreOptions.sort(
+      (a, b) => kMovieGenreOptions.indexOf(a).compareTo(kMovieGenreOptions.indexOf(b)),
+    );
+    yearOptions.sort((a, b) => int.parse(b).compareTo(int.parse(a)));
+    final shownYears = yearOptions.take(4).toList();
+    final hasOlderYears = yearOptions.length > shownYears.length;
+    if (shownYears.isNotEmpty) {
+      storeProvider.setEarliestShownYear(int.parse(shownYears.last));
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('生活记录'),
@@ -1531,6 +1559,87 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                       ),
                     ),
                   ],
+                  if (currentTplKey == 'movie') ...[
+                    // 媒体类型筛选
+                    const SizedBox(height: 8),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          FilterChip(
+                            label: const Text('全部媒体类型'),
+                            selected: storeProvider.selectedMediaType == '全部媒体类型',
+                            onSelected: (_) => storeProvider.selectMediaType('全部媒体类型'),
+                          ),
+                          ...mediaTypeOptions.map((t) => Padding(
+                                padding: const EdgeInsets.only(left: 6),
+                                child: FilterChip(
+                                  label: Text(t),
+                                  selected: storeProvider.selectedMediaType == t,
+                                  selectedColor: const Color(0xFF10B981).withAlpha(90),
+                                  onSelected: (_) => storeProvider.selectMediaType(t),
+                                ),
+                              )),
+                        ],
+                      ),
+                    ),
+                    // 题材筛选
+                    const SizedBox(height: 8),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          FilterChip(
+                            label: const Text('全部题材'),
+                            selected: storeProvider.selectedGenre == '全部题材',
+                            onSelected: (_) => storeProvider.selectGenre('全部题材'),
+                          ),
+                          ...genreOptions.map((t) => Padding(
+                                padding: const EdgeInsets.only(left: 6),
+                                child: FilterChip(
+                                  label: Text(t),
+                                  selected: storeProvider.selectedGenre == t,
+                                  selectedColor: const Color(0xFF6366F1).withAlpha(90),
+                                  onSelected: (_) => storeProvider.selectGenre(t),
+                                ),
+                              )),
+                        ],
+                      ),
+                    ),
+                    // 上映年份筛选
+                    const SizedBox(height: 8),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          FilterChip(
+                            label: const Text('全部年份'),
+                            selected: storeProvider.selectedYear == '全部年份',
+                            onSelected: (_) => storeProvider.selectYear('全部年份'),
+                          ),
+                          ...shownYears.map((y) => Padding(
+                                padding: const EdgeInsets.only(left: 6),
+                                child: FilterChip(
+                                  label: Text(y),
+                                  selected: storeProvider.selectedYear == y,
+                                  selectedColor: Colors.amber.withAlpha(70),
+                                  onSelected: (_) => storeProvider.selectYear(y),
+                                ),
+                              )),
+                          if (hasOlderYears)
+                            Padding(
+                              padding: const EdgeInsets.only(left: 6),
+                              child: FilterChip(
+                                label: const Text('更早'),
+                                selected: storeProvider.selectedYear == '更早',
+                                selectedColor: Colors.amber.withAlpha(70),
+                                onSelected: (_) => storeProvider.selectYear('更早'),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 16),
 
                   storeProvider.filteredStoreItems.isEmpty
@@ -1560,6 +1669,7 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
 
   // Card 模式 (支持点击翻转/跳转至独立 StoreDetailScreen 详情页)
   Widget _buildStoreGlassCard(StoreItem store, int checkinCount, double totalCost) {
+    final moviePlatforms = _platformsOf(store);
     return Padding(
       padding: const EdgeInsets.only(bottom: 14.0),
       child: _buildGlassCard(
@@ -1636,6 +1746,21 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                                     child: Text(
                                       store.extras['status'].toString(),
                                       style: TextStyle(fontSize: 9, color: _movieStatusColor(store.extras['status'].toString()), fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                ],
+                                if (resolveGenre(store.extras).isNotEmpty) ...[
+                                  const SizedBox(width: 5),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Colors.purple.withAlpha(50),
+                                      borderRadius: BorderRadius.circular(7),
+                                      border: Border.all(color: Colors.purpleAccent.withAlpha(90)),
+                                    ),
+                                    child: Text(
+                                      resolveGenre(store.extras),
+                                      style: const TextStyle(fontSize: 9, color: Colors.purpleAccent, fontWeight: FontWeight.bold),
                                     ),
                                   ),
                                 ],
@@ -1743,6 +1868,21 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                                       style: const TextStyle(fontSize: 10, color: Colors.lightBlueAccent, fontWeight: FontWeight.bold),
                                     ),
                                   ),
+                                  if (resolveGenre(store.extras).isNotEmpty) ...[
+                                    const SizedBox(width: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: Colors.purple.withAlpha(50),
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(color: Colors.purpleAccent.withAlpha(90)),
+                                      ),
+                                      child: Text(
+                                        resolveGenre(store.extras),
+                                        style: const TextStyle(fontSize: 10, color: Colors.purpleAccent, fontWeight: FontWeight.bold),
+                                      ),
+                                    ),
+                                  ],
                                 ],
                                 const SizedBox(width: 8),
                                 Flexible(
@@ -1831,7 +1971,15 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                     ),
                   ),
                 if (_isMovieItem(store)) ...[
-                  // 影视：卡片展示一句话点评（短评），长评只在详情页
+                  // 影视：卡片展示观看平台 + 一句话点评（短评），长评只在详情页
+                  if (moviePlatforms.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Text(
+                        '▶ ${moviePlatforms.join(' · ')}',
+                        style: const TextStyle(fontSize: 12, color: Colors.lightBlueAccent, fontWeight: FontWeight.w600),
+                      ),
+                    ),
                   if ((store.extras['reason']?.toString() ?? '').isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 4),
@@ -2045,6 +2193,16 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
   /// 影视观看进度与状态辅助
   bool _isMovieItem(StoreItem store) =>
       LifeTemplates.matchTemplateKey(store.category) == 'movie';
+
+  /// 观看平台：兼容多选 List 与旧版单值 String
+  List<String> _platformsOf(StoreItem store) {
+    final v = store.extras['platform'];
+    if (v == null) return const [];
+    final list = v is List
+        ? v.map((e) => e.toString()).where((e) => e.isNotEmpty).toList()
+        : [v.toString()];
+    return list;
+  }
 
   int _watchedEpisodesOf(StoreItem store) {
     final v = store.extras['watchedEpisodes'];

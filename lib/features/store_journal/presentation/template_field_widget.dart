@@ -29,6 +29,7 @@ class TemplateFieldWidget extends StatefulWidget {
 
 class _TemplateFieldWidgetState extends State<TemplateFieldWidget> {
   late final TextEditingController _textController;
+  late final TextEditingController _multiChoiceController;
 
   /// 标记本次重建是否由本组件自身输入触发（避免覆盖正在输入的内容）
   bool _selfChange = false;
@@ -37,6 +38,7 @@ class _TemplateFieldWidgetState extends State<TemplateFieldWidget> {
   void initState() {
     super.initState();
     _textController = TextEditingController(text: _textOf(widget.value));
+    _multiChoiceController = TextEditingController();
   }
 
   @override
@@ -56,6 +58,7 @@ class _TemplateFieldWidgetState extends State<TemplateFieldWidget> {
   @override
   void dispose() {
     _textController.dispose();
+    _multiChoiceController.dispose();
     super.dispose();
   }
 
@@ -106,6 +109,19 @@ class _TemplateFieldWidgetState extends State<TemplateFieldWidget> {
   }
 
   static const TextStyle _hintStyle = AppTheme.hintStyle;
+
+  /// 多选列表：用户自定义新增选项（如自建 Jellyfin），自动加入选中值
+  void _addCustomChoice() {
+    final text = _multiChoiceController.text.trim();
+    if (text.isEmpty) return;
+    _multiChoiceController.clear();
+    final current = (widget.value is List)
+        ? List<String>.from(widget.value).where((e) => e.isNotEmpty).toList()
+        : <String>[];
+    final next = [...current];
+    if (!next.contains(text)) next.add(text);
+    widget.onChanged(next);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -232,6 +248,31 @@ class _TemplateFieldWidgetState extends State<TemplateFieldWidget> {
                   },
                 );
               }).toList(),
+            ),
+            const SizedBox(height: 8),
+            // 自定义新增：允许用户自由添加平台/选项（如自建 Jellyfin）
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _multiChoiceController,
+                    decoration: const InputDecoration(
+                      hintText: '自定义新增，如: Jellyfin',
+                      hintStyle: AppTheme.hintStyle,
+                      isDense: true,
+                      border: OutlineInputBorder(),
+                    ),
+                    onSubmitted: (_) => _addCustomChoice(),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                TextButton.icon(
+                  onPressed: _addCustomChoice,
+                  icon: const Icon(Icons.add, size: 16),
+                  label: const Text('添加'),
+                  style: TextButton.styleFrom(foregroundColor: const Color(0xFF10B981)),
+                ),
+              ],
             ),
           ],
         );

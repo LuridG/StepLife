@@ -12,6 +12,9 @@ class StoreProvider extends ChangeNotifier {
   List<StoreMenuItem> _menuItems = [];
   String _selectedCategory = '全部分类';
   String _selectedStatus = '全部状态';
+  String _selectedMediaType = '全部媒体类型';
+  String _selectedGenre = '全部题材';
+  String _selectedYear = '全部年份';
   bool _isCardView = true;
   bool _isLoading = true;
 
@@ -21,6 +24,9 @@ class StoreProvider extends ChangeNotifier {
   List<StoreMenuItem> get menuItems => _menuItems;
   String get selectedCategory => _selectedCategory;
   String get selectedStatus => _selectedStatus;
+  String get selectedMediaType => _selectedMediaType;
+  String get selectedGenre => _selectedGenre;
+  String get selectedYear => _selectedYear;
   bool get isCardView => _isCardView;
   bool get isLoading => _isLoading;
 
@@ -31,10 +37,33 @@ class StoreProvider extends ChangeNotifier {
     }
     if (_selectedStatus != '全部状态') {
       result = result.where((item) {
-        // 仅影视记录参与状态筛选
         if (LifeTemplates.matchTemplateKey(item.category) != 'movie') return true;
         final status = item.extras['status']?.toString() ?? '想看';
         return status == _selectedStatus;
+      });
+    }
+    if (_selectedMediaType != '全部媒体类型') {
+      result = result.where((item) {
+        if (LifeTemplates.matchTemplateKey(item.category) != 'movie') return true;
+        return resolveMediaType(item.extras) == _selectedMediaType;
+      });
+    }
+    if (_selectedGenre != '全部题材') {
+      result = result.where((item) {
+        if (LifeTemplates.matchTemplateKey(item.category) != 'movie') return true;
+        return (item.extras['genre']?.toString() ?? '') == _selectedGenre;
+      });
+    }
+    if (_selectedYear != '全部年份') {
+      result = result.where((item) {
+        if (LifeTemplates.matchTemplateKey(item.category) != 'movie') return true;
+        final year = item.extras['year']?.toString() ?? '';
+        if (_selectedYear == '更早') {
+          return year.isNotEmpty &&
+              int.tryParse(year) != null &&
+              int.parse(year) < _earliestShownYear;
+        }
+        return year == _selectedYear;
       });
     }
     return result.toList();
@@ -71,14 +100,22 @@ class StoreProvider extends ChangeNotifier {
 
   void selectCategory(String categoryName) {
     _selectedCategory = categoryName;
-    if (_selectedStatus != '全部状态') {
+    if (_selectedStatus != '全部状态' ||
+        _selectedMediaType != '全部媒体类型' ||
+        _selectedGenre != '全部题材' ||
+        _selectedYear != '全部年份') {
       bool isMovieCat = false;
       if (categoryName == '全部分类') {
         isMovieCat = _storeItems.any((i) => LifeTemplates.matchTemplateKey(i.category) == 'movie');
       } else {
         isMovieCat = _storeItems.any((i) => i.category == categoryName && LifeTemplates.matchTemplateKey(i.category) == 'movie');
       }
-      if (!isMovieCat) _selectedStatus = '全部状态';
+      if (!isMovieCat) {
+        _selectedStatus = '全部状态';
+        _selectedMediaType = '全部媒体类型';
+        _selectedGenre = '全部题材';
+        _selectedYear = '全部年份';
+      }
     }
     notifyListeners();
   }
@@ -86,6 +123,29 @@ class StoreProvider extends ChangeNotifier {
   void selectStatus(String statusName) {
     _selectedStatus = statusName;
     notifyListeners();
+  }
+
+  void selectMediaType(String value) {
+    _selectedMediaType = value;
+    notifyListeners();
+  }
+
+  void selectGenre(String value) {
+    _selectedGenre = value;
+    notifyListeners();
+  }
+
+  void selectYear(String value) {
+    _selectedYear = value;
+    notifyListeners();
+  }
+
+  /// 年份筛选中“更早”的边界：展示年份列表里最旧的年份
+  int _earliestShownYear = 9999;
+
+  /// 设置“更早”边界（由 UI 按数据动态计算后调用）
+  void setEarliestShownYear(int year) {
+    _earliestShownYear = year;
   }
 
   Future<void> addCategory(String name) async {
