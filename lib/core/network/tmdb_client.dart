@@ -14,6 +14,7 @@ class TmdbMovie {
   final List<String> directors;
   final List<String> cast;
   final bool isTv; // true = 电视剧/综艺，false = 电影
+  final int? totalEpisodes; // 电视剧总集数（TMDB number_of_episodes）
 
   const TmdbMovie({
     required this.id,
@@ -26,6 +27,7 @@ class TmdbMovie {
     this.directors = const [],
     this.cast = const [],
     this.isTv = false,
+    this.totalEpisodes,
   });
 
   int? get year {
@@ -193,6 +195,7 @@ class TmdbClient {
     return TmdbMovie(
       id: id,
       isTv: true,
+      totalEpisodes: (json['number_of_episodes'] as num?)?.toInt(),
       title: json['name'] as String? ?? json['original_name'] as String? ?? '',
       releaseDate: json['first_air_date'] as String?,
       overview: json['overview'] as String?,

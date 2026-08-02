@@ -364,6 +364,35 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                 .toList();
           }
           final mergedFields = [...tpl.itemFields, ...customFields];
+
+    // 观看平台：历史已用值自动成为快捷选项
+    final platformHistory = <String>[];
+    for (final it in context.read<StoreProvider>().storeItems) {
+      final v = it.extras['platform'];
+      if (v == null) continue;
+      final list = v is List
+          ? v.map((e) => e.toString()).toList()
+          : [v.toString()];
+      for (final s in list) {
+        if (s.isNotEmpty && !platformHistory.contains(s)) {
+          platformHistory.add(s);
+        }
+      }
+    }
+    final formFields = mergedFields
+        .map((f) => f.key == 'platform'
+            ? TemplateField(
+                key: f.key,
+                label: f.label,
+                type: f.type,
+                hint: f.hint,
+                required: f.required,
+                options: f.options,
+                defaultValue: f.defaultValue,
+                suggestions: platformHistory,
+              )
+            : f)
+        .toList();
           final nameLabel = tpl.itemNameLabel.isEmpty ? '名称' : tpl.itemNameLabel;
 
           Future<void> searchTmdbAndFill() async {
@@ -435,6 +464,9 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                 extrasValues['mediaType'] = details.isTv ? '电视剧' : '电影';
                 extrasValues['genre'] = details.genres.isNotEmpty ? details.genres.first : '';
                 extrasValues['synopsis'] = details.overview ?? '';
+                if (details.totalEpisodes != null) {
+                  extrasValues['totalEpisodes'] = details.totalEpisodes;
+                }
               });
               if (details.posterFullUrl.isNotEmpty) {
                 try {
@@ -579,7 +611,7 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                   const SizedBox(height: 14),
 
                   // 模板专属字段（动态渲染）
-                  ...mergedFields.map((f) => Padding(
+                  ...formFields.map((f) => Padding(
                         padding: const EdgeInsets.only(bottom: 12),
                         child: TemplateFieldWidget(
                           field: f,
@@ -824,15 +856,21 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                     ),
                   const SizedBox(height: 14),
 
-                  TextField(
-                    controller: addressController,
-                    decoration: const InputDecoration(labelText: '位置 / 平台 / 来源说明'),
-                  ),
-                  const SizedBox(height: 12),
+                  if (tpl.key != 'movie') ...[
+                    TextField(
+                      controller: addressController,
+                      decoration: const InputDecoration(labelText: '位置 / 平台 / 来源说明'),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
                   TextField(
                     controller: notesController,
-                    decoration: const InputDecoration(labelText: '特色说明 / 推荐好菜 / 备忘'),
-                    maxLines: 2,
+                    decoration: InputDecoration(
+                      labelText: tpl.key == 'movie' ? '长评 (仅详情页展示)' : '特色说明 / 推荐好菜 / 备忘',
+                      hintText: tpl.key == 'movie' ? '写下详细长评，只在详情页展示' : null,
+                      hintStyle: AppTheme.hintStyle,
+                    ),
+                    maxLines: tpl.key == 'movie' ? 4 : 2,
                   ),
                 ],
               ),
@@ -857,13 +895,21 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                     return;
                   }
 
+                  // 影视默认观看状态（未选择时落库为“想看”）
+                  if (tpl.key == 'movie' &&
+                      (extrasValues['status']?.toString() ?? '').isEmpty) {
+                    extrasValues['status'] = '想看';
+                  }
+
                   if (isEditing) {
                     final updated = storeToEdit.copyWith(
                       name: name,
                       category: selectedCategory,
                       rating: rating,
                       images: images,
-                      address: addressController.text.trim(),
+                      address: tpl.key == 'movie'
+                          ? (storeToEdit.address ?? '')
+                          : addressController.text.trim(),
                       notes: notesController.text.trim(),
                       extras: extrasValues,
                     );
@@ -875,7 +921,9 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                           category: selectedCategory,
                           rating: rating,
                           images: images,
-                          address: addressController.text.trim(),
+                          address: tpl.key == 'movie'
+                              ? ''
+                              : addressController.text.trim(),
                           notes: notesController.text.trim(),
                           extras: extrasValues,
                           menuItems: menuDrafts,
@@ -1313,6 +1361,16 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
   Widget build(BuildContext context) {
     super.build(context);
     final storeProvider = context.watch<StoreProvider>();
+    // 当前分类对应的模板 key（用于影视状态筛选显示）
+    String? currentTplKey;
+    if (storeProvider.selectedCategory != '全部分类') {
+      for (final c in storeProvider.categories) {
+        if (c.name == storeProvider.selectedCategory) {
+          currentTplKey = c.templateKey;
+          break;
+        }
+      }
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -1449,6 +1507,30 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                       ],
                     ),
                   ),
+                  if (currentTplKey == 'movie') ...[
+                    const SizedBox(height: 8),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          FilterChip(
+                            label: const Text('全部状态'),
+                            selected: storeProvider.selectedStatus == '全部状态',
+                            onSelected: (_) => storeProvider.selectStatus('全部状态'),
+                          ),
+                          ...kMovieStatusOptions.map((s) => Padding(
+                                padding: const EdgeInsets.only(left: 6),
+                                child: FilterChip(
+                                  label: Text(s),
+                                  selected: storeProvider.selectedStatus == s,
+                                  selectedColor: const Color(0xFF6366F1).withAlpha(90),
+                                  onSelected: (_) => storeProvider.selectStatus(s),
+                                ),
+                              )),
+                        ],
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 16),
 
                   storeProvider.filteredStoreItems.isEmpty
@@ -1542,6 +1624,21 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                                     style: const TextStyle(fontSize: 9, color: Colors.lightBlueAccent, fontWeight: FontWeight.bold),
                                   ),
                                 ),
+                                if ((store.extras['status']?.toString() ?? '').isNotEmpty) ...[
+                                  const SizedBox(width: 5),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: _movieStatusColor(store.extras['status'].toString()).withAlpha(45),
+                                      borderRadius: BorderRadius.circular(7),
+                                      border: Border.all(color: _movieStatusColor(store.extras['status'].toString()).withAlpha(110)),
+                                    ),
+                                    child: Text(
+                                      store.extras['status'].toString(),
+                                      style: TextStyle(fontSize: 9, color: _movieStatusColor(store.extras['status'].toString()), fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                ],
                               ],
                             ),
                             const SizedBox(height: 6),
@@ -1567,6 +1664,29 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                                 Text(store.rating.toStringAsFixed(1), style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold, fontSize: 12)),
                               ],
                             ),
+                            if (_isSerialItem(store)) ...[
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  Text(
+                                    '📺 观看进度 ${_watchedEpisodesOf(store)}/${_totalEpisodesOf(store) ?? '?'} 集',
+                                    style: const TextStyle(fontSize: 11, color: Colors.lightBlueAccent, fontWeight: FontWeight.bold),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 5),
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(3),
+                                child: LinearProgressIndicator(
+                                  value: (_totalEpisodesOf(store) ?? 0) > 0
+                                      ? (_watchedEpisodesOf(store) / _totalEpisodesOf(store)!).clamp(0.0, 1.0)
+                                      : 0,
+                                  minHeight: 5,
+                                  backgroundColor: Colors.white12,
+                                  valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF06B6D4)),
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ),
@@ -1710,10 +1830,24 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                       style: const TextStyle(fontSize: 12, color: Color(0xFF06B6D4), fontWeight: FontWeight.w600),
                     ),
                   ),
-                if (store.address != null && store.address!.isNotEmpty)
-                  Text('📍 ${store.address}', style: const TextStyle(fontSize: 12, color: Colors.white70)),
-                if (store.notes != null && store.notes!.isNotEmpty)
-                  Text('📝 ${store.notes}', style: const TextStyle(fontSize: 12, color: Colors.white54, fontStyle: FontStyle.italic)),
+                if (_isMovieItem(store)) ...[
+                  // 影视：卡片展示一句话点评（短评），长评只在详情页
+                  if ((store.extras['reason']?.toString() ?? '').isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Text(
+                        '💬 ${store.extras['reason']}',
+                        style: const TextStyle(fontSize: 12, color: Colors.white70),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                ] else ...[
+                  if (store.address != null && store.address!.isNotEmpty)
+                    Text('📍 ${store.address}', style: const TextStyle(fontSize: 12, color: Colors.white70)),
+                  if (store.notes != null && store.notes!.isNotEmpty)
+                    Text('📝 ${store.notes}', style: const TextStyle(fontSize: 12, color: Colors.white54, fontStyle: FontStyle.italic)),
+                ],
 
                 const SizedBox(height: 12),
                 Row(
@@ -1822,7 +1956,11 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
             ],
           ),
           subtitle: Text(
-            '累计 $checkinCount 次 · 总消费 ¥${totalCost.toStringAsFixed(1)}',
+            _isMovieItem(store)
+                ? (_isSerialItem(store)
+                    ? '${store.extras['status'] ?? '想看'} · 📺 $_watchedEpisodesOf(store)/${_totalEpisodesOf(store) ?? '?'} 集 · 打卡 $checkinCount 次'
+                    : '${store.extras['status'] ?? '想看'} · 打卡 $checkinCount 次')
+                : '累计 $checkinCount 次 · 总消费 ¥${totalCost.toStringAsFixed(1)}',
             style: const TextStyle(fontSize: 11, color: Colors.white54),
             overflow: TextOverflow.ellipsis,
           ),
@@ -1902,6 +2040,38 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
       }
     }
     return parts.take(2).join(' · ');
+  }
+
+  /// 影视观看进度与状态辅助
+  bool _isMovieItem(StoreItem store) =>
+      LifeTemplates.matchTemplateKey(store.category) == 'movie';
+
+  int _watchedEpisodesOf(StoreItem store) {
+    final v = store.extras['watchedEpisodes'];
+    return (v is num) ? v.toInt() : 0;
+  }
+
+  int? _totalEpisodesOf(StoreItem store) {
+    final v = store.extras['totalEpisodes'];
+    return (v is num) ? v.toInt() : null;
+  }
+
+  bool _isSerialItem(StoreItem store) =>
+      _isMovieItem(store) && resolveMediaType(store.extras) != '电影';
+
+  Color _movieStatusColor(String status) {
+    switch (status) {
+      case '在追':
+        return const Color(0xFF10B981);
+      case '看完':
+        return Colors.amber;
+      case '搁置':
+        return Colors.grey;
+      case '抛弃':
+        return Colors.redAccent;
+      default:
+        return Colors.lightBlueAccent;
+    }
   }
 
   Widget _buildGlassCard({required Widget child}) {

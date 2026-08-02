@@ -69,7 +69,8 @@ class StoreDetailScreen extends StatelessWidget {
     final looseExtras = storeItem.extras.entries
         .where((e) =>
             !knownKeys.contains(e.key) &&
-            !(tpl.key == 'movie' && e.key == 'type') &&
+            !(tpl.key == 'movie' &&
+                (e.key == 'type' || e.key == 'totalEpisodes' || e.key == 'watchedEpisodes')) &&
             e.value != null &&
             e.value.toString().isNotEmpty)
         .map((e) => MapEntry(e.key, e.value.toString()))
@@ -270,6 +271,26 @@ class StoreDetailScreen extends StatelessWidget {
                                         style: const TextStyle(fontSize: 12, color: Color(0xFF06B6D4), fontWeight: FontWeight.w600),
                                       ),
                                     ],
+                                    if (tpl.key == 'movie' &&
+                                        resolveMediaType(storeItem.extras) != '电影') ...[
+                                      const SizedBox(height: 10),
+                                      Text(
+                                        '📺 观看进度 ${_watchedEpisodesOf(storeItem)}/${_totalEpisodesOf(storeItem) ?? '?'} 集',
+                                        style: const TextStyle(fontSize: 12, color: Colors.lightBlueAccent, fontWeight: FontWeight.bold),
+                                      ),
+                                      const SizedBox(height: 6),
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(4),
+                                        child: LinearProgressIndicator(
+                                          value: (_totalEpisodesOf(storeItem) ?? 0) > 0
+                                              ? (_watchedEpisodesOf(storeItem) / _totalEpisodesOf(storeItem)!).clamp(0.0, 1.0)
+                                              : 0,
+                                          minHeight: 6,
+                                          backgroundColor: Colors.white12,
+                                          valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF06B6D4)),
+                                        ),
+                                      ),
+                                    ],
                                   ],
                                 ),
                               ),
@@ -403,7 +424,10 @@ class StoreDetailScreen extends StatelessWidget {
                         ],
                         if (storeItem.notes != null && storeItem.notes!.isNotEmpty) ...[
                           const SizedBox(height: 6),
-                          Text('📝 特色备忘: ${storeItem.notes}', style: const TextStyle(color: Colors.white54, fontSize: 12, fontStyle: FontStyle.italic)),
+                          Text(
+                            tpl.key == 'movie' ? '📝 长评: ${storeItem.notes}' : '📝 特色备忘: ${storeItem.notes}',
+                            style: const TextStyle(color: Colors.white54, fontSize: 12, fontStyle: FontStyle.italic),
+                          ),
                         ],
                         if (visitorCounts.isNotEmpty) ...[
                           const SizedBox(height: 14),
@@ -652,6 +676,16 @@ class StoreDetailScreen extends StatelessWidget {
     return v.toStringAsFixed(1);
   }
 
+  int _watchedEpisodesOf(StoreItem store) {
+    final v = store.extras['watchedEpisodes'];
+    return (v is num) ? v.toInt() : 0;
+  }
+
+  int? _totalEpisodesOf(StoreItem store) {
+    final v = store.extras['totalEpisodes'];
+    return (v is num) ? v.toInt() : null;
+  }
+
   String _formatFieldValue(TemplateField f, dynamic value) {
     if (value == null) return '';
     switch (f.type) {
@@ -663,6 +697,8 @@ class StoreDetailScreen extends StatelessWidget {
         return '已添加图片';
       case TemplateFieldType.rating:
         return '⭐ ${value is num ? value.toStringAsFixed(1) : value.toString()}';
+      case TemplateFieldType.multiChoice:
+        return (value is List) ? value.join(' / ') : value.toString();
       default:
         return value.toString();
     }

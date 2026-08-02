@@ -190,6 +190,52 @@ class _TemplateFieldWidgetState extends State<TemplateFieldWidget> {
             if (v != null) widget.onChanged(v);
           },
         );
+      case TemplateFieldType.multiChoice:
+        final selected = (widget.value is List)
+            ? List<String>.from(widget.value).where((e) => e.isNotEmpty).toList()
+            : ((widget.value?.toString().isNotEmpty ?? false)
+                ? [widget.value!.toString()]
+                : <String>[]);
+        final baseOptions = (field.options ?? const []).toList();
+        final hist = (field.suggestions ?? const [])
+            .where((s) => s.isNotEmpty && !baseOptions.contains(s))
+            .toList();
+        final allOptions = [...baseOptions, ...hist];
+        // 已选但不在候选中的值也展示，避免脏数据丢失
+        for (final s in selected) {
+          if (!allOptions.contains(s)) allOptions.add(s);
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(field.label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            const SizedBox(height: 8),
+            if (allOptions.isEmpty)
+              const Text('暂无选项，可先在其他记录中填写', style: TextStyle(fontSize: 11, color: Colors.white38)),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: allOptions.map((o) {
+                final isOn = selected.contains(o);
+                return FilterChip(
+                  label: Text(o, style: const TextStyle(fontSize: 12)),
+                  selected: isOn,
+                  selectedColor: const Color(0xFF10B981).withAlpha(90),
+                  onSelected: (v) {
+                    final next = [...selected];
+                    if (v) {
+                      if (!next.contains(o)) next.add(o);
+                    } else {
+                      next.remove(o);
+                    }
+                    widget.onChanged(next);
+                  },
+                );
+              }).toList(),
+            ),
+          ],
+        );
+
       case TemplateFieldType.date:
         return ListTile(
           contentPadding: EdgeInsets.zero,

@@ -50,6 +50,11 @@ class StoreCheckinDialog extends StatelessWidget {
         .map((m) => TemplateField.fromJson(m))
         .toList();
     final mergedCheckinFields = [...tpl.checkinFields, ...customFields];
+    // 集数打卡仅对电视剧/动漫/综艺等剧集展示（电影不显示）
+    final isSerialMovie = tpl.key == 'movie' && resolveMediaType(store.extras) != '电影';
+    final checkinFields = mergedCheckinFields
+        .where((f) => !(f.key == 'episodesWatched' && !isSerialMovie))
+        .toList();
 
     // 餐饮菜单：打卡时多选菜品，自动合计消费
     final storeMenu = tpl.key == 'dining'
@@ -262,7 +267,7 @@ class StoreCheckinDialog extends StatelessWidget {
                 const SizedBox(height: 14),
 
                 // 模板专属打卡字段（动态渲染）
-                ...mergedCheckinFields.map((f) => Padding(
+                ...checkinFields.map((f) => Padding(
                       padding: const EdgeInsets.only(bottom: 12),
                       child: TemplateFieldWidget(
                         field: f,
@@ -372,6 +377,23 @@ class StoreCheckinDialog extends StatelessWidget {
                         menuSpecs: selectedMenuItems.map((s) => s.spec?.name ?? '').toList(),
                         targetDate: selectedDateTime,
                       );
+                }
+
+                // 影视剧集观看进度累计（编辑时按差值回退/累加）
+                if (tpl.key == 'movie' && isSerialMovie) {
+                  final watchedNew = extrasValues['episodesWatched'];
+                  final newN = (watchedNew is num) ? watchedNew.toInt() : 0;
+                  var oldN = 0;
+                  if (isEdit) {
+                    final oldV = existingLog!.extras['episodesWatched'];
+                    oldN = (oldV is num) ? oldV.toInt() : 0;
+                  }
+                  final delta = newN - oldN;
+                  if (delta != 0) {
+                    context
+                        .read<StoreProvider>()
+                        .applyEpisodesProgress(store.id ?? 0, delta);
+                  }
                 }
 
                 costController.dispose();

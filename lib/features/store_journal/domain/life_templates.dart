@@ -12,6 +12,7 @@ enum TemplateFieldType {
   images, // 图片集（最多 3 张）
   switchField, // 开关（是/否）
   tags, // 标签列表
+  multiChoice, // 多选列表（如观看平台，可多选）
 }
 
 /// 影视一级分类：媒体类型
@@ -23,6 +24,11 @@ const List<String> kMovieMediaTypeOptions = [
 const List<String> kMovieGenreOptions = [
   '动作', '冒险', '动画', '喜剧', '犯罪', '剧情', '家庭', '奇幻', '恐怖',
   '悬疑', '音乐', '爱情', '科幻', '惊悚', '战争', '西部', '真人秀', '脱口秀',
+];
+
+/// 影视观看状态：快捷标记 + 筛选
+const List<String> kMovieStatusOptions = [
+  '想看', '在追', '看完', '搁置', '抛弃',
 ];
 
 /// 从店铺 extras 解析媒体类型（兼容旧字段 type）
@@ -52,6 +58,7 @@ class TemplateField {
   final bool required;
   final List<String>? options; // choice 类型用
   final String? defaultValue;
+  final List<String>? suggestions; // 历史建议选项（multiChoice 与 options 合并展示，动态生成）
 
   const TemplateField({
     required this.key,
@@ -61,6 +68,7 @@ class TemplateField {
     this.required = false,
     this.options,
     this.defaultValue,
+    this.suggestions,
   });
 
   Map<String, dynamic> toJson() => {
@@ -71,6 +79,7 @@ class TemplateField {
         'required': required,
         'options': options,
         'defaultValue': defaultValue,
+        'suggestions': suggestions,
       };
 
   factory TemplateField.fromJson(Map<String, dynamic> json) {
@@ -85,6 +94,7 @@ class TemplateField {
       required: json['required'] as bool? ?? false,
       options: (json['options'] as List?)?.map((e) => e.toString()).toList(),
       defaultValue: json['defaultValue'] as String?,
+      suggestions: (json['suggestions'] as List?)?.map((e) => e.toString()).toList(),
     );
   }
 }
@@ -128,11 +138,13 @@ class LifeTemplates {
         TemplateField(key: 'year', label: '年份', type: TemplateFieldType.text, hint: '例: 2023'),
         TemplateField(key: 'director', label: '导演 / 主演', type: TemplateFieldType.text, hint: '例: 郭帆 / 吴京'),
         TemplateField(key: 'duration', label: '片长（分钟）', type: TemplateFieldType.number, hint: '例: 173'),
-        TemplateField(key: 'platform', label: '观看平台', type: TemplateFieldType.text, hint: '例: 电影院 / 爱奇艺'),
+        TemplateField(key: 'status', label: '观看状态', type: TemplateFieldType.choice, options: kMovieStatusOptions, defaultValue: '想看'),
+        TemplateField(key: 'platform', label: '观看平台', type: TemplateFieldType.multiChoice, options: ['电影院', '爱奇艺', '腾讯视频', '优酷', 'B站', '芒果TV', 'Netflix', 'Disney+', '其他']),
         TemplateField(key: 'synopsis', label: '剧情简介', type: TemplateFieldType.multiline, hint: '影片剧情梗概（TMDB 导入自动填充）'),
-        TemplateField(key: 'reason', label: '种草理由', type: TemplateFieldType.multiline, hint: '为什么想看'),
+        TemplateField(key: 'reason', label: '一句话点评', type: TemplateFieldType.text, hint: '一句话点评，快速展示在卡片上'),
       ],
       checkinFields: [
+        TemplateField(key: 'episodesWatched', label: '本次观看集数', type: TemplateFieldType.number, hint: '电视剧/动漫填本次看了几集，自动累计进度'),
         TemplateField(key: 'channel', label: '观影渠道', type: TemplateFieldType.choice, options: ['影院', '线上平台', 'DVD/下载', '其他']),
         TemplateField(key: 'rewatch', label: '是否二刷', type: TemplateFieldType.switchField),
         TemplateField(key: 'review', label: '观后感', type: TemplateFieldType.multiline, hint: '值得看吗？最打动你的点'),

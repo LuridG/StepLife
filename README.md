@@ -12,7 +12,7 @@
   <img src="https://img.shields.io/badge/Flutter-3.27+-02569B?logo=flutter" alt="Flutter" />
   <img src="https://img.shields.io/badge/Dart-3.6+-0175C2?logo=dart" alt="Dart" />
   <img src="https://img.shields.io/badge/Platform-Android%20%7C%20Windows-green" alt="Platform" />
-  <img src="https://img.shields.io/badge/Version-v1.4.5-emerald" alt="Version" />
+  <img src="https://img.shields.io/badge/Version-v1.4.6-emerald" alt="Version" />
   <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License" />
 </p>
 
@@ -56,7 +56,9 @@
 
 ### 🛍️ 3. 生活记录 (探店 / 影视 / 阅读 / 景点打卡)
 - **基础模板体系**：内置影视观影、餐饮美食、通用记录等多套模板，新建时一键选用；通用模板支持自定义字段（文本/多行/数字/日期/标签）。
-- **影视模板 + TMDB**：一键搜索电影/电视剧并自动填充海报、题材、剧情简介、导演主演；媒体类型（电影/电视剧）与题材（科幻/动作…）二级分类，海报 2:3 竖版 + 文字环绕排版。
+- **影视模板 + TMDB**：一键搜索电影/电视剧并自动填充海报、题材、剧情简介、导演主演、**剧集总集数**；媒体类型（电影/电视剧）与题材（科幻/动作…）二级分类，海报 2:3 竖版 + 文字环绕排版。
+- **观看状态与进度**：影视支持 想看/在追/看完/搁置/抛弃 快捷标记与筛选；电视剧/动漫可按集数打卡，浏览卡片直接展示 `看了 x/y 集` 进度条。
+- **短评长评**：种草理由升级为「一句话点评」快速展示在卡片，新增「长评」仅详情页展示；观看平台改为多选列表，历史已用平台自动成为快捷选项。
 - **餐饮菜单管理**：店铺菜单固定菜品与价格；菜品支持**自由添加份量规格**（如 大份/小份、面条一两/二两/三两），每个规格可单独定价，打卡选菜时按规格计价并自动合计消费；历史打卡记录可修改（金额/成员/点菜/点评/时刻）。
 - **1.0 ~ 5.0 亮金星级 Rating 评分**：支持在表单中自由点选星级评分，列表直观星级呈现。
 - **照片画廊 (至多 3 张)**：集成 `image_picker` 选择器，图片写入应用缓存，支持至多 3 张剧照/海报/店铺实拍照片预览。
@@ -77,10 +79,10 @@
 
 | 文件名 | 适用 CPU 架构 | 文件大小 | 推荐说明 |
 | :--- | :--- | :---: | :--- |
-| **`StepLife-v1.4.5-arm64-v8a.apk`** | 64 位 ARM (`arm64-v8a`) | **25.8 MB** | 🔥 **最推荐**！适配 99% 的现代 Android 手机 |
-| **`StepLife-v1.4.5-armeabi-v7a.apk`** | 32 位 ARM (`armeabi-v7a`) | 23.5 MB | 适配老旧 32 位 Android 机型 |
-| **`StepLife-v1.4.5-x86_64.apk`** | Intel/AMD (`x86_64`) | 27.1 MB | 适配 Android 模拟器与 x86 平板 |
-| **`StepLife-v1.4.5-universal.apk`** | 通用全架构胖包 | 63.4 MB | 整合全架构二进制，兼容任意设备 |
+| **`StepLife-v1.4.6-arm64-v8a.apk`** | 64 位 ARM (`arm64-v8a`) | **25.8 MB** | 🔥 **最推荐**！适配 99% 的现代 Android 手机 |
+| **`StepLife-v1.4.6-armeabi-v7a.apk`** | 32 位 ARM (`armeabi-v7a`) | 23.5 MB | 适配老旧 32 位 Android 机型 |
+| **`StepLife-v1.4.6-x86_64.apk`** | Intel/AMD (`x86_64`) | 27.1 MB | 适配 Android 模拟器与 x86 平板 |
+| **`StepLife-v1.4.6-universal.apk`** | 通用全架构胖包 | 63.4 MB | 整合全架构二进制，兼容任意设备 |
 
 ---
 

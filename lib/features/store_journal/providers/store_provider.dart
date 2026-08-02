@@ -11,6 +11,7 @@ class StoreProvider extends ChangeNotifier {
   List<StoreLog> _storeLogs = [];
   List<StoreMenuItem> _menuItems = [];
   String _selectedCategory = '全部分类';
+  String _selectedStatus = '全部状态';
   bool _isCardView = true;
   bool _isLoading = true;
 
@@ -19,14 +20,24 @@ class StoreProvider extends ChangeNotifier {
   List<StoreLog> get storeLogs => _storeLogs;
   List<StoreMenuItem> get menuItems => _menuItems;
   String get selectedCategory => _selectedCategory;
+  String get selectedStatus => _selectedStatus;
   bool get isCardView => _isCardView;
   bool get isLoading => _isLoading;
 
   List<StoreItem> get filteredStoreItems {
-    if (_selectedCategory == '全部分类') {
-      return _storeItems;
+    Iterable<StoreItem> result = _storeItems;
+    if (_selectedCategory != '全部分类') {
+      result = result.where((item) => item.category == _selectedCategory);
     }
-    return _storeItems.where((item) => item.category == _selectedCategory).toList();
+    if (_selectedStatus != '全部状态') {
+      result = result.where((item) {
+        // 仅影视记录参与状态筛选
+        if (LifeTemplates.matchTemplateKey(item.category) != 'movie') return true;
+        final status = item.extras['status']?.toString() ?? '想看';
+        return status == _selectedStatus;
+      });
+    }
+    return result.toList();
   }
 
   StoreProvider() {
@@ -60,6 +71,20 @@ class StoreProvider extends ChangeNotifier {
 
   void selectCategory(String categoryName) {
     _selectedCategory = categoryName;
+    if (_selectedStatus != '全部状态') {
+      bool isMovieCat = false;
+      if (categoryName == '全部分类') {
+        isMovieCat = _storeItems.any((i) => LifeTemplates.matchTemplateKey(i.category) == 'movie');
+      } else {
+        isMovieCat = _storeItems.any((i) => i.category == categoryName && LifeTemplates.matchTemplateKey(i.category) == 'movie');
+      }
+      if (!isMovieCat) _selectedStatus = '全部状态';
+    }
+    notifyListeners();
+  }
+
+  void selectStatus(String statusName) {
+    _selectedStatus = statusName;
     notifyListeners();
   }
 
@@ -304,6 +329,24 @@ class StoreProvider extends ChangeNotifier {
     await DatabaseService.instance.updateStoreLog(log);
     final i = _storeLogs.indexWhere((l) => l.id == logId);
     if (i != -1) _storeLogs[i] = log;
+    notifyListeners();
+  }
+
+  /// 影视剧集观看进度累计（打卡/修改打卡时调用，delta 可为负回退）
+  Future<void> applyEpisodesProgress(int storeId, int delta) async {
+    if (delta == 0) return;
+    final idx = _storeItems.indexWhere((i) => i.id == storeId);
+    if (idx == -1) return;
+    final item = _storeItems[idx];
+    final current = (item.extras['watchedEpisodes'] is num)
+        ? (item.extras['watchedEpisodes'] as num).toInt()
+        : 0;
+    final next = (current + delta).clamp(0, 1 << 30);
+    final newExtras = Map<String, dynamic>.from(item.extras);
+    newExtras['watchedEpisodes'] = next;
+    final updated = item.copyWith(extras: newExtras);
+    _storeItems[idx] = updated;
+    await DatabaseService.instance.updateStoreItem(updated);
     notifyListeners();
   }
 
