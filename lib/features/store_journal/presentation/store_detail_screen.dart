@@ -76,6 +76,16 @@ class StoreDetailScreen extends StatelessWidget {
         .toList();
     final menuItems = storeProvider.getMenuItemsForStore(storeItem.id ?? 0);
 
+    // 影视摘要：年份 · 导演/主演 · 片长（放在海报右侧信息区）
+    final movieMetaParts = <String>[
+      if ((storeItem.extras['year']?.toString() ?? '').isNotEmpty)
+        storeItem.extras['year'].toString(),
+      if ((storeItem.extras['director']?.toString() ?? '').isNotEmpty)
+        storeItem.extras['director'].toString(),
+      if (storeItem.extras['duration'] is num)
+        '${storeItem.extras['duration']}分钟',
+    ];
+
     final logFieldLabels = {
       for (final f in [...tpl.checkinFields, ...(cat?.extraFields ?? const []).map((m) => TemplateField.fromJson(m))])
         f.key: f.label,
@@ -116,8 +126,8 @@ class StoreDetailScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 高清照片画廊
-                if (storeItem.images.isNotEmpty)
+                // 高清照片画廊：非影视模板保留横滑大图（cover，无黑边）
+                if (storeItem.images.isNotEmpty && tpl.key != 'movie')
                   Padding(
                     padding: const EdgeInsets.only(bottom: 16.0),
                     child: SizedBox(
@@ -130,19 +140,16 @@ class StoreDetailScreen extends StatelessWidget {
                             padding: const EdgeInsets.only(right: 12.0),
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(16),
-                              child: Container(
-                                color: Colors.black38,
-                                child: Image.file(
-                                  File(storeItem.images[idx]),
+                              child: Image.file(
+                                File(storeItem.images[idx]),
+                                width: 260,
+                                height: 180,
+                                fit: BoxFit.cover,
+                                errorBuilder: (c, e, s) => Container(
                                   width: 260,
                                   height: 180,
-                                  fit: tpl.key == 'movie' ? BoxFit.contain : BoxFit.cover,
-                                  errorBuilder: (c, e, s) => Container(
-                                    width: 260,
-                                    height: 180,
-                                    color: Colors.white10,
-                                    child: const Icon(Icons.broken_image, color: Colors.white38),
-                                  ),
+                                  color: Colors.white10,
+                                  child: const Icon(Icons.broken_image, color: Colors.white38),
                                 ),
                               ),
                             ),
@@ -159,73 +166,185 @@ class StoreDetailScreen extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF10B981).withAlpha(40),
-                                borderRadius: BorderRadius.circular(8),
+                        if (tpl.key == 'movie') ...[
+                          // 影视：海报左（2:3 竖版，完整展示无黑边）+ 文字右
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(14),
+                                child: storeItem.images.isNotEmpty
+                                    ? Image.file(
+                                        File(storeItem.images.first),
+                                        width: 112,
+                                        height: 168,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (c, e, s) => Container(
+                                          width: 112,
+                                          height: 168,
+                                          color: Colors.white10,
+                                          child: const Icon(Icons.movie_outlined, color: Colors.white38),
+                                        ),
+                                      )
+                                    : Container(
+                                        width: 112,
+                                        height: 168,
+                                        decoration: BoxDecoration(
+                                          color: Colors.white10,
+                                          borderRadius: BorderRadius.circular(14),
+                                        ),
+                                        child: const Icon(Icons.movie_outlined, color: Colors.white38),
+                                      ),
                               ),
-                              child: Text(storeItem.category, style: const TextStyle(fontSize: 12, color: Color(0xFF10B981), fontWeight: FontWeight.bold)),
-                            ),
-                            if (tpl.key == 'movie') ...[
-                              const SizedBox(width: 6),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: Colors.indigo.withAlpha(60),
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: Colors.indigoAccent.withAlpha(110)),
-                                ),
-                                child: Text(
-                                  resolveMediaType(storeItem.extras) == '电影'
-                                      ? '🎬 电影'
-                                      : '📺 ${resolveMediaType(storeItem.extras)}',
-                                  style: const TextStyle(fontSize: 12, color: Colors.lightBlueAccent, fontWeight: FontWeight.bold),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Wrap(
+                                      spacing: 6,
+                                      runSpacing: 6,
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFF10B981).withAlpha(40),
+                                            borderRadius: BorderRadius.circular(7),
+                                          ),
+                                          child: Text(storeItem.category, style: const TextStyle(fontSize: 11, color: Color(0xFF10B981), fontWeight: FontWeight.bold)),
+                                        ),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                          decoration: BoxDecoration(
+                                            color: Colors.indigo.withAlpha(60),
+                                            borderRadius: BorderRadius.circular(7),
+                                            border: Border.all(color: Colors.indigoAccent.withAlpha(110)),
+                                          ),
+                                          child: Text(
+                                            resolveMediaType(storeItem.extras) == '电影'
+                                                ? '🎬 电影'
+                                                : '📺 ${resolveMediaType(storeItem.extras)}',
+                                            style: const TextStyle(fontSize: 11, color: Colors.lightBlueAccent, fontWeight: FontWeight.bold),
+                                          ),
+                                        ),
+                                        if (resolveGenre(storeItem.extras).isNotEmpty)
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                            decoration: BoxDecoration(
+                                              color: Colors.purple.withAlpha(50),
+                                              borderRadius: BorderRadius.circular(7),
+                                              border: Border.all(color: Colors.purpleAccent.withAlpha(90)),
+                                            ),
+                                            child: Text(
+                                              '${resolveGenre(storeItem.extras)} 题材',
+                                              style: const TextStyle(fontSize: 11, color: Colors.purpleAccent, fontWeight: FontWeight.bold),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 10),
+                                    Text(
+                                      storeItem.name,
+                                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Row(
+                                      children: [
+                                        Row(
+                                          children: List.generate(5, (sIdx) {
+                                            return Icon(
+                                              sIdx < storeItem.rating.floor() ? Icons.star : Icons.star_border,
+                                              color: Colors.amber,
+                                              size: 18,
+                                            );
+                                          }),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Text('${storeItem.rating.toStringAsFixed(1)} 分', style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold, fontSize: 14)),
+                                      ],
+                                    ),
+                                    if (movieMetaParts.isNotEmpty) ...[
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        movieMetaParts.join(' · '),
+                                        style: const TextStyle(fontSize: 12, color: Color(0xFF06B6D4), fontWeight: FontWeight.w600),
+                                      ),
+                                    ],
+                                  ],
                                 ),
                               ),
-                              if (resolveGenre(storeItem.extras).isNotEmpty) ...[
-                                const SizedBox(width: 6),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: Colors.purple.withAlpha(50),
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(color: Colors.purpleAccent.withAlpha(90)),
-                                  ),
-                                  child: Text(
-                                    '${resolveGenre(storeItem.extras)} 题材',
-                                    style: const TextStyle(fontSize: 12, color: Colors.purpleAccent, fontWeight: FontWeight.bold),
-                                  ),
-                                ),
-                              ],
                             ],
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                storeItem.name,
-                                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+                          ),
+                          // 第 2/3 张图：小缩略图横滑
+                          if (storeItem.images.length > 1) ...[
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              height: 88,
+                              child: ListView.builder(
+                                scrollDirection: Axis.horizontal,
+                                itemCount: storeItem.images.length - 1,
+                                itemBuilder: (ctx, i) {
+                                  final path = storeItem.images[i + 1];
+                                  return Padding(
+                                    padding: const EdgeInsets.only(right: 8.0),
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(10),
+                                      child: Image.file(
+                                        File(path),
+                                        width: 58,
+                                        height: 88,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (c, e, s) => Container(
+                                          width: 58,
+                                          height: 88,
+                                          color: Colors.white10,
+                                          child: const Icon(Icons.image, color: Colors.white38, size: 18),
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
                               ),
                             ),
                           ],
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Row(
-                              children: List.generate(5, (sIdx) {
-                                return Icon(
-                                  sIdx < storeItem.rating.floor() ? Icons.star : Icons.star_border,
-                                  color: Colors.amber,
-                                  size: 20,
-                                );
-                              }),
-                            ),
-                            const SizedBox(width: 8),
-                            Text('${storeItem.rating.toStringAsFixed(1)} 分', style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold, fontSize: 15)),
-                          ],
-                        ),
+                        ] else ...[
+                          // 非影视：分类 + 名称 + 评分
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF10B981).withAlpha(40),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(storeItem.category, style: const TextStyle(fontSize: 12, color: Color(0xFF10B981), fontWeight: FontWeight.bold)),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  storeItem.name,
+                                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Row(
+                                children: List.generate(5, (sIdx) {
+                                  return Icon(
+                                    sIdx < storeItem.rating.floor() ? Icons.star : Icons.star_border,
+                                    color: Colors.amber,
+                                    size: 20,
+                                  );
+                                }),
+                              ),
+                              const SizedBox(width: 8),
+                              Text('${storeItem.rating.toStringAsFixed(1)} 分', style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold, fontSize: 15)),
+                            ],
+                          ),
+                        ],
                         if (presentFields.isNotEmpty) ...[
                           const SizedBox(height: 12),
                           ...presentFields.map((f) => Padding(

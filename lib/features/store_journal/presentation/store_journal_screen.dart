@@ -1379,106 +1379,200 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF10B981).withAlpha(40),
-                                  borderRadius: BorderRadius.circular(8),
+                if (LifeTemplates.matchTemplateKey(store.category) == 'movie' && store.images.isNotEmpty) ...[
+                  // 影视：海报左（2:3 竖版）+ 文字右
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.file(
+                          File(store.images.first),
+                          width: 60,
+                          height: 90,
+                          fit: BoxFit.cover,
+                          errorBuilder: (c, e, s) => Container(
+                            width: 60,
+                            height: 90,
+                            color: Colors.white10,
+                            child: const Icon(Icons.movie_outlined, color: Colors.white38),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF10B981).withAlpha(40),
+                                    borderRadius: BorderRadius.circular(7),
+                                  ),
+                                  child: Text(store.category, style: const TextStyle(fontSize: 10, color: Color(0xFF10B981), fontWeight: FontWeight.bold)),
                                 ),
-                                child: Text(store.category, style: const TextStyle(fontSize: 11, color: Color(0xFF10B981), fontWeight: FontWeight.bold)),
-                              ),
-                              if (LifeTemplates.matchTemplateKey(store.category) == 'movie') ...[
-                                const SizedBox(width: 6),
+                                const SizedBox(width: 5),
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                   decoration: BoxDecoration(
                                     color: Colors.indigo.withAlpha(50),
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(color: Colors.indigoAccent.withAlpha(90)),
+                                    borderRadius: BorderRadius.circular(7),
                                   ),
                                   child: Text(
                                     resolveMediaType(store.extras) == '电影'
                                         ? '🎬 电影'
                                         : '📺 ${resolveMediaType(store.extras)}',
-                                    style: const TextStyle(fontSize: 10, color: Colors.lightBlueAccent, fontWeight: FontWeight.bold),
+                                    style: const TextStyle(fontSize: 9, color: Colors.lightBlueAccent, fontWeight: FontWeight.bold),
                                   ),
                                 ),
                               ],
-                              const SizedBox(width: 8),
-                              Flexible(
-                                child: Text(
-                                  store.name,
-                                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
-                                  overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              store.name,
+                              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 6),
+                            Row(
+                              children: [
+                                Row(
+                                  children: List.generate(5, (sIdx) {
+                                    return Icon(
+                                      sIdx < store.rating.floor() ? Icons.star : Icons.star_border,
+                                      color: Colors.amber,
+                                      size: 14,
+                                    );
+                                  }),
                                 ),
-                              ),
-                            ],
+                                const SizedBox(width: 5),
+                                Text(store.rating.toStringAsFixed(1), style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold, fontSize: 12)),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            padding: const EdgeInsets.all(4),
+                            constraints: const BoxConstraints(),
+                            icon: const Icon(Icons.edit_outlined, color: Colors.lightBlueAccent, size: 18),
+                            onPressed: () => _showStoreFormDialog(storeToEdit: store),
                           ),
-                          const SizedBox(height: 4),
-                          Row(
-                            children: [
-                              Row(
-                                children: List.generate(5, (sIdx) {
-                                  return Icon(
-                                    sIdx < store.rating.floor() ? Icons.star : Icons.star_border,
-                                    color: Colors.amber,
-                                    size: 16,
-                                  );
-                                }),
-                              ),
-                              const SizedBox(width: 6),
-                              Text(store.rating.toStringAsFixed(1), style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold, fontSize: 13)),
-                            ],
+                          IconButton(
+                            padding: const EdgeInsets.all(4),
+                            constraints: const BoxConstraints(),
+                            icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 18),
+                            onPressed: () => _confirmDeleteStore(store),
                           ),
                         ],
                       ),
-                    ),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.edit_outlined, color: Colors.lightBlueAccent, size: 18),
-                          onPressed: () => _showStoreFormDialog(storeToEdit: store),
+                    ],
+                  ),
+                ] else ...[
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF10B981).withAlpha(40),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(store.category, style: const TextStyle(fontSize: 11, color: Color(0xFF10B981), fontWeight: FontWeight.bold)),
+                                ),
+                                if (LifeTemplates.matchTemplateKey(store.category) == 'movie') ...[
+                                  const SizedBox(width: 6),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Colors.indigo.withAlpha(50),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: Colors.indigoAccent.withAlpha(90)),
+                                    ),
+                                    child: Text(
+                                      resolveMediaType(store.extras) == '电影'
+                                          ? '🎬 电影'
+                                          : '📺 ${resolveMediaType(store.extras)}',
+                                      style: const TextStyle(fontSize: 10, color: Colors.lightBlueAccent, fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                ],
+                                const SizedBox(width: 8),
+                                Flexible(
+                                  child: Text(
+                                    store.name,
+                                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                Row(
+                                  children: List.generate(5, (sIdx) {
+                                    return Icon(
+                                      sIdx < store.rating.floor() ? Icons.star : Icons.star_border,
+                                      color: Colors.amber,
+                                      size: 16,
+                                    );
+                                  }),
+                                ),
+                                const SizedBox(width: 6),
+                                Text(store.rating.toStringAsFixed(1), style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold, fontSize: 13)),
+                              ],
+                            ),
+                          ],
                         ),
-                        IconButton(
-                          icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 18),
-                          onPressed: () => _confirmDeleteStore(store),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-
-                if (store.images.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 10.0),
-                    child: SizedBox(
-                      height: 80,
-                      child: ListView.builder(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: store.images.length,
-                        itemBuilder: (ctx, iIdx) {
-                          return Padding(
-                            padding: const EdgeInsets.only(right: 8.0),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(10),
-                              child: Container(
-                                color: Colors.black38,
+                      ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.edit_outlined, color: Colors.lightBlueAccent, size: 18),
+                            onPressed: () => _showStoreFormDialog(storeToEdit: store),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 18),
+                            onPressed: () => _confirmDeleteStore(store),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  if (store.images.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 10.0),
+                      child: SizedBox(
+                        height: 80,
+                        child: ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: store.images.length,
+                          itemBuilder: (ctx, iIdx) {
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 8.0),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(10),
                                 child: Image.file(
                                   File(store.images[iIdx]),
                                   width: 100,
                                   height: 80,
-                                  fit: LifeTemplates.matchTemplateKey(store.category) == 'movie' ? BoxFit.contain : BoxFit.cover,
+                                  fit: BoxFit.cover,
                                   errorBuilder: (c, e, s) => Container(
                                     width: 100,
                                     height: 80,
@@ -1487,12 +1581,12 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                                   ),
                                 ),
                               ),
-                            ),
-                          );
-                        },
+                            );
+                          },
+                        ),
                       ),
                     ),
-                  ),
+                ],
 
                 if (_storeExtraSummary(store).isNotEmpty)
                   Padding(
@@ -1550,22 +1644,38 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
             );
           },
           contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-          leading: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-            decoration: BoxDecoration(
-              color: Colors.amber.withAlpha(30),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.amber.withAlpha(80)),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.star, color: Colors.amber, size: 14),
-                const SizedBox(width: 2),
-                Text(store.rating.toStringAsFixed(1), style: const TextStyle(color: Colors.amber, fontSize: 11, fontWeight: FontWeight.bold)),
-              ],
-            ),
-          ),
+          leading: LifeTemplates.matchTemplateKey(store.category) == 'movie' && store.images.isNotEmpty
+              ? ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: Image.file(
+                    File(store.images.first),
+                    width: 44,
+                    height: 66,
+                    fit: BoxFit.cover,
+                    errorBuilder: (c, e, s) => Container(
+                      width: 44,
+                      height: 66,
+                      color: Colors.white10,
+                      child: const Icon(Icons.movie_outlined, color: Colors.white38, size: 20),
+                    ),
+                  ),
+                )
+              : Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.withAlpha(30),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.amber.withAlpha(80)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.star, color: Colors.amber, size: 14),
+                      const SizedBox(width: 2),
+                      Text(store.rating.toStringAsFixed(1), style: const TextStyle(color: Colors.amber, fontSize: 11, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                ),
           title: Row(
             children: [
               Container(

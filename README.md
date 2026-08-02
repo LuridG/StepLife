@@ -12,7 +12,7 @@
   <img src="https://img.shields.io/badge/Flutter-3.27+-02569B?logo=flutter" alt="Flutter" />
   <img src="https://img.shields.io/badge/Dart-3.6+-0175C2?logo=dart" alt="Dart" />
   <img src="https://img.shields.io/badge/Platform-Android%20%7C%20Windows-green" alt="Platform" />
-  <img src="https://img.shields.io/badge/Version-v1.2.0-emerald" alt="Version" />
+  <img src="https://img.shields.io/badge/Version-v1.4.4-emerald" alt="Version" />
   <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License" />
 </p>
 
@@ -55,11 +55,14 @@
 - **单项独立热力图与饼图 (`ChoreDetailScreen`)**：点击任意家务可生成专属的年度 Calendar Heatmap 热力图与成员贡献占比饼图。
 
 ### 🛍️ 3. 生活记录 (探店 / 影视 / 阅读 / 景点打卡)
-- **通用生活打卡表单**：涵盖电影、电视剧、书籍、美食餐馆、景点场所等多维生活项目打卡。
+- **基础模板体系**：内置影视观影、餐饮美食、通用记录等多套模板，新建时一键选用；通用模板支持自定义字段（文本/多行/数字/日期/标签）。
+- **影视模板 + TMDB**：一键搜索电影/电视剧并自动填充海报、题材、剧情简介、导演主演；媒体类型（电影/电视剧）与题材（科幻/动作…）二级分类，海报 2:3 竖版 + 文字环绕排版。
+- **餐饮菜单管理**：店铺菜单固定菜品与价格，打卡多点菜自动合计消费；历史打卡记录可修改（金额/成员/点菜/点评/时刻）。
 - **1.0 ~ 5.0 亮金星级 Rating 评分**：支持在表单中自由点选星级评分，列表直观星级呈现。
-- **照片画廊 (至多 3 张)**：集成 `image_picker` 选择器，支持上传至多 3 张剧照/海报/店铺实拍照片预览。
-- **Card 模式 ↔ 紧凑列表模式**：提供 3D 玻璃网格卡片与单行紧凑列表双视图切换，**上次视图选择自动在数据库持久化记忆**，重启应用完美还原。
-- **可收缩分类侧边栏 (Drawer)**：支持自定义分类创建、重命名与安全平滑删除（删除后记录自动归类到“通用未分类”）。
+- **照片画廊 (至多 3 张)**：集成 `image_picker` 选择器，图片写入应用缓存，支持至多 3 张剧照/海报/店铺实拍照片预览。
+- **Card 模式 ↔ 紧凑列表模式**：3D 玻璃网格卡片与单行紧凑列表双视图切换，**上次视图选择自动在数据库持久化记忆**。
+- **可收缩分类侧边栏 (Drawer)**：自定义分类创建、重命名与安全平滑删除（删除后记录自动归类到“通用未分类”）。
+- **设置中心**：生活页右上角统一入口，缓存统计与上限清理、TMDB API Key（v3/v4 通用）、默认打卡成员等；支持 **WebDAV 云同步** 备份与恢复。
 
 ### 👥 4. 统一家庭成员系统 (Unified Member System)
 - `Member` 实体融合了姓名、性别、身高 (cm)、体重 (kg)、年龄与自定义步长。
@@ -74,10 +77,10 @@
 
 | 文件名 | 适用 CPU 架构 | 文件大小 | 推荐说明 |
 | :--- | :--- | :---: | :--- |
-| **`StepLife-v1.1.0-arm64-v8a.apk`** | 64 位 ARM (`arm64-v8a`) | **19.7 MB** | 🔥 **最推荐**！适配 99% 的现代 Android 手机 |
-| **`StepLife-v1.1.0-armeabi-v7a.apk`** | 32 位 ARM (`armeabi-v7a`) | 17.3 MB | 适配老旧 32 位 Android 机型 |
-| **`StepLife-v1.1.0-x86_64.apk`** | Intel/AMD (`x86_64`) | 21.1 MB | 适配 Android 模拟器与 x86 平板 |
-| **`StepLife-v1.1.0-universal.apk`** | 通用全架构胖包 | 55.7 MB | 整合全架构二进制，兼容任意设备 |
+| **`StepLife-v1.4.4-arm64-v8a.apk`** | 64 位 ARM (`arm64-v8a`) | **25.8 MB** | 🔥 **最推荐**！适配 99% 的现代 Android 手机 |
+| **`StepLife-v1.4.4-armeabi-v7a.apk`** | 32 位 ARM (`armeabi-v7a`) | 23.5 MB | 适配老旧 32 位 Android 机型 |
+| **`StepLife-v1.4.4-x86_64.apk`** | Intel/AMD (`x86_64`) | 27.1 MB | 适配 Android 模拟器与 x86 平板 |
+| **`StepLife-v1.4.4-universal.apk`** | 通用全架构胖包 | 63.4 MB | 整合全架构二进制，兼容任意设备 |
 
 ---
 
@@ -85,7 +88,9 @@
 
 - **核心框架**: Flutter (Dart) Material 3 & Google Fonts (`Outfit`)
 - **状态管理**: Provider (`ProfileProvider`, `StepProvider`, `ChoreProvider`, `StoreProvider`)
-- **本地持久化**: SQLite (`sqflite` / `sqflite_common_ffi` Schema v7)
+- **本地持久化**: SQLite (`sqflite` / `sqflite_common_ffi` Schema v9，旧版数据安全接管合并迁移)
+- **影视数据**: TMDB v3 API（v3 Key / v4 Token 自动识别）
+- **云同步**: WebDAV 备份与恢复
 - **UI 风格**: Modern Frosted Glassmorphism (毛玻璃模糊 + 霓虹暗夜色彩系统)
 - **图像选择**: `image_picker`
 
