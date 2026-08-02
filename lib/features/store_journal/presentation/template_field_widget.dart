@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../core/cache/cache_manager.dart';
 import '../../../core/settings/settings_provider.dart';
 import '../domain/life_templates.dart';
@@ -104,7 +105,7 @@ class _TemplateFieldWidgetState extends State<TemplateFieldWidget> {
     }
   }
 
-  static const TextStyle _hintStyle = TextStyle(color: Colors.white60, fontSize: 12);
+  static const TextStyle _hintStyle = AppTheme.hintStyle;
 
   @override
   Widget build(BuildContext context) {

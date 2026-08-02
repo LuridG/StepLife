@@ -7,6 +7,7 @@ import '../domain/store_models.dart';
 import '../domain/life_templates.dart';
 import '../providers/store_provider.dart';
 import '../../../core/cache/cache_manager.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../core/network/tmdb_client.dart';
 import '../../../core/settings/settings_button.dart';
 import '../../../core/settings/settings_provider.dart';
@@ -523,7 +524,7 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                     decoration: InputDecoration(
                       labelText: '$nameLabel (必填)',
                       hintText: tpl.itemNameHint,
-                      hintStyle: const TextStyle(color: Colors.white60, fontSize: 12),
+                      hintStyle: AppTheme.hintStyle,
                       suffixIcon: (tpl.key == 'movie' && context.read<SettingsProvider>().tmdbEnabled)
                           ? IconButton(
                               icon: const Icon(Icons.search, color: Color(0xFF10B981)),
@@ -707,10 +708,16 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                                     children: [
                                       Text(item.name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
                                       const SizedBox(height: 2),
-                                      Text(
-                                        '¥${_fmtPrice(item.price)}',
-                                        style: const TextStyle(fontSize: 12, color: Color(0xFF10B981), fontWeight: FontWeight.bold),
-                                      ),
+                                      if (item.specs.isEmpty)
+                                        Text(
+                                          '¥${_fmtPrice(item.price)}',
+                                          style: const TextStyle(fontSize: 12, color: Color(0xFF10B981), fontWeight: FontWeight.bold),
+                                        )
+                                      else
+                                        Text(
+                                          item.specs.map((s) => '${s.name} ¥${_fmtPrice(s.price)}').join(' · '),
+                                          style: const TextStyle(fontSize: 11, color: Color(0xFF10B981), fontWeight: FontWeight.bold),
+                                        ),
                                     ],
                                   ),
                                 ),
@@ -914,7 +921,7 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                 decoration: const InputDecoration(
                   labelText: '字段名称',
                   hintText: '例如: 产地 / 口味 / 座位号',
-                  hintStyle: TextStyle(color: Colors.white60, fontSize: 12),
+                  hintStyle: AppTheme.hintStyle,
                 ),
               ),
               const SizedBox(height: 12),
@@ -983,7 +990,7 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
     return v.toStringAsFixed(1);
   }
 
-  /// 餐饮菜单：添加 / 编辑菜品弹窗（菜名 + 固定价格 + 可选图片，图片写入应用缓存）
+  /// 餐饮菜单：添加 / 编辑菜品弹窗（菜名 + 固定价格 + 可选份量规格 + 可选图片，图片写入应用缓存）
   Future<void> _showMenuItemDialog(
     BuildContext dialogCtx,
     void Function(void Function()) setModalState,
@@ -995,6 +1002,13 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
       text: existing == null ? '' : _fmtPrice(existing.price),
     );
     String? imagePath = existing?.imagePath;
+    // 份量规格：规格名 + 价格 成对编辑，可自由添加/删除
+    final List<TextEditingController> specNameControllers = [];
+    final List<TextEditingController> specPriceControllers = [];
+    for (final s in existing?.specs ?? const <MenuItemSpec>[]) {
+      specNameControllers.add(TextEditingController(text: s.name));
+      specPriceControllers.add(TextEditingController(text: _fmtPrice(s.price)));
+    }
 
     await showDialog(
       context: dialogCtx,
@@ -1020,6 +1034,15 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
             }
           }
 
+          void removeSpecRow(int index) {
+            mset(() {
+              specNameControllers[index].dispose();
+              specPriceControllers[index].dispose();
+              specNameControllers.removeAt(index);
+              specPriceControllers.removeAt(index);
+            });
+          }
+
           return AlertDialog(
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
             title: Text(existing == null ? '添加菜品' : '编辑菜品'),
@@ -1034,7 +1057,7 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                     decoration: const InputDecoration(
                       labelText: '菜名',
                       hintText: '例如: 招牌红烧肉 / 冰美式',
-                      hintStyle: TextStyle(color: Colors.white60, fontSize: 12),
+                      hintStyle: AppTheme.hintStyle,
                       prefixIcon: Icon(Icons.restaurant_menu),
                       border: OutlineInputBorder(),
                     ),
@@ -1046,11 +1069,75 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                     decoration: const InputDecoration(
                       labelText: '固定价格 (元)',
                       hintText: '例如: 38',
-                      hintStyle: TextStyle(color: Colors.white60, fontSize: 12),
+                      hintStyle: AppTheme.hintStyle,
                       prefixIcon: Icon(Icons.attach_money),
                       border: OutlineInputBorder(),
                     ),
                   ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      const Text('份量规格 (可选)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      const Spacer(),
+                      TextButton.icon(
+                        onPressed: () => mset(() {
+                          specNameControllers.add(TextEditingController());
+                          specPriceControllers.add(TextEditingController());
+                        }),
+                        icon: const Icon(Icons.add, size: 16),
+                        label: const Text('添加规格'),
+                        style: TextButton.styleFrom(foregroundColor: const Color(0xFF10B981)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  const Text('例如: 大份 / 小份、一两 / 二两 / 三两，各对应不同价格', style: TextStyle(fontSize: 11, color: Colors.white54)),
+                  const SizedBox(height: 8),
+                  if (specNameControllers.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 8),
+                      child: Text('未添加规格时，打卡按固定价格计价', style: TextStyle(fontSize: 11, color: Colors.white38)),
+                    ),
+                  ...List.generate(specNameControllers.length, (i) => Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              flex: 3,
+                              child: TextField(
+                                controller: specNameControllers[i],
+                                decoration: const InputDecoration(
+                                  labelText: '规格名',
+                                  hintText: '例如: 大份 / 二两',
+                                  hintStyle: AppTheme.hintStyle,
+                                  isDense: true,
+                                  border: OutlineInputBorder(),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              flex: 2,
+                              child: TextField(
+                                controller: specPriceControllers[i],
+                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                decoration: const InputDecoration(
+                                  labelText: '价格 (元)',
+                                  hintText: '例如: 42',
+                                  hintStyle: AppTheme.hintStyle,
+                                  isDense: true,
+                                  border: OutlineInputBorder(),
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              onPressed: () => removeSpecRow(i),
+                              icon: const Icon(Icons.remove_circle_outline, color: Colors.redAccent, size: 18),
+                              tooltip: '删除该规格',
+                            ),
+                          ],
+                        ),
+                      )),
                   const SizedBox(height: 16),
                   const Text('菜品图片 (可选，计入缓存):', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                   const SizedBox(height: 8),
@@ -1106,6 +1193,12 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                 onPressed: () {
                   nameController.dispose();
                   priceController.dispose();
+                  for (final c in specNameControllers) {
+                    c.dispose();
+                  }
+                  for (final c in specPriceControllers) {
+                    c.dispose();
+                  }
                   Navigator.of(mctx).pop();
                 },
                 child: const Text('取消'),
@@ -1127,12 +1220,26 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                     );
                     return;
                   }
+                  // 收集份量规格并校验
+                  final specs = <MenuItemSpec>[];
+                  for (var i = 0; i < specNameControllers.length; i++) {
+                    final sName = specNameControllers[i].text.trim();
+                    final sPrice = double.tryParse(specPriceControllers[i].text.trim());
+                    if (sName.isEmpty || sPrice == null || sPrice < 0) {
+                      ScaffoldMessenger.of(mctx).showSnackBar(
+                        const SnackBar(content: Text('请完整填写每个规格的名称与价格 (大于等于 0)，或删除空行')),
+                      );
+                      return;
+                    }
+                    specs.add(MenuItemSpec(name: sName, price: sPrice));
+                  }
                   setModalState(() {
                     if (existing == null) {
                       menuDrafts.add(StoreMenuItem(
                         name: name,
                         price: price,
                         imagePath: imagePath,
+                        specs: specs,
                         sortOrder: menuDrafts.length,
                       ));
                     } else {
@@ -1145,6 +1252,7 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                           name: name,
                           price: price,
                           imagePath: imagePath,
+                          specs: specs,
                           sortOrder: existing.sortOrder,
                           createdAt: existing.createdAt,
                         );
@@ -1153,6 +1261,12 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                   });
                   nameController.dispose();
                   priceController.dispose();
+                  for (final c in specNameControllers) {
+                    c.dispose();
+                  }
+                  for (final c in specPriceControllers) {
+                    c.dispose();
+                  }
                   Navigator.of(mctx).pop();
                 },
                 style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981), foregroundColor: Colors.white),

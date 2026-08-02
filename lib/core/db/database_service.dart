@@ -99,6 +99,7 @@ class DatabaseService {
               price REAL NOT NULL DEFAULT 0,
               imagePath TEXT,
               sortOrder INTEGER NOT NULL DEFAULT 0,
+              specsJson TEXT NOT NULL DEFAULT '[]',
               createdAt TEXT NOT NULL
             )
           ''');
@@ -108,6 +109,12 @@ class DatabaseService {
         } catch (_) {}
         try {
           await db.execute("ALTER TABLE store_logs ADD COLUMN menuNamesJson TEXT NOT NULL DEFAULT '[]'");
+        } catch (_) {}
+        try {
+          await db.execute("ALTER TABLE store_logs ADD COLUMN menuSpecsJson TEXT NOT NULL DEFAULT '[]'");
+        } catch (_) {}
+        try {
+          await db.execute("ALTER TABLE store_menu_items ADD COLUMN specsJson TEXT NOT NULL DEFAULT '[]'");
         } catch (_) {}
       },
     );
@@ -308,6 +315,7 @@ class DatabaseService {
         extrasJson TEXT NOT NULL DEFAULT '{}',
         menuItemIdsJson TEXT NOT NULL DEFAULT '[]',
         menuNamesJson TEXT NOT NULL DEFAULT '[]',
+        menuSpecsJson TEXT NOT NULL DEFAULT '[]',
         timestamp TEXT NOT NULL
       )
     ''');
@@ -321,6 +329,7 @@ class DatabaseService {
         price REAL NOT NULL DEFAULT 0,
         imagePath TEXT,
         sortOrder INTEGER NOT NULL DEFAULT 0,
+        specsJson TEXT NOT NULL DEFAULT '[]',
         createdAt TEXT NOT NULL
       );
 

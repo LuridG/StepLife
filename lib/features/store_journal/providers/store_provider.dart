@@ -229,6 +229,7 @@ class StoreProvider extends ChangeNotifier {
     Map<String, dynamic> extras = const {},
     List<int> menuItemIds = const [],
     List<String> menuNames = const [],
+    List<String> menuSpecs = const [],
     DateTime? targetDate,
   }) async {
     final log = StoreLog(
@@ -241,6 +242,7 @@ class StoreProvider extends ChangeNotifier {
       extras: extras,
       menuItemIds: menuItemIds,
       menuNames: menuNames,
+      menuSpecs: menuSpecs,
       timestamp: targetDate ?? DateTime.now(),
     );
 
@@ -258,6 +260,7 @@ class StoreProvider extends ChangeNotifier {
         extras: extras,
         menuItemIds: menuItemIds,
         menuNames: menuNames,
+        menuSpecs: menuSpecs,
         timestamp: log.timestamp,
       ),
     );
@@ -281,6 +284,7 @@ class StoreProvider extends ChangeNotifier {
     Map<String, dynamic> extras = const {},
     List<int> menuItemIds = const [],
     List<String> menuNames = const [],
+    List<String> menuSpecs = const [],
     DateTime? targetDate,
   }) async {
     final log = StoreLog(
@@ -294,6 +298,7 @@ class StoreProvider extends ChangeNotifier {
       extras: extras,
       menuItemIds: menuItemIds,
       menuNames: menuNames,
+      menuSpecs: menuSpecs,
       timestamp: targetDate ?? DateTime.now(),
     );
     await DatabaseService.instance.updateStoreLog(log);

@@ -12,7 +12,7 @@
   <img src="https://img.shields.io/badge/Flutter-3.27+-02569B?logo=flutter" alt="Flutter" />
   <img src="https://img.shields.io/badge/Dart-3.6+-0175C2?logo=dart" alt="Dart" />
   <img src="https://img.shields.io/badge/Platform-Android%20%7C%20Windows-green" alt="Platform" />
-  <img src="https://img.shields.io/badge/Version-v1.4.4-emerald" alt="Version" />
+  <img src="https://img.shields.io/badge/Version-v1.4.5-emerald" alt="Version" />
   <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License" />
 </p>
 
@@ -57,7 +57,7 @@
 ### 🛍️ 3. 生活记录 (探店 / 影视 / 阅读 / 景点打卡)
 - **基础模板体系**：内置影视观影、餐饮美食、通用记录等多套模板，新建时一键选用；通用模板支持自定义字段（文本/多行/数字/日期/标签）。
 - **影视模板 + TMDB**：一键搜索电影/电视剧并自动填充海报、题材、剧情简介、导演主演；媒体类型（电影/电视剧）与题材（科幻/动作…）二级分类，海报 2:3 竖版 + 文字环绕排版。
-- **餐饮菜单管理**：店铺菜单固定菜品与价格，打卡多点菜自动合计消费；历史打卡记录可修改（金额/成员/点菜/点评/时刻）。
+- **餐饮菜单管理**：店铺菜单固定菜品与价格；菜品支持**自由添加份量规格**（如 大份/小份、面条一两/二两/三两），每个规格可单独定价，打卡选菜时按规格计价并自动合计消费；历史打卡记录可修改（金额/成员/点菜/点评/时刻）。
 - **1.0 ~ 5.0 亮金星级 Rating 评分**：支持在表单中自由点选星级评分，列表直观星级呈现。
 - **照片画廊 (至多 3 张)**：集成 `image_picker` 选择器，图片写入应用缓存，支持至多 3 张剧照/海报/店铺实拍照片预览。
 - **Card 模式 ↔ 紧凑列表模式**：3D 玻璃网格卡片与单行紧凑列表双视图切换，**上次视图选择自动在数据库持久化记忆**。
@@ -77,10 +77,10 @@
 
 | 文件名 | 适用 CPU 架构 | 文件大小 | 推荐说明 |
 | :--- | :--- | :---: | :--- |
-| **`StepLife-v1.4.4-arm64-v8a.apk`** | 64 位 ARM (`arm64-v8a`) | **25.8 MB** | 🔥 **最推荐**！适配 99% 的现代 Android 手机 |
-| **`StepLife-v1.4.4-armeabi-v7a.apk`** | 32 位 ARM (`armeabi-v7a`) | 23.5 MB | 适配老旧 32 位 Android 机型 |
-| **`StepLife-v1.4.4-x86_64.apk`** | Intel/AMD (`x86_64`) | 27.1 MB | 适配 Android 模拟器与 x86 平板 |
-| **`StepLife-v1.4.4-universal.apk`** | 通用全架构胖包 | 63.4 MB | 整合全架构二进制，兼容任意设备 |
+| **`StepLife-v1.4.5-arm64-v8a.apk`** | 64 位 ARM (`arm64-v8a`) | **25.8 MB** | 🔥 **最推荐**！适配 99% 的现代 Android 手机 |
+| **`StepLife-v1.4.5-armeabi-v7a.apk`** | 32 位 ARM (`armeabi-v7a`) | 23.5 MB | 适配老旧 32 位 Android 机型 |
+| **`StepLife-v1.4.5-x86_64.apk`** | Intel/AMD (`x86_64`) | 27.1 MB | 适配 Android 模拟器与 x86 平板 |
+| **`StepLife-v1.4.5-universal.apk`** | 通用全架构胖包 | 63.4 MB | 整合全架构二进制，兼容任意设备 |
 
 ---
 
@@ -88,10 +88,10 @@
 
 - **核心框架**: Flutter (Dart) Material 3 & Google Fonts (`Outfit`)
 - **状态管理**: Provider (`ProfileProvider`, `StepProvider`, `ChoreProvider`, `StoreProvider`)
-- **本地持久化**: SQLite (`sqflite` / `sqflite_common_ffi` Schema v9，旧版数据安全接管合并迁移)
+- **本地持久化**: SQLite (`sqflite` / `sqflite_common_ffi`，Schema v9 兼容升级，旧版数据安全接管合并迁移，菜品规格/打卡规格非破坏新增)
 - **影视数据**: TMDB v3 API（v3 Key / v4 Token 自动识别）
 - **云同步**: WebDAV 备份与恢复
-- **UI 风格**: Modern Frosted Glassmorphism (毛玻璃模糊 + 霓虹暗夜色彩系统)
+- **UI 风格**: Modern Frosted Glassmorphism (毛玻璃模糊 + 霓虹暗夜色彩系统)；全局输入框提示文字统一淡灰小字号，避免喧宾夺主
 - **图像选择**: `image_picker`
 
 ---

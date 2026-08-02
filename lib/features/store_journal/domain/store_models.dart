@@ -183,6 +183,9 @@ class StoreLog {
   final List<int> menuItemIds;
   final List<String> menuNames;
 
+  /// 与 menuItemIds 对应的份量规格名（无规格菜品为空字符串，与 menuItemIds 等长）
+  final List<String> menuSpecs;
+
   final DateTime timestamp; // 分钟级打卡时刻 (yyyy-MM-dd HH:mm)
 
   StoreLog({
@@ -196,6 +199,7 @@ class StoreLog {
     this.extras = const {},
     this.menuItemIds = const [],
     this.menuNames = const [],
+    this.menuSpecs = const [],
     DateTime? timestamp,
   }) : timestamp = timestamp ?? DateTime.now();
 
@@ -210,6 +214,7 @@ class StoreLog {
     Map<String, dynamic>? extras,
     List<int>? menuItemIds,
     List<String>? menuNames,
+    List<String>? menuSpecs,
     DateTime? timestamp,
   }) {
     return StoreLog(
@@ -223,6 +228,7 @@ class StoreLog {
       extras: extras ?? this.extras,
       menuItemIds: menuItemIds ?? this.menuItemIds,
       menuNames: menuNames ?? this.menuNames,
+      menuSpecs: menuSpecs ?? this.menuSpecs,
       timestamp: timestamp ?? this.timestamp,
     );
   }
@@ -239,6 +245,7 @@ class StoreLog {
       'extrasJson': jsonEncode(extras),
       'menuItemIdsJson': jsonEncode(menuItemIds),
       'menuNamesJson': jsonEncode(menuNames),
+      'menuSpecsJson': jsonEncode(menuSpecs),
       'timestamp': timestamp.toIso8601String(),
     };
   }
@@ -287,6 +294,13 @@ class StoreLog {
         menuNames = decoded.map((e) => e.toString()).toList();
       }
     }
+    List<String> menuSpecs = [];
+    if (map['menuSpecsJson'] != null) {
+      final decoded = jsonDecode(map['menuSpecsJson'] as String);
+      if (decoded is List) {
+        menuSpecs = decoded.map((e) => e.toString()).toList();
+      }
+    }
 
     return StoreLog(
       id: map['id'] as int?,
@@ -299,13 +313,41 @@ class StoreLog {
       extras: extras,
       menuItemIds: menuIds,
       menuNames: menuNames,
+      menuSpecs: menuSpecs,
       timestamp: DateTime.parse(map['timestamp'] as String),
     );
   }
 }
 
 
+/// 菜品份量规格：规格名 + 对应价格（如 大份/小份、一两/二两/三两）
+class MenuItemSpec {
+  final String name;
+  final double price;
+
+  const MenuItemSpec({required this.name, required this.price});
+
+  MenuItemSpec copyWith({String? name, double? price}) {
+    return MenuItemSpec(
+      name: name ?? this.name,
+      price: price ?? this.price,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {'name': name, 'price': price};
+  }
+
+  factory MenuItemSpec.fromJson(Map<String, dynamic> json) {
+    return MenuItemSpec(
+      name: json['name']?.toString() ?? '',
+      price: (json['price'] as num?)?.toDouble() ?? 0,
+    );
+  }
+}
+
 /// 餐饮菜单条目：固定名称 + 价格，可选菜品图片（图片存入应用缓存）
+/// specs: 可自由添加的份量规格（如 大份/小份、一两/二两/三两），各自对应价格；为空表示单一固定价
 class StoreMenuItem {
   final int? id;
   final int storeId;
@@ -314,6 +356,7 @@ class StoreMenuItem {
   final String? imagePath;
   final int sortOrder;
   final DateTime createdAt;
+  final List<MenuItemSpec> specs;
 
   StoreMenuItem({
     this.id,
@@ -322,6 +365,7 @@ class StoreMenuItem {
     this.price = 0,
     this.imagePath,
     this.sortOrder = 0,
+    this.specs = const [],
     DateTime? createdAt,
   }) : createdAt = createdAt ?? DateTime.now();
 
@@ -332,6 +376,7 @@ class StoreMenuItem {
     double? price,
     String? imagePath,
     int? sortOrder,
+    List<MenuItemSpec>? specs,
     DateTime? createdAt,
   }) {
     return StoreMenuItem(
@@ -341,6 +386,7 @@ class StoreMenuItem {
       price: price ?? this.price,
       imagePath: imagePath ?? this.imagePath,
       sortOrder: sortOrder ?? this.sortOrder,
+      specs: specs ?? this.specs,
       createdAt: createdAt ?? this.createdAt,
     );
   }
@@ -353,6 +399,7 @@ class StoreMenuItem {
       'price': price,
       'imagePath': imagePath,
       'sortOrder': sortOrder,
+      'specsJson': jsonEncode(specs.map((s) => s.toJson()).toList()),
       'createdAt': createdAt.toIso8601String(),
     };
   }
@@ -365,8 +412,23 @@ class StoreMenuItem {
       price: (map['price'] as num?)?.toDouble() ?? 0,
       imagePath: map['imagePath'] as String?,
       sortOrder: (map['sortOrder'] as num?)?.toInt() ?? 0,
+      specs: _parseMenuItemSpecs(map['specsJson']),
       createdAt:
           DateTime.tryParse(map['createdAt']?.toString() ?? '') ?? DateTime.now(),
     );
   }
+}
+
+List<MenuItemSpec> _parseMenuItemSpecs(Object? raw) {
+  if (raw == null) return const [];
+  try {
+    final decoded = jsonDecode(raw.toString());
+    if (decoded is List) {
+      return decoded
+          .whereType<Map>()
+          .map((e) => MenuItemSpec.fromJson(Map<String, dynamic>.from(e)))
+          .toList();
+    }
+  } catch (_) {}
+  return const [];
 }

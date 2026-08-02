@@ -8,6 +8,7 @@ import '../providers/store_provider.dart';
 import '../../chore_tracker/domain/chore_models.dart';
 import '../../chore_tracker/providers/chore_provider.dart';
 import '../../../core/settings/settings_provider.dart';
+import '../../../core/theme/app_theme.dart';
 import 'template_field_widget.dart';
 
 /// 生活打卡弹窗：新建 / 修改复用（传入 existingLog 即为编辑模式，预填原记录）
@@ -54,7 +55,7 @@ class StoreCheckinDialog extends StatelessWidget {
     final storeMenu = tpl.key == 'dining'
         ? storeProvider.getMenuItemsForStore(store.id ?? 0)
         : const <StoreMenuItem>[];
-    final List<StoreMenuItem> selectedMenuItems = [];
+    final List<_SelectedMenu> selectedMenuItems = [];
 
     DateTime selectedDateTime = isEdit ? existingLog!.timestamp : DateTime.now();
     final List<Member> selectedMembers = [];
@@ -82,12 +83,23 @@ class StoreCheckinDialog extends StatelessWidget {
           }
         }
       }
-      // 预选菜品
-      final menuIdSet = existingLog!.menuItemIds.toSet();
+      // 预选菜品（含份量规格，按 menuItemIds / menuSpecs 恢复）
+      final menuIdList = existingLog!.menuItemIds;
+      final menuSpecList = existingLog!.menuSpecs;
       for (final m in storeMenu) {
-        if (m.id != null && menuIdSet.contains(m.id)) {
-          selectedMenuItems.add(m);
+        if (m.id == null || !menuIdList.contains(m.id)) continue;
+        final idx = menuIdList.indexOf(m.id!);
+        final specName = (idx >= 0 && idx < menuSpecList.length) ? menuSpecList[idx] : '';
+        MenuItemSpec? spec;
+        if (specName.isNotEmpty) {
+          for (final s in m.specs) {
+            if (s.name == specName) {
+              spec = s;
+              break;
+            }
+          }
         }
+        selectedMenuItems.add(_SelectedMenu(m, spec));
       }
     } else {
       // ---- 新建模式：默认成员 ----
@@ -142,7 +154,14 @@ class StoreCheckinDialog extends StatelessWidget {
                     spacing: 8,
                     runSpacing: 8,
                     children: storeMenu.map((m) {
-                      final isSelected = selectedMenuItems.contains(m);
+                      final selIndex = selectedMenuItems.indexWhere((s) => s.item.id == m.id);
+                      final isSelected = selIndex != -1;
+                      final currentSpec = isSelected ? selectedMenuItems[selIndex].spec : null;
+                      final label = m.specs.isEmpty
+                          ? '${m.name} ¥${_fmtPrice(m.price)}'
+                          : (currentSpec != null
+                              ? '${m.name}（${currentSpec.name} ¥${_fmtPrice(currentSpec.price)}）'
+                              : '${m.name} ¥${_fmtPrice(m.specs.first.price)}起');
                       return FilterChip(
                         avatar: (m.imagePath != null && m.imagePath!.isNotEmpty)
                             ? ClipRRect(
@@ -156,22 +175,46 @@ class StoreCheckinDialog extends StatelessWidget {
                                 ),
                               )
                             : null,
-                        label: Text('${m.name} ¥${_fmtPrice(m.price)}'),
+                        label: Text(label, style: const TextStyle(fontSize: 12)),
                         selected: isSelected,
                         selectedColor: const Color(0xFF10B981).withAlpha(90),
                         onSelected: (sel) {
-                          setModalState(() {
-                            if (sel) {
-                              selectedMenuItems.add(m);
-                            } else {
-                              selectedMenuItems.remove(m);
-                            }
-                            final sum = selectedMenuItems.fold<double>(
-                              0.0,
-                              (acc, x) => acc + x.price,
-                            );
-                            costController.text = sum == 0 ? '' : _fmtPrice(sum);
-                          });
+                          if (m.specs.isEmpty) {
+                            setModalState(() {
+                              if (sel) {
+                                selectedMenuItems.add(_SelectedMenu(m, null));
+                              } else {
+                                selectedMenuItems.removeWhere((s) => s.item.id == m.id);
+                              }
+                              final sum = selectedMenuItems.fold<double>(
+                                0.0,
+                                (acc, x) => acc + x.price,
+                              );
+                              costController.text = sum == 0 ? '' : _fmtPrice(sum);
+                            });
+                          } else if (sel) {
+                            // 有规格：弹出规格选择
+                            _showSpecPicker(dialogCtx, m, (spec) {
+                              setModalState(() {
+                                selectedMenuItems.removeWhere((s) => s.item.id == m.id);
+                                selectedMenuItems.add(_SelectedMenu(m, spec));
+                                final sum = selectedMenuItems.fold<double>(
+                                  0.0,
+                                  (acc, x) => acc + x.price,
+                                );
+                                costController.text = sum == 0 ? '' : _fmtPrice(sum);
+                              });
+                            });
+                          } else {
+                            setModalState(() {
+                              selectedMenuItems.removeWhere((s) => s.item.id == m.id);
+                              final sum = selectedMenuItems.fold<double>(
+                                0.0,
+                                (acc, x) => acc + x.price,
+                              );
+                              costController.text = sum == 0 ? '' : _fmtPrice(sum);
+                            });
+                          }
                         },
                       );
                     }).toList(),
@@ -184,7 +227,7 @@ class StoreCheckinDialog extends StatelessWidget {
                   decoration: const InputDecoration(
                     labelText: '本次打卡消费金额',
                     hintText: '例: 45 元 (不涉及消费可留空或填 0)',
-                    hintStyle: TextStyle(color: Colors.white60, fontSize: 12),
+                    hintStyle: AppTheme.hintStyle,
                     prefixIcon: Icon(Icons.attach_money),
                     border: OutlineInputBorder(),
                   ),
@@ -233,7 +276,7 @@ class StoreCheckinDialog extends StatelessWidget {
                   decoration: const InputDecoration(
                     labelText: '点评 / 体验感受',
                     hintText: '记录本次体验、口味评价等 (选填)',
-                    hintStyle: TextStyle(color: Colors.white60, fontSize: 12),
+                    hintStyle: AppTheme.hintStyle,
                     border: OutlineInputBorder(),
                   ),
                   maxLines: 2,
@@ -307,8 +350,9 @@ class StoreCheckinDialog extends StatelessWidget {
                         visitorNames: vNames.isNotEmpty ? vNames : ['自己'],
                         memo: memoController.text.trim(),
                         extras: extrasValues,
-                        menuItemIds: selectedMenuItems.map((m) => m.id ?? 0).toList(),
-                        menuNames: selectedMenuItems.map((m) => m.name).toList(),
+                        menuItemIds: selectedMenuItems.map((s) => s.item.id ?? 0).toList(),
+                        menuNames: selectedMenuItems.map((s) => s.displayName).toList(),
+                        menuSpecs: selectedMenuItems.map((s) => s.spec?.name ?? '').toList(),
                         targetDate: selectedDateTime,
                       );
                 } else {
@@ -323,8 +367,9 @@ class StoreCheckinDialog extends StatelessWidget {
                         visitorNames: vNames.isNotEmpty ? vNames : ['自己'],
                         memo: memoController.text.trim(),
                         extras: extrasValues,
-                        menuItemIds: selectedMenuItems.map((m) => m.id ?? 0).toList(),
-                        menuNames: selectedMenuItems.map((m) => m.name).toList(),
+                        menuItemIds: selectedMenuItems.map((s) => s.item.id ?? 0).toList(),
+                        menuNames: selectedMenuItems.map((s) => s.displayName).toList(),
+                        menuSpecs: selectedMenuItems.map((s) => s.spec?.name ?? '').toList(),
                         targetDate: selectedDateTime,
                       );
                 }
@@ -348,4 +393,52 @@ class StoreCheckinDialog extends StatelessWidget {
       },
     );
   }
+
+  /// 有规格菜品：弹出规格选择（规格名 + 对应价格）
+  Future<void> _showSpecPicker(
+    BuildContext dialogCtx,
+    StoreMenuItem item,
+    void Function(MenuItemSpec spec) onPick,
+  ) async {
+    await showDialog(
+      context: dialogCtx,
+      builder: (specCtx) => SimpleDialog(
+        title: Text('选择 ${item.name} 份量'),
+        children: [
+          ...item.specs.map(
+            (s) => SimpleDialogOption(
+              onPressed: () {
+                Navigator.of(specCtx).pop();
+                onPick(s);
+              },
+              child: Row(
+                children: [
+                  const Icon(Icons.straighten, size: 18, color: Color(0xFF10B981)),
+                  const SizedBox(width: 10),
+                  Text('${s.name} · ¥${_fmtPrice(s.price)}', style: const TextStyle(fontSize: 14)),
+                ],
+              ),
+            ),
+          ),
+          const Divider(),
+          SimpleDialogOption(
+            onPressed: () => Navigator.of(specCtx).pop(),
+            child: const Text('取消', style: TextStyle(color: Colors.white54, fontSize: 13)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 点菜选中项：菜品 + 可选份量规格（无规格时 spec 为 null，按固定价格计价）
+class _SelectedMenu {
+  final StoreMenuItem item;
+  final MenuItemSpec? spec;
+
+  const _SelectedMenu(this.item, this.spec);
+
+  double get price => spec?.price ?? item.price;
+
+  String get displayName => spec == null ? item.name : '${item.name}（${spec!.name}）';
 }

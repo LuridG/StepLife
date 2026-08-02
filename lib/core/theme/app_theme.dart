@@ -8,6 +8,13 @@ class AppTheme {
   static const Color backgroundColor = Color(0xFF0B1329); // Deep Midnight
   static const Color cardBgColor = Color(0x1AFFFFFF);
 
+  /// 全局输入框提示文字：淡灰、小字号，避免喧宾夺主（用于深色对话框）
+  static const TextStyle hintStyle = TextStyle(
+    color: Colors.white38,
+    fontSize: 10.5,
+    fontWeight: FontWeight.w400,
+  );
+
 
   /// 浅色主题：页面背景保留品牌深色渐变，对话框保持深色毛玻璃以兼容现有硬编码文字
   static ThemeData get lightTheme {
@@ -58,6 +65,9 @@ class AppTheme {
         elevation: 10,
         type: BottomNavigationBarType.fixed,
       ),
+      inputDecorationTheme: const InputDecorationTheme(
+        hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 10.5, fontWeight: FontWeight.w400),
+      ),
     );
   }
 
@@ -106,6 +116,9 @@ class AppTheme {
         unselectedItemColor: Colors.white38,
         elevation: 10,
         type: BottomNavigationBarType.fixed,
+      ),
+      inputDecorationTheme: const InputDecorationTheme(
+        hintStyle: hintStyle,
       ),
     );
   }
