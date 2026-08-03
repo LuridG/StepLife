@@ -5,7 +5,6 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../../core/settings/settings_button.dart';
-import '../../../core/db/database_service.dart';
 import '../domain/step_models.dart';
 import '../providers/step_provider.dart';
 import '../utils/step_counter_service.dart';
@@ -48,34 +47,11 @@ class _StepTrackerScreenState extends State<StepTrackerScreen>
   @override
   bool get wantKeepAlive => true;
 
-  /// 路线列表排序：created 按创建时间 | steps 按平均步数 | measures 按测量次数
-  String _routeSort = 'created';
-
-  @override
-  void initState() {
-    super.initState();
-    _loadRouteSort();
-  }
-
-  Future<void> _loadRouteSort() async {
-    try {
-      final v = await DatabaseService.instance.getSetting('route_sort');
-      if (v != null && mounted) setState(() => _routeSort = v);
-    } catch (_) {}
-  }
-
-  Future<void> _setRouteSort(String v) async {
-    setState(() => _routeSort = v);
-    try {
-      await DatabaseService.instance.setSetting('route_sort', v);
-    } catch (_) {}
-  }
-
   List<RouteItem> _sortedRoutes(List<RouteItem> routes) {
     final list = [...routes];
-    if (_routeSort == 'steps') {
+    if (context.read<StepProvider>().routeSort == 'steps') {
       list.sort((a, b) => b.refSteps.compareTo(a.refSteps));
-    } else if (_routeSort == 'measures') {
+    } else if (context.read<StepProvider>().routeSort == 'measures') {
       list.sort((a, b) => context
           .read<StepProvider>()
           .measurementCountOf(b.id!)
@@ -1321,7 +1297,7 @@ class _StepTrackerScreenState extends State<StepTrackerScreen>
                         ),
                       ),
                       PopupMenuButton<String>(
-                        initialValue: _routeSort,
+                        initialValue: context.read<StepProvider>().routeSort,
                         tooltip: '路线排序',
                         icon: const Icon(
                           Icons.sort,
@@ -1329,7 +1305,7 @@ class _StepTrackerScreenState extends State<StepTrackerScreen>
                           color: Colors.white70,
                         ),
                         color: const Color(0xFF0F172A),
-                        onSelected: _setRouteSort,
+                        onSelected: (v) => context.read<StepProvider>().setRouteSort(v),
                         itemBuilder: (ctx) => const [
                           PopupMenuItem(
                             value: 'created',

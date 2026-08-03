@@ -69,6 +69,7 @@ class SettingsProvider extends ChangeNotifier {
   static const String kLastCheckinMemberIds = 'last_checkin_member_ids';
   static const String kBackupWarning = 'backup_warning';
   static const String kAutoCheckUpdate = 'auto_check_update';
+  static const String kRouteSort = 'route_sort';
 
   /// 从 app_settings 加载全部设置
   Future<void> load() async {

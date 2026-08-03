@@ -3,6 +3,7 @@ import '../../chore_tracker/providers/chore_provider.dart';
 import '../../chore_tracker/domain/chore_models.dart';
 import '../../store_journal/domain/store_models.dart';
 import '../domain/assistant_models.dart';
+import '../../store_journal/domain/life_templates.dart';
 import 'deepseek_service.dart';
 
 /// 智能助手编排：组装上下文 → 调 DeepSeek → 解析/校验 → 确认后执行
@@ -15,10 +16,25 @@ class AssistantOrchestrator {
     final b = StringBuffer();
     b.writeln('你是「步履生活」家庭生活智能助手。用户会用一句话描述一件事，你要把它解析成「家务打卡」或「生活记录」动作。');
     b.writeln('只输出一个 JSON 对象，不要输出任何其他文字。字段如下（用不到的字段不要填）：');
-    b.writeln('action（必填）: "chore_log" 家务打卡(已存在) | "chore_new" 新建家务并打卡(不存在) | "store_checkin" 生活记录打卡(项目已存在) | "store_new" 仅新建生活项目 | "store_new_checkin" 新建并立即打卡 | "ask" 信息不足需追问(reply 写自然中文问题) | "reject" 无法转换');
-    b.writeln('通用字段: date(yyyy-MM-dd HH:mm, 支持"昨天/今天早上"换算, 默认当前时间), members(参与成员姓名数组, 必须取自下方成员列表, 识别不出填空数组表示默认), memo(备注), cost(消费金额数字)');
+    b.writeln(
+      'action（必填）: "chore_log" 家务打卡(已存在) | "chore_new" 新建家务并打卡(不存在) | '
+      '"store_checkin" 生活记录打卡(项目已存在) | "store_new" 仅新建生活项目 | '
+      '"store_new_checkin" 新建并立即打卡 | "ask" 信息不足需追问(reply 写自然中文问题) | "reject" 无法转换',
+    );
+    b.writeln(
+      '通用字段: date(yyyy-MM-dd HH:mm, 支持"昨天/今天早上"换算, 默认当前时间), '
+      'members(参与成员姓名数组, 必须取自下方成员列表, 识别不出填空数组表示默认), memo(备注), cost(消费金额数字)',
+    );
     b.writeln('家务字段: choreTitle(家务名), category(家务分类默认"日常家务"), value(数量), unit(单位), quantifiable(是否可量化 bool)');
-    b.writeln('生活字段: name(项目名: 店铺/片名/书名/景点/商品/菜篮子品类), category(分类名, 必须取自下方分类列表), template(movie/dining/book/place/shopping/basket/snack/generic), rating(1-5), address(位置/平台), menuNames(餐饮点的菜名数组, 必须取自下方菜单列表), menuSpecs(与菜名一一对应的份量规格数组如 大份/小份/二两, 必须取自菜品规格), extras(模板专属字段对象: 影视 director/genre/status/platform/episodesWatched, 餐饮 taste/ambience/recommend, 菜篮子 unit/price/qty/brand/channel/quality/note, 零食 brand/snackTag/priceTb/priceJd/priceStore/comment, 购物 brand/sku/refPrice, 书籍 author/pages/status)');
+    final templateKeys = LifeTemplates.all.map((t) => t.key).join('/');
+    b.writeln(
+      '生活字段: name(项目名: 店铺/片名/书名/景点/商品/菜篮子品类), category(分类名, 必须取自下方分类列表), '
+      'template($templateKeys), rating(1-5), address(位置/平台), '
+      'menuNames(餐饮点的菜名数组, 必须取自下方菜单列表), menuSpecs(与菜名一一对应的份量规格数组如 大份/小份/二两, 必须取自菜品规格), '
+      'extras(模板专属字段对象: 影视 director/genre/status/platform/episodesWatched, 餐饮 taste/ambience/recommend, '
+      '菜篮子 unit/price/qty/brand/channel/quality/note, 零食 brand/snackTag/priceTb/priceJd/priceStore/comment, '
+      '购物 brand/sku/refPrice, 书籍 author/pages/status)',
+    );
     b.writeln('匹配字段: match("existing"=已存在 / "new"=不存在), matchedName(match=existing 时必须给, 且必须与下方列表中的名称一字不差), matchedBrand(菜篮子品牌)');
     b.writeln('【铁律】');
     b.writeln('1. matchedName 必须与提供列表中的现有名称完全一致，不确定一律 match=new。');

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
+import 'package:permission_handler/permission_handler.dart';
 import '../../../core/settings/settings_provider.dart';
 import '../../../core/settings/settings_screen.dart';
 import '../../chore_tracker/providers/chore_provider.dart';
@@ -72,11 +73,67 @@ class _AssistantScreenState extends State<AssistantScreen> {
 
   Future<void> _initSpeech() async {
     try {
-      _speechReady = await _speech.initialize(onStatus: (_) {}, onError: (_) {});
+      _speechReady = await _speech.initialize(
+        onStatus: (status) {
+          // 录音结束/被取消时复位按钮状态
+          if (mounted &&
+              _listening &&
+              (status == 'done' || status == 'notListening')) {
+            setState(() => _listening = false);
+          }
+        },
+        onError: (err) {
+          if (!mounted) return;
+          setState(() => _listening = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(_speechErrorText(err.errorMsg))),
+          );
+        },
+      );
     } catch (_) {
       _speechReady = false;
     }
     if (mounted) setState(() {});
+  }
+
+  /// 语音错误码 → 中文提示
+  String _speechErrorText(String code) {
+    switch (code) {
+      case 'error_no_microphone':
+        return '未检测到麦克风，请检查系统录音权限或外接麦克风';
+      case 'error_permission':
+      case 'error_insufficient_permissions':
+        return '未获得麦克风权限，请在系统设置中允许本应用录音';
+      case 'error_network':
+      case 'error_network_timeout':
+        return '网络异常，语音识别失败，请稍后重试';
+      case 'error_busy':
+      case 'error_recognizer_busy':
+        return '语音识别正忙，请稍后再试';
+      case 'error_speech_timeout':
+        return '没有听到声音，请靠近麦克风再说一次';
+      case 'error_no_match':
+        return '没有识别到内容，请再说一次';
+      case 'error_not_supported':
+        return '当前设备不支持系统语音识别，请直接手动输入';
+      default:
+        return '语音识别失败（$code），请重试或手动输入';
+    }
+  }
+
+  /// 确保麦克风权限（运行时申请；被永久拒绝时引导去系统设置）
+  Future<bool> _ensureMicPermission() async {
+    final status = await Permission.microphone.status;
+    if (status.isGranted) return true;
+    final result = await Permission.microphone.request();
+    if (result.isGranted) return true;
+    if (result.isPermanentlyDenied && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('麦克风权限已被永久拒绝，请到系统设置中手动开启')),
+      );
+      await openAppSettings();
+    }
+    return false;
   }
 
   Future<void> _toggleListening() async {
@@ -85,27 +142,52 @@ class _AssistantScreenState extends State<AssistantScreen> {
       if (mounted) setState(() => _listening = false);
       return;
     }
-    if (!_speechReady) await _initSpeech();
-    if (!_speechReady) {
+    // 1. 先确保麦克风权限
+    if (!await _ensureMicPermission()) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('当前设备不支持语音输入，请直接手动输入')),
+          const SnackBar(content: Text('未获得麦克风权限，无法使用语音输入')),
         );
       }
       return;
     }
+    // 2. 初始化语音识别服务
+    if (!_speechReady) await _initSpeech();
+    if (!_speechReady) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('当前设备不支持系统语音识别，请直接手动输入')),
+        );
+      }
+      return;
+    }
+    // 3. 语音包缺失时回退系统默认语言，避免强制 zh_CN 启动失败
+    var hasZhCn = false;
+    try {
+      hasZhCn = (await _speech.locales()).any((l) => l.localeId == 'zh_CN');
+    } catch (_) {}
+
     setState(() => _listening = true);
-    _speech.listen(
-      listenOptions: stt.SpeechListenOptions(
-        localeId: 'zh_CN',
-        partialResults: true,
-        cancelOnError: true,
-      ),
-      onResult: (result) {
-        final text = result.recognizedWords;
-        if (mounted && text.isNotEmpty) _controller.text = text;
-      },
-    );
+    try {
+      await _speech.listen(
+        listenOptions: stt.SpeechListenOptions(
+          localeId: hasZhCn ? 'zh_CN' : null,
+          partialResults: true,
+          cancelOnError: true,
+        ),
+        onResult: (result) {
+          final text = result.recognizedWords;
+          if (mounted && text.isNotEmpty) _controller.text = text;
+        },
+      );
+    } catch (e) {
+      if (mounted) {
+        setState(() => _listening = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('语音启动失败：$e')),
+        );
+      }
+    }
   }
 
   Future<void> _send([String? override]) async {

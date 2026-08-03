@@ -3,6 +3,7 @@ import '../domain/step_models.dart';
 import '../../profile/domain/user_profile.dart';
 import '../../chore_tracker/domain/chore_models.dart';
 import '../../../core/db/database_service.dart';
+import '../../../core/settings/settings_provider.dart';
 import '../../../core/utils/fitness_calculator.dart';
 
 class StepProvider extends ChangeNotifier {
@@ -11,10 +12,14 @@ class StepProvider extends ChangeNotifier {
   List<RouteMeasurement> _measurements = [];
   bool _isLoading = true;
 
+  // 路线列表排序: created 按创建时间 | steps 按平均步数 | measures 按测量次数
+  String _routeSort = 'created';
+
   List<RouteItem> get routes => _routes;
   List<StepLog> get stepLogs => _stepLogs;
   List<RouteMeasurement> get measurements => _measurements;
   bool get isLoading => _isLoading;
+  String get routeSort => _routeSort;
 
   /// 某路线的测量记录（按时间倒序）
   List<RouteMeasurement> measurementsOf(int routeId) =>
@@ -25,6 +30,7 @@ class StepProvider extends ChangeNotifier {
 
   StepProvider() {
     loadData();
+    loadRouteSort();
   }
 
   Future<void> loadData() async {
@@ -65,6 +71,26 @@ class StepProvider extends ChangeNotifier {
 
     _isLoading = false;
     notifyListeners();
+  }
+
+  /// 加载路线排序偏好
+  Future<void> loadRouteSort() async {
+    try {
+      final v = await DatabaseService.instance.getSetting(SettingsProvider.kRouteSort);
+      if (v != null && v.isNotEmpty) {
+        _routeSort = v;
+        notifyListeners();
+      }
+    } catch (_) {}
+  }
+
+  /// 保存路线排序偏好
+  Future<void> setRouteSort(String v) async {
+    _routeSort = v;
+    notifyListeners();
+    try {
+      await DatabaseService.instance.setSetting(SettingsProvider.kRouteSort, v);
+    } catch (_) {}
   }
 
   /// 创建客观路线资产，返回新路线 id（用于追加首条测量记录）
