@@ -281,7 +281,7 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
   }
 
   // 客观资产登记表单 (只登记客观信息，初次登记无消费)
-  void _showStoreFormDialog({StoreItem? storeToEdit, String? initialTemplateKey}) {
+  Future<void> _showStoreFormDialog({StoreItem? storeToEdit, String? initialTemplateKey}) async {
     final isEditing = storeToEdit != null;
     final nameController = TextEditingController(text: storeToEdit?.name ?? '');
     final addressController = TextEditingController(text: storeToEdit?.address ?? '');
@@ -306,7 +306,7 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
       }
     }
 
-    final categories = context.read<StoreProvider>().categories;
+    var categories = context.read<StoreProvider>().categories;
     String selectedCategory = storeToEdit?.category ?? (categories.isNotEmpty ? categories.first.name : '餐饮美食');
 
     // 初始模板：编辑按分类模板；新建优先画廊选择，其次按分类名称匹配
@@ -332,7 +332,20 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
         selectedCategory = match.name;
         currentTemplateKey = match.templateKey;
       } else {
+        // 没有绑定该模板的分类：自动创建并选中，避免条目落错分类（如零食存成影视卡）
+        final tplForPick = LifeTemplates.byKey(initialTemplateKey);
+        final storeProvider = context.read<StoreProvider>();
+        await storeProvider.addCategory(tplForPick.name, templateKey: tplForPick.key);
+        if (!mounted) return;
+        categories = storeProvider.categories;
         currentTemplateKey = initialTemplateKey;
+        selectedCategory = tplForPick.name;
+        for (final c in categories) {
+          if (c.templateKey == initialTemplateKey) {
+            selectedCategory = c.name;
+            break;
+          }
+        }
       }
     } else {
       currentTemplateKey = catOf(selectedCategory)?.templateKey ?? LifeTemplates.matchTemplateKey(selectedCategory);
@@ -383,19 +396,42 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
         }
       }
     }
+    // 零食分类：历史已用值自动成为下拉选项（无预设，全由用户定义）
+    final snackTagHistory = <String>[];
+    for (final it in context.read<StoreProvider>().storeItems) {
+      final t = it.extras['snackTag']?.toString() ?? '';
+      if (t.isNotEmpty && !snackTagHistory.contains(t)) {
+        snackTagHistory.add(t);
+      }
+    }
     final formFields = mergedFields
-        .map((f) => f.key == 'platform'
-            ? TemplateField(
-                key: f.key,
-                label: f.label,
-                type: f.type,
-                hint: f.hint,
-                required: f.required,
-                options: f.options,
-                defaultValue: f.defaultValue,
-                suggestions: platformHistory,
-              )
-            : f)
+        .map((f) {
+          if (f.key == 'platform') {
+            return TemplateField(
+              key: f.key,
+              label: f.label,
+              type: f.type,
+              hint: f.hint,
+              required: f.required,
+              options: f.options,
+              defaultValue: f.defaultValue,
+              suggestions: platformHistory,
+            );
+          }
+          if (f.key == 'snackTag') {
+            return TemplateField(
+              key: f.key,
+              label: f.label,
+              type: f.type,
+              hint: f.hint,
+              required: f.required,
+              options: f.options,
+              defaultValue: f.defaultValue,
+              suggestions: snackTagHistory,
+            );
+          }
+          return f;
+        })
         .toList();
           final nameLabel = tpl.itemNameLabel.isEmpty ? '名称' : tpl.itemNameLabel;
 
@@ -1451,7 +1487,7 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
     final genreOptions = <String>[];
     final yearOptions = <String>[];
     for (final it in storeProvider.storeItems) {
-      if (LifeTemplates.matchTemplateKey(it.category) != 'movie') continue;
+      if (_templateKeyOf(it) != 'movie') continue;
       final mt = resolveMediaType(it.extras);
       if (!mediaTypeOptions.contains(mt)) mediaTypeOptions.add(mt);
       final g = it.extras['genre']?.toString() ?? '';
@@ -1472,18 +1508,11 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
     // 零食二级筛选选项（预设分类兜底 + 数据中实际使用过的分类）
     final snackTagOptions = <String>[];
     for (final it in storeProvider.storeItems) {
-      if (LifeTemplates.matchTemplateKey(it.category) != 'snack') continue;
+      if (_templateKeyOf(it) != 'snack') continue;
       final t = it.extras['snackTag']?.toString() ?? '';
       if (t.isNotEmpty && !snackTagOptions.contains(t)) snackTagOptions.add(t);
     }
-    snackTagOptions.sort((a, b) {
-      final ia = kSnackTagOptions.indexOf(a);
-      final ib = kSnackTagOptions.indexOf(b);
-      if (ia == -1 && ib == -1) return a.compareTo(b);
-      if (ia == -1) return 1;
-      if (ib == -1) return -1;
-      return ia.compareTo(ib);
-    });
+    snackTagOptions.sort((a, b) => a.compareTo(b));
     final hasOlderYears = yearOptions.length > shownYears.length;
     if (shownYears.isNotEmpty) {
       storeProvider.setEarliestShownYear(int.parse(shownYears.last));
@@ -1805,7 +1834,7 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (LifeTemplates.matchTemplateKey(store.category) == 'movie' && store.images.isNotEmpty) ...[
+                if (_templateKeyOf(store) == 'movie' && store.images.isNotEmpty) ...[
                   // 影视：海报左（2:3 竖版）+ 文字右
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1955,7 +1984,7 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                                   ),
                                   child: Text(store.category, style: const TextStyle(fontSize: 11, color: Color(0xFF10B981), fontWeight: FontWeight.bold)),
                                 ),
-                                if (LifeTemplates.matchTemplateKey(store.category) == 'movie') ...[
+                                if (_templateKeyOf(store) == 'movie') ...[
                                   const SizedBox(width: 6),
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -2202,7 +2231,7 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
             }
           },
           contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-          leading: LifeTemplates.matchTemplateKey(store.category) == 'movie' && store.images.isNotEmpty
+          leading: _templateKeyOf(store) == 'movie' && store.images.isNotEmpty
               ? ClipRRect(
                   borderRadius: BorderRadius.circular(10),
                   child: Image.file(
@@ -2241,7 +2270,7 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                 decoration: BoxDecoration(color: const Color(0xFF10B981).withAlpha(40), borderRadius: BorderRadius.circular(6)),
                 child: Text(store.category, style: const TextStyle(fontSize: 10, color: Color(0xFF10B981), fontWeight: FontWeight.bold)),
               ),
-              if (LifeTemplates.matchTemplateKey(store.category) == 'movie') ...[
+              if (_templateKeyOf(store) == 'movie') ...[
                 const SizedBox(width: 5),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
@@ -2330,7 +2359,7 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
   /// 卡片上的模板字段摘要（导演/年份、招牌菜、作者等）
   String _storeExtraSummary(StoreItem store) {
     if (store.extras.isEmpty) return '';
-    final tpl = LifeTemplates.byKey(LifeTemplates.matchTemplateKey(store.category));
+    final tpl = LifeTemplates.byKey(_templateKeyOf(store));
     const priority = ['director', 'year', 'genre', 'signature', 'author', 'bestSeason', 'brand', 'sku'];
     final parts = <String>[];
     for (final k in priority) {
@@ -2353,13 +2382,21 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
 
   /// 影视观看进度与状态辅助
   bool _isMovieItem(StoreItem store) =>
-      LifeTemplates.matchTemplateKey(store.category) == 'movie';
+      _templateKeyOf(store) == 'movie';
 
   bool _isDiningItem(StoreItem store) =>
-      LifeTemplates.matchTemplateKey(store.category) == 'dining';
+      _templateKeyOf(store) == 'dining';
 
   bool _isSnackItem(StoreItem store) =>
-      LifeTemplates.matchTemplateKey(store.category) == 'snack';
+      _templateKeyOf(store) == 'snack';
+
+  /// 按分类绑定的模板解析条目（兜底按分类名关键词匹配），保证新建/编辑/展示一致
+  String _templateKeyOf(StoreItem store) {
+    for (final c in context.read<StoreProvider>().categories) {
+      if (c.name == store.category) return c.templateKey;
+    }
+    return LifeTemplates.matchTemplateKey(store.category);
+  }
 
   /// 零食多平台参考价（仅展示已填写的平台）
   List<String> _snackPricesOf(StoreItem store) {

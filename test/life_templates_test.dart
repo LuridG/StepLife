@@ -17,6 +17,20 @@ void main() {
       expect(LifeTemplates.matchTemplateKey('演出'), 'place');
       expect(LifeTemplates.matchTemplateKey('购物好物'), 'shopping');
       expect(LifeTemplates.matchTemplateKey('数码'), 'shopping');
+      expect(LifeTemplates.matchTemplateKey('零食干货'), 'snack');
+      expect(LifeTemplates.matchTemplateKey('零食'), 'snack');
+      expect(LifeTemplates.matchTemplateKey('方便面'), 'snack');
+      expect(LifeTemplates.matchTemplateKey('坚果炒货'), 'snack');
+      expect(LifeTemplates.matchTemplateKey('薯片'), 'snack');
+      expect(LifeTemplates.matchTemplateKey('我的自定义分类'), 'generic');
+      expect(LifeTemplates.matchTemplateKey(''), 'generic');
+    });
+
+    test('零食模板分类字段为用户自定义下拉（无预设 options）', () {
+      final snackTpl = LifeTemplates.byKey('snack');
+      final tagField = snackTpl.itemFields.firstWhere((f) => f.key == 'snackTag');
+      expect(tagField.type, TemplateFieldType.choice);
+      expect(tagField.options ?? const [], isEmpty);
     });
 
     test('未知分类兜底 generic', () {

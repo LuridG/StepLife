@@ -34,6 +34,9 @@ class _TemplateFieldWidgetState extends State<TemplateFieldWidget> {
   /// 标记本次重建是否由本组件自身输入触发（避免覆盖正在输入的内容）
   bool _selfChange = false;
 
+  /// choice 类型本次会话内用户自定义新增的选项
+  final List<String> _choiceExtraOptions = <String>[];
+
   @override
   void initState() {
     super.initState();
@@ -123,6 +126,17 @@ class _TemplateFieldWidgetState extends State<TemplateFieldWidget> {
     widget.onChanged(next);
   }
 
+  /// choice 类型：用户自定义新增选项，选中并加入本次会话候选
+  void _addChoiceOption() {
+    final text = _multiChoiceController.text.trim();
+    if (text.isEmpty) return;
+    _multiChoiceController.clear();
+    if (!_choiceExtraOptions.contains(text)) {
+      setState(() => _choiceExtraOptions.add(text));
+    }
+    widget.onChanged(text);
+  }
+
   @override
   Widget build(BuildContext context) {
     final field = widget.field;
@@ -178,33 +192,79 @@ class _TemplateFieldWidgetState extends State<TemplateFieldWidget> {
           ],
         );
       case TemplateFieldType.choice:
-        final options = field.options ?? const [];
-        // 安全兜底：值不在选项中时回退到第一个选项，绝不因脏数据崩溃
-        var current = widget.value?.toString() ??
-            field.defaultValue ??
-            (options.isNotEmpty ? options.first : '');
-        if (options.isNotEmpty && !options.contains(current)) {
-          current = options.first;
+        // 固定选项 + 历史建议 + 用户本次新增值合并展示；无任何选项时退化为纯输入框
+        final baseOptions = (field.options ?? const []).toList();
+        final histOptions = (field.suggestions ?? const [])
+            .where((s) => s.isNotEmpty && !baseOptions.contains(s))
+            .toList();
+        final allOptions = <String>[...baseOptions, ...histOptions];
+        for (final s in _choiceExtraOptions) {
+          if (!allOptions.contains(s)) allOptions.add(s);
         }
-        if (options.isEmpty) {
+        var current = widget.value?.toString() ?? field.defaultValue ?? '';
+        if (allOptions.isNotEmpty && !allOptions.contains(current)) {
+          // 安全兜底：脏数据值也加入候选，绝不因值不在选项中崩溃
+          if (current.isNotEmpty) allOptions.add(current);
+          if (current.isEmpty) current = allOptions.first;
+        }
+        if (allOptions.isEmpty) {
           return TextField(
             controller: _textController,
-            decoration: InputDecoration(labelText: field.label, hintStyle: _hintStyle),
+            decoration: InputDecoration(
+              labelText: field.label,
+              hintText: field.hint,
+              hintStyle: _hintStyle,
+            ),
             onChanged: (v) {
               _selfChange = true;
               widget.onChanged(v);
             },
           );
         }
-        return DropdownButtonFormField<String>(
-          initialValue: current,
-          decoration: InputDecoration(labelText: field.label),
-          items: options
-              .map((o) => DropdownMenuItem(value: o, child: Text(o)))
-              .toList(),
-          onChanged: (v) {
-            if (v != null) widget.onChanged(v);
-          },
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            DropdownButtonFormField<String>(
+              initialValue: allOptions.contains(current) ? current : allOptions.first,
+              decoration: InputDecoration(
+                labelText: field.label,
+                border: const OutlineInputBorder(),
+              ),
+              items: allOptions
+                  .map((o) => DropdownMenuItem(value: o, child: Text(o)))
+                  .toList(),
+              onChanged: (v) {
+                if (v != null) widget.onChanged(v);
+              },
+            ),
+            if (field.suggestions != null) ...[
+              const SizedBox(height: 6),
+              // 自定义新增：下拉选项不足时允许输入新值（历史值自动成为后续选项）
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _multiChoiceController,
+                      decoration: const InputDecoration(
+                        hintText: '自定义新增，如: 螺蛳粉',
+                        hintStyle: AppTheme.hintStyle,
+                        isDense: true,
+                        border: OutlineInputBorder(),
+                      ),
+                      onSubmitted: (_) => _addChoiceOption(),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  TextButton.icon(
+                    onPressed: _addChoiceOption,
+                    icon: const Icon(Icons.add, size: 16),
+                    label: const Text('添加'),
+                    style: TextButton.styleFrom(foregroundColor: const Color(0xFF10B981)),
+                  ),
+                ],
+              ),
+            ],
+          ],
         );
       case TemplateFieldType.multiChoice:
         final selected = (widget.value is List)

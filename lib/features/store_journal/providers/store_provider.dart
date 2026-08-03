@@ -39,26 +39,26 @@ class StoreProvider extends ChangeNotifier {
     }
     if (_selectedStatus != '全部状态') {
       result = result.where((item) {
-        if (LifeTemplates.matchTemplateKey(item.category) != 'movie') return true;
+        if (_templateKeyOf(item) != 'movie') return true;
         final status = item.extras['status']?.toString() ?? '想看';
         return status == _selectedStatus;
       });
     }
     if (_selectedMediaType != '全部媒体类型') {
       result = result.where((item) {
-        if (LifeTemplates.matchTemplateKey(item.category) != 'movie') return true;
+        if (_templateKeyOf(item) != 'movie') return true;
         return resolveMediaType(item.extras) == _selectedMediaType;
       });
     }
     if (_selectedGenre != '全部题材') {
       result = result.where((item) {
-        if (LifeTemplates.matchTemplateKey(item.category) != 'movie') return true;
+        if (_templateKeyOf(item) != 'movie') return true;
         return (item.extras['genre']?.toString() ?? '') == _selectedGenre;
       });
     }
     if (_selectedYear != '全部年份') {
       result = result.where((item) {
-        if (LifeTemplates.matchTemplateKey(item.category) != 'movie') return true;
+        if (_templateKeyOf(item) != 'movie') return true;
         final year = item.extras['year']?.toString() ?? '';
         if (_selectedYear == '更早') {
           return year.isNotEmpty &&
@@ -70,7 +70,7 @@ class StoreProvider extends ChangeNotifier {
     }
     if (_selectedSnackTag != '全部零食分类') {
       result = result.where((item) {
-        if (LifeTemplates.matchTemplateKey(item.category) != 'snack') return true;
+        if (_templateKeyOf(item) != 'snack') return true;
         return (item.extras['snackTag']?.toString() ?? '') == _selectedSnackTag;
       });
     }
@@ -89,6 +89,9 @@ class StoreProvider extends ChangeNotifier {
     _storeItems = await DatabaseService.instance.getStoreItems();
     _storeLogs = await DatabaseService.instance.getStoreLogs();
     _menuItems = await DatabaseService.instance.getStoreMenuItems();
+
+    // 旧数据自愈：误存到其他分类的零食条目自动归位
+    await _repairMisplacedSnackItems();
 
     final savedMode = await DatabaseService.instance.getPreferredViewMode();
     _isCardView = (savedMode == 'card');
@@ -114,9 +117,9 @@ class StoreProvider extends ChangeNotifier {
         _selectedYear != '全部年份') {
       bool isMovieCat = false;
       if (categoryName == '全部分类') {
-        isMovieCat = _storeItems.any((i) => LifeTemplates.matchTemplateKey(i.category) == 'movie');
+        isMovieCat = _storeItems.any((i) => _templateKeyOf(i) == 'movie');
       } else {
-        isMovieCat = _storeItems.any((i) => i.category == categoryName && LifeTemplates.matchTemplateKey(i.category) == 'movie');
+        isMovieCat = _storeItems.any((i) => i.category == categoryName && _templateKeyOf(i) == 'movie');
       }
       if (!isMovieCat) {
         _selectedStatus = '全部状态';
@@ -125,7 +128,7 @@ class StoreProvider extends ChangeNotifier {
         _selectedYear = '全部年份';
         _selectedSnackTag = '全部零食分类';
       }
-      if (categoryName == '全部分类' || !_storeItems.any((i) => i.category == categoryName && LifeTemplates.matchTemplateKey(i.category) == 'snack')) {
+      if (categoryName == '全部分类' || !_storeItems.any((i) => i.category == categoryName && _templateKeyOf(i) == 'snack')) {
         _selectedSnackTag = '全部零食分类';
       }
     }
@@ -165,12 +168,23 @@ class StoreProvider extends ChangeNotifier {
     _earliestShownYear = year;
   }
 
-  Future<void> addCategory(String name) async {
-    final templateKey = LifeTemplates.matchTemplateKey(name);
-    final cat = StoreCategory(name: name, templateKey: templateKey);
+  Future<void> addCategory(String name, {String? templateKey}) async {
+    final key = templateKey ?? LifeTemplates.matchTemplateKey(name);
+    // 同名分类已存在：仅校正模板绑定，避免 UNIQUE 冲突导致静默失败
+    for (final c in _categories) {
+      if (c.name == name) {
+        if (c.templateKey != key && c.id != null) {
+          await DatabaseService.instance.updateCategoryTemplate(c.id!, key);
+          _categories[_categories.indexOf(c)] = c.copyWith(templateKey: key);
+          notifyListeners();
+        }
+        return;
+      }
+    }
+    final cat = StoreCategory(name: name, templateKey: key);
     final id = await DatabaseService.instance.insertStoreCategory(cat);
     if (id > 0) {
-      _categories.add(StoreCategory(id: id, name: name, templateKey: templateKey));
+      _categories.add(StoreCategory(id: id, name: name, templateKey: key));
       notifyListeners();
     }
   }
@@ -462,4 +476,46 @@ class StoreProvider extends ChangeNotifier {
     final logs = getLogsForStore(storeId);
     return logs.fold(0.0, (sum, log) => sum + (log.cost ?? 0.0));
   }
+
+  /// 按分类绑定模板解析条目模板（兜底按分类名关键词匹配）
+  String _templateKeyOf(StoreItem item) {
+    for (final c in _categories) {
+      if (c.name == item.category) return c.templateKey;
+    }
+    return LifeTemplates.matchTemplateKey(item.category);
+  }
+
+  /// 旧数据自愈：历史版本画廊选模板未自动建分类，导致零食条目落错分类。
+  /// 带零食专属字段（snackTag）但分类未绑定零食模板的条目，自动归入零食分类。
+  Future<void> _repairMisplacedSnackItems() async {
+    StoreCategory? snackCat;
+    final repaired = <StoreItem>[];
+    for (final item in _storeItems) {
+      if ((item.extras['snackTag']?.toString() ?? '').isEmpty) continue;
+      if (_templateKeyOf(item) == 'snack') continue;
+      snackCat ??= _firstSnackCategory();
+      if (snackCat == null) {
+        await addCategory('零食干货', templateKey: 'snack');
+        snackCat = _firstSnackCategory();
+      }
+      if (snackCat == null) continue;
+      final updated = item.copyWith(category: snackCat.name);
+      await DatabaseService.instance.updateStoreItem(updated);
+      repaired.add(updated);
+    }
+    if (repaired.isEmpty) return;
+    for (final r in repaired) {
+      final i = _storeItems.indexWhere((x) => x.id == r.id);
+      if (i != -1) _storeItems[i] = r;
+    }
+    notifyListeners();
+  }
+
+  StoreCategory? _firstSnackCategory() {
+    for (final c in _categories) {
+      if (c.templateKey == 'snack') return c;
+    }
+    return null;
+  }
+
 }
