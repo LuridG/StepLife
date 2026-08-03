@@ -77,6 +77,7 @@ Future<void> showUpdateDialog(BuildContext context, UpdateInfo info) async {
 Future<void> _downloadAndInstall(BuildContext context, UpdateInfo info) async {
   final messenger = ScaffoldMessenger.of(context);
   var failed = false;
+  var cancelled = false;
   String? errorMsg;
   File? apkFile;
 
@@ -95,40 +96,39 @@ Future<void> _downloadAndInstall(BuildContext context, UpdateInfo info) async {
                 setModalState(() {});
               }
             },
-            onDone: (file) => apkFile = file,
+            onDone: (file) {
+              // 下载完成：自动关闭进度框并继续拉起系统安装器
+              apkFile = file;
+              if (dialogCtx.mounted) Navigator.of(dialogCtx).pop();
+            },
             onError: (msg) {
               failed = true;
               errorMsg = msg;
-              if (dialogCtx.mounted) {
-                setModalState(() {});
-              }
+              if (dialogCtx.mounted) setModalState(() {});
+            },
+            onCancelled: () {
+              cancelled = true;
+              if (dialogCtx.mounted) Navigator.of(dialogCtx).pop();
             },
           ),
-          actions: failed
-              ? [
-                  TextButton(
-                    onPressed: () => Navigator.of(dialogCtx).pop(),
-                    child: const Text('关闭'),
-                  ),
-                ]
-              : [
-                  TextButton(
-                    onPressed: () => Navigator.of(dialogCtx).pop(),
-                    child: const Text('取消'),
-                  ),
-                ],
         );
       },
     ),
   );
 
+  if (cancelled) {
+    messenger.showSnackBar(
+      const SnackBar(content: Text('已取消更新，安装包已清理')),
+    );
+    return;
+  }
   if (failed) {
     messenger.showSnackBar(
       SnackBar(content: Text('更新失败: $errorMsg'), backgroundColor: Colors.redAccent),
     );
     return;
   }
-  if (apkFile == null) return; // 用户取消
+  if (apkFile == null) return;
 
   try {
     await AppUpdater.installApk(apkFile!);
@@ -140,7 +140,7 @@ Future<void> _downloadAndInstall(BuildContext context, UpdateInfo info) async {
       SnackBar(content: Text('无法打开安装器: $e'), backgroundColor: Colors.redAccent),
     );
   }
-  // 下次启动自动清理安装包（AppUpdater.cleanupStaleApk）
+  // 安装包下次启动由 AppUpdater.cleanupStaleApk 兜底清理
 }
 
 class _DownloadProgress extends StatefulWidget {
@@ -148,12 +148,14 @@ class _DownloadProgress extends StatefulWidget {
   final void Function(int received, int total) onProgress;
   final void Function(File file) onDone;
   final void Function(String message) onError;
+  final void Function() onCancelled;
 
   const _DownloadProgress({
     required this.info,
     required this.onProgress,
     required this.onDone,
     required this.onError,
+    required this.onCancelled,
   });
 
   @override
@@ -164,6 +166,9 @@ class _DownloadProgressState extends State<_DownloadProgress> {
   double _progress = 0;
   int _received = 0;
   int _total = 0;
+  bool _cancelled = false;
+  bool _failed = false;
+  String? _errorMsg;
 
   @override
   void initState() {
@@ -184,48 +189,100 @@ class _DownloadProgressState extends State<_DownloadProgress> {
           });
           widget.onProgress(received, total);
         },
+        isCancelled: () => _cancelled,
       );
       if (!mounted) return;
-      widget.onDone(file);
+      widget.onDone(file); // 父级自动关闭并拉起系统安装器
     } catch (e) {
       if (!mounted) return;
-      widget.onError(e.toString());
+      if (_cancelled) {
+        widget.onCancelled();
+      } else {
+        setState(() {
+          _failed = true;
+          _errorMsg = e.toString();
+        });
+        widget.onError(e.toString());
+      }
     }
   }
 
-  String _pct() =>
-      _total > 0 ? '${(_progress * 100).toStringAsFixed(0)}%' : '...';
+  void _cancel() {
+    if (_failed || _cancelled) return;
+    setState(() => _cancelled = true);
+  }
+
+  String _pct() => _total > 0
+      ? '${(_progress * 100).toStringAsFixed(0)}%'
+      : '...';
 
   @override
   Widget build(BuildContext context) {
     return Column(
       mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        LinearProgressIndicator(
-          value: _progress,
-          minHeight: 6,
-          borderRadius: BorderRadius.circular(3),
-          backgroundColor: Colors.white12,
-          color: const Color(0xFF10B981),
-        ),
-        const SizedBox(height: 10),
-        Text(
-          'v${widget.info.versionName} · ${_pct()}',
-          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-        ),
-        if (_total > 0)
-          Padding(
-            padding: const EdgeInsets.only(top: 4),
-            child: Text(
-              '${_fmtSize(_received)} / ${_fmtSize(_total)}',
-              style: const TextStyle(fontSize: 12, color: Colors.white54),
+        if (_failed) ...[
+          const Icon(Icons.error_outline, color: Colors.redAccent, size: 28),
+          const SizedBox(height: 8),
+          const Text(
+            '下载失败',
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            _errorMsg ?? '未知错误',
+            style: const TextStyle(fontSize: 12, color: Colors.white54),
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: () => Navigator.of(context).pop(),
+              style:
+                  FilledButton.styleFrom(backgroundColor: const Color(0xFF10B981)),
+              child: const Text('关闭'),
             ),
           ),
-        const SizedBox(height: 6),
-        const Text(
-          '下载完成后会自动拉起系统安装器',
-          style: TextStyle(fontSize: 11, color: Colors.white38),
-        ),
+        ] else if (_cancelled) ...[
+          const Text('正在取消…', style: TextStyle(fontSize: 13)),
+        ] else ...[
+          LinearProgressIndicator(
+            value: _progress,
+            minHeight: 6,
+            borderRadius: BorderRadius.circular(3),
+            backgroundColor: Colors.white12,
+            color: const Color(0xFF10B981),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'v${widget.info.versionName} · ${_pct()}',
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+          ),
+          if (_total > 0)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                '${_fmtSize(_received)} / ${_fmtSize(_total)}',
+                style: const TextStyle(fontSize: 12, color: Colors.white54),
+              ),
+            ),
+          const SizedBox(height: 6),
+          const Text(
+            '下载完成后会自动拉起系统安装器',
+            style: TextStyle(fontSize: 11, color: Colors.white38),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              TextButton(
+                onPressed: _cancel,
+                child: const Text('取消下载'),
+              ),
+            ],
+          ),
+        ],
       ],
     );
   }

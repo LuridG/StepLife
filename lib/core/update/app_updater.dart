@@ -48,13 +48,9 @@ class AppUpdater {
     if (tag.isEmpty) return null;
     final notes = (json['body'] as String? ?? '').trim();
     final assets = (json['assets'] as List?) ?? const [];
-    Map<String, dynamic> apkAsset = const {};
-    for (final a in assets) {
-      if (a is Map && (a['name'] as String? ?? '').contains('-universal.apk')) {
-        apkAsset = Map<String, dynamic>.from(a);
-        break;
-      }
-    }
+    // 按设备 ABI 选择对应架构安装包（arm64-v8a / armeabi-v7a / x86_64），无法识别时回退 universal
+    final abi = await deviceAbi();
+    final apkAsset = _pickApkAsset(assets, abi);
     final url = apkAsset['browser_download_url'] as String?;
     if (url == null || url.isEmpty) return null;
 
@@ -72,6 +68,42 @@ class AppUpdater {
     );
   }
 
+  /// 当前设备主 ABI（如 arm64-v8a / armeabi-v7a / x86_64）；获取失败返回空串
+  static Future<String> deviceAbi() async {
+    try {
+      final v = await _channel.invokeMethod<String>('getAbi');
+      return v?.trim() ?? '';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  /// 根据设备 ABI 匹配 Release 资产中的 APK；无法识别时回退 universal
+  static Map<String, dynamic> _pickApkAsset(
+      List<dynamic> assets, String abi) {
+    final key = abi.toLowerCase();
+    String? wantedSuffix;
+    if (key.contains('arm64') || key.contains('aarch64')) {
+      wantedSuffix = '-arm64-v8a.apk';
+    } else if (key.contains('armeabi') || key.contains('armv')) {
+      wantedSuffix = '-armeabi-v7a.apk';
+    } else if (key.contains('x86_64') || key.contains('amd64')) {
+      wantedSuffix = '-x86_64.apk';
+    }
+    Map<String, dynamic>? fallback;
+    for (final a in assets) {
+      if (a is! Map) continue;
+      final name = (a['name'] as String? ?? '');
+      if (wantedSuffix != null && name.endsWith(wantedSuffix)) {
+        return Map<String, dynamic>.from(a);
+      }
+      if (name.endsWith('-universal.apk')) {
+        fallback = Map<String, dynamic>.from(a);
+      }
+    }
+    return fallback ?? const {};
+  }
+
   /// 静默检查（启动自动检查用）：任何失败都返回 null，不打扰用户
   static Future<UpdateInfo?> safeCheckForUpdate() async {
     try {
@@ -84,8 +116,9 @@ class AppUpdater {
   /// 下载 APK 到应用文档目录，进度回调 (received, total)
   static Future<File> downloadApk(
     UpdateInfo info,
-    void Function(int received, int total) onProgress,
-  ) async {
+    void Function(int received, int total) onProgress, {
+    bool Function()? isCancelled,
+  }) async {
     final dir = await getApplicationDocumentsDirectory();
     final file = File('${dir.path}/$_apkFileName');
     if (await file.exists()) {
@@ -103,10 +136,19 @@ class AppUpdater {
     var received = 0;
     try {
       await for (final chunk in resp.stream) {
+        if (isCancelled?.call() ?? false) {
+          throw HttpException('下载已取消');
+        }
         received += chunk.length;
         sink.add(chunk);
         if (total > 0) onProgress(received, total);
       }
+    } catch (_) {
+      // 下载失败/取消：清理残留文件，避免占用缓存
+      try {
+        if (await file.exists()) await file.delete();
+      } catch (_) {}
+      rethrow;
     } finally {
       await sink.close();
     }
