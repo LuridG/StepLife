@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../cache/cache_manager.dart';
@@ -279,6 +280,212 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final removed = await CacheManager.instance.clean(limitMB: settings.cacheLimitMB);
     await _refreshCacheStats();
     _toast('已清理缓存文件 ${removed.toString()} 个');
+  }
+
+  /// 关于：更新记录与版本历史弹窗
+  void _showChangelogDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.history_toggle_off, color: Color(0xFF6366F1)),
+            SizedBox(width: 8),
+            Text('更新记录与版本历史'),
+          ],
+        ),
+        content: SizedBox(
+          width: 540,
+          height: 440,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildVersionItem(
+                  version: 'v1.4.8 (2026-08-10)',
+                  isLatest: true,
+                  changes: [
+                    '🧺 菜篮子板块：新增买菜/水果专用模板（果蔬分类 tag/单位/产地 + 单价/数量/购买渠道/新鲜度/备注），浏览卡片展示最近价、涨跌徽章与迷你走势图。',
+                    '📈 菜篮子总表：筛选后一键进入总表页，全品类价格一览 + 多商品价格对比走势图（默认全展示，支持涨幅归一化对比）+ 分类月度均价柱状图 + 涨跌榜。',
+                    '📊 单品价格走势：菜篮子详情页新增指标区（最近价/较上次/较7天/30天均价）与走势图（全部/近30天/近90天/今年范围切换，可叠加 7 日均线）。',
+                    '⚙️ 设置整合：原「关于」Tab 合并进设置中心（品牌信息/更新记录/版本历史/架构说明），底部 Tab 精简为 路线/家务/生活/成员。',
+                  ],
+                ),
+                const Divider(color: Colors.white12, height: 24),
+                _buildVersionItem(
+                  version: 'v1.4.7 (2026-08-09)',
+                  isLatest: false,
+                  changes: [
+                    '🖱️ 卡片防误触：生活记录浏览卡片的编辑/删除按钮移入详情页，避免误操作。',
+                    '🍽️ 餐饮位置/结算平台拆分：位置支持点击拉起地图（高德/百度/腾讯/系统地图），结算平台多选并在卡片与详情展示。',
+                    '📍 位置一键定位：位置输入框旁新增定位按钮，GPS 定位 + 逆地理编码自动填写地址，也可手动填写。',
+                    '🍛 菜品打分：菜单项新增 👍 推荐招牌菜 / 👎 不推荐 / 未点即一般，浏览卡片小字展示推荐与不推荐菜品。',
+                    '⭐ 口味评价/环境服务改为 5 星滑杆：与推荐指数一致，更简单直观。',
+                    '🗑️ 移除打卡弹窗中与点菜多选重复的「点了哪些菜」文本框。',
+                  ],
+                ),
+                const Divider(color: Colors.white12, height: 24),
+                _buildVersionItem(
+                  version: 'v1.4.6 (2026-08-08)',
+                  isLatest: false,
+                  changes: [
+                    '🧩 生活模板化：影视/餐饮/书籍/景点/购物/通用 6 大模板，分类自动绑定，表单各有针对性。',
+                    '🛠️ 自定义字段：每个分类可追加文本/数字/单选/日期/图片/开关/标签等专属字段。',
+                    '🎬 TMDB 影视导入：填 Key 后影视模板支持搜索自动填充片名、导演、海报等信息。',
+                    '⚙️ 设置中心：右上角齿轮全局入口，收纳主题、视图、缓存、同步等全部选项。',
+                    '🖼️ 缓存管理：选图复制入应用目录、上限自动清理、压缩质量可调。',
+                    '☁️ WebDAV 同步：坚果云/Nextcloud 手动备份与恢复（数据库 + 图片增量）。',
+                    '🔒 非破坏数据迁移：升级前自动备份旧库，全程事务增量迁移与行数对账，零数据丢失。',
+                    '🍽️ 餐饮份量规格：菜品可自由添加 大份/小份、一两/二两 等规格并独立定价，打卡按规格计价自动合计。',
+                    '📺 观看平台多选：影视平台改为多选，历史已用平台自动成为快捷选项，支持自定义新增（如 Jellyfin），卡片展示观看平台。',
+                    '🎬 影视二级筛选：媒体类型 / 题材 / 上映年份 可叠加筛选；卡片展示题材徽章。',
+                    '⏭️ 剧集进度：TMDB 读取总集数，打卡录入本次观看集数自动累计，卡片与详情展示 看了 x/y 集 进度条。',
+                    '💬 短评长评：一句话点评快速展示在卡片，长评仅详情页展示；观看状态（想看/在追/看完/搁置/抛弃）快捷标记与筛选。',
+                  ],
+                ),
+                const Divider(color: Colors.white12, height: 24),
+                _buildVersionItem(
+                  version: 'v1.3.0 (2026-07-30)',
+                  isLatest: false,
+                  changes: [
+                    '👥 独立成员管理 Tab：新增专属成员档案 Bottom Tab，支持全员查看、编辑、删除与新增。',
+                    '🎂 出生年月与动态年龄：成员档案引入出生日期登记，根据当前时间自动精准计算真实年龄。',
+                    '⭐ 星级评分滑杆化：生活记录新增项目评分改为 1.0~5.0 粒度滑杆，防止弹窗溢出。',
+                    '📝 家务打卡备注点标：针对写有打卡备注的格子添加琥珀色点标提示。',
+                    '⚡ 界面精简与体验优化：优化底部 Tab 导航文本为精简双字，去除重复闪电图标与冗余标题注释。',
+                  ],
+                ),
+                const Divider(color: Colors.white12, height: 24),
+                _buildVersionItem(
+                  version: 'v1.2.0 (2026-07-30)',
+                  isLatest: false,
+                  changes: [
+                    '🛍️ 客观项目资产拆分：初次登记仅录入项目信息，移除初始消费设定。',
+                    '🕒 分钟级打卡时刻：打卡时间精确定律至【yyyy-MM-dd HH:mm】，默认当前精确时刻，支持选历史分钟。',
+                    '👥 成员同行复用：生活打卡可多选同行成员，共享统一家庭成员档案库并统计同行频率。',
+                    '📊 独立项目详情页：卡片支持点击跳转独立详情界面，直观呈现高清画廊、累计消费与履约历史时间线。',
+                  ],
+                ),
+                const Divider(color: Colors.white12, height: 24),
+                _buildVersionItem(
+                  version: 'v1.1.0 (2026-07-30)',
+                  isLatest: false,
+                  changes: [
+                    '🏷️ 应用品牌重塑：全量重命名为【步履生活】。',
+                    '🛍️ 生活记录大升级：支持探店、影视剧集、书籍阅读、景点场所等通用生活打卡与 1.0~5.0 星级评分。',
+                    '👁️ Card ↔ 紧凑列表双视图：支持一键切换视图模式，上次展示偏好自动记忆与重启还原。',
+                    '🗂️ 分类全量管理：侧边栏 Drawer 支持自定义分类重命名与安全平滑删除。',
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('关闭'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 关于：系统架构说明书（walkthrough.md）
+  void _showWalkthroughDialog(BuildContext context) async {
+    String content = '';
+    try {
+      content = await rootBundle.loadString('assets/walkthrough.md');
+    } catch (_) {
+      content = '暂未找到资源文档。';
+    }
+    if (!context.mounted) return;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.description, color: Color(0xFF10B981)),
+            SizedBox(width: 8),
+            Text('架构与说明文档 (walkthrough)'),
+          ],
+        ),
+        content: SizedBox(
+          width: 520,
+          height: 420,
+          child: SingleChildScrollView(
+            child: Text(
+              content,
+              style: const TextStyle(fontSize: 13, height: 1.5, fontFamily: 'monospace'),
+            ),
+          ),
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('关闭'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVersionItem({
+    required String version,
+    required bool isLatest,
+    required List<String> changes,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 8,
+              height: 8,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Color(0xFF6366F1),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(version,
+                style: const TextStyle(
+                    fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white)),
+            if (isLatest) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF6366F1).withAlpha(40),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Text('最新版',
+                    style: TextStyle(fontSize: 10, color: Color(0xFF818CF8))),
+              ),
+            ],
+          ],
+        ),
+        const SizedBox(height: 8),
+        Padding(
+          padding: const EdgeInsets.only(left: 16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: changes.map((c) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 6.0),
+                child: Text(c,
+                    style: const TextStyle(
+                        fontSize: 12, color: Colors.white70, height: 1.4)),
+              );
+            }).toList(),
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _section(String title, Widget child) {
@@ -607,22 +814,103 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ],
                 )),
 
-                // 关于
+                // 关于（合并原 About Tab：品牌信息 / 更新记录 / 架构说明）
                 _section('关于', Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 56,
+                          height: 56,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(14),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFF10B981).withAlpha(70),
+                                blurRadius: 14,
+                                spreadRadius: 1,
+                              ),
+                            ],
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(14),
+                            child: Image.asset('assets/icon/app_icon.png',
+                                fit: BoxFit.cover),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('StepLife 步履生活',
+                                  style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white)),
+                              const SizedBox(height: 4),
+                              Text(
+                                _appVersion.isEmpty
+                                    ? '版本号: 获取中…'
+                                    : '版本号: v$_appVersion',
+                                style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Color(0xFF10B981),
+                                    fontWeight: FontWeight.bold),
+                              ),
+                              const SizedBox(height: 2),
+                              const Text(
+                                '涵盖路线步量、家务习惯与生活记录 (探店/影视/图书) 的全能生活管理应用',
+                                style: TextStyle(
+                                    fontSize: 11, color: Colors.white54),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    const Divider(color: Colors.white12, height: 1),
+                    const SizedBox(height: 4),
                     ListTile(
                       contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.info_outline, color: Color(0xFF06B6D4)),
-                      title: const Text('StepLife 步履生活', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
-                      subtitle: Text(
-                        _appVersion.isEmpty ? '获取版本号中… · 数据来源 TMDB' : 'v$_appVersion · 数据来源 TMDB',
-                        style: const TextStyle(fontSize: 12, color: Colors.white54),
-                      ),
+                      leading: const Icon(Icons.history_toggle_off,
+                          color: Color(0xFF6366F1)),
+                      title: const Text('更新记录与版本历史',
+                          style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white)),
+                      subtitle: const Text('查看各版本功能更新',
+                          style: TextStyle(
+                              fontSize: 11, color: Colors.white54)),
+                      trailing:
+                          const Icon(Icons.chevron_right, color: Colors.white38),
+                      onTap: () => _showChangelogDialog(context),
                     ),
-                    const SizedBox(height: 4),
-                    if (settings.backupWarning.isNotEmpty)
-                      Text('提示: ${settings.backupWarning}', style: const TextStyle(fontSize: 12, color: Colors.orangeAccent)),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.article_outlined,
+                          color: Color(0xFF10B981)),
+                      title: const Text('系统架构说明书',
+                          style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white)),
+                      subtitle: const Text('查看 walkthrough.md 架构与说明文档',
+                          style: TextStyle(
+                              fontSize: 11, color: Colors.white54)),
+                      trailing:
+                          const Icon(Icons.chevron_right, color: Colors.white38),
+                      onTap: () => _showWalkthroughDialog(context),
+                    ),
+                    if (settings.backupWarning.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text('提示: ${settings.backupWarning}',
+                          style: const TextStyle(
+                              fontSize: 12, color: Colors.orangeAccent)),
+                    ],
                   ],
                 )),
               ],

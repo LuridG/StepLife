@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import '../domain/store_models.dart';
 import '../domain/life_templates.dart';
+import '../utils/basket_stats.dart';
 import '../../../core/db/database_service.dart';
 import '../../../core/cache/image_migrator.dart';
 
@@ -16,6 +17,8 @@ class StoreProvider extends ChangeNotifier {
   String _selectedGenre = '全部题材';
   String _selectedYear = '全部年份';
   String _selectedSnackTag = '全部零食分类';
+  String _selectedBasketTag = '全部果蔬分类';
+  String _selectedBasketTrend = '全部涨跌';
   bool _isCardView = true;
   bool _isLoading = true;
 
@@ -29,6 +32,8 @@ class StoreProvider extends ChangeNotifier {
   String get selectedGenre => _selectedGenre;
   String get selectedYear => _selectedYear;
   String get selectedSnackTag => _selectedSnackTag;
+  String get selectedBasketTag => _selectedBasketTag;
+  String get selectedBasketTrend => _selectedBasketTrend;
   bool get isCardView => _isCardView;
   bool get isLoading => _isLoading;
 
@@ -72,6 +77,20 @@ class StoreProvider extends ChangeNotifier {
       result = result.where((item) {
         if (_templateKeyOf(item) != 'snack') return true;
         return (item.extras['snackTag']?.toString() ?? '') == _selectedSnackTag;
+      });
+    }
+    if (_selectedBasketTag != '全部果蔬分类') {
+      result = result.where((item) {
+        if (_templateKeyOf(item) != 'basket') return true;
+        return (item.extras['basketTag']?.toString() ?? '') == _selectedBasketTag;
+      });
+    }
+    if (_selectedBasketTrend != '全部涨跌') {
+      result = result.where((item) {
+        if (_templateKeyOf(item) != 'basket') return true;
+        final logs = getLogsForStore(item.id ?? 0);
+        final dir = BasketStats.trendDirection(logs);
+        return (dir ?? 'flat') == _selectedBasketTrend;
       });
     }
     return result.toList();
@@ -127,9 +146,15 @@ class StoreProvider extends ChangeNotifier {
         _selectedGenre = '全部题材';
         _selectedYear = '全部年份';
         _selectedSnackTag = '全部零食分类';
+        _selectedBasketTag = '全部果蔬分类';
+        _selectedBasketTrend = '全部涨跌';
       }
       if (categoryName == '全部分类' || !_storeItems.any((i) => i.category == categoryName && _templateKeyOf(i) == 'snack')) {
         _selectedSnackTag = '全部零食分类';
+      }
+      if (categoryName == '全部分类' || !_storeItems.any((i) => i.category == categoryName && _templateKeyOf(i) == 'basket')) {
+        _selectedBasketTag = '全部果蔬分类';
+        _selectedBasketTrend = '全部涨跌';
       }
     }
     notifyListeners();
@@ -157,6 +182,16 @@ class StoreProvider extends ChangeNotifier {
 
   void selectSnackTag(String value) {
     _selectedSnackTag = value;
+    notifyListeners();
+  }
+
+  void selectBasketTag(String value) {
+    _selectedBasketTag = value;
+    notifyListeners();
+  }
+
+  void selectBasketTrend(String value) {
+    _selectedBasketTrend = value;
     notifyListeners();
   }
 

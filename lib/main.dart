@@ -15,7 +15,6 @@ import 'features/step_tracker/presentation/step_tracker_screen.dart';
 import 'features/chore_tracker/presentation/chore_tracker_screen.dart';
 import 'features/store_journal/presentation/store_journal_screen.dart';
 import 'features/profile/presentation/member_screen.dart';
-import 'features/about/presentation/about_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -124,7 +123,6 @@ class _MainHomeScreenState extends State<MainHomeScreen> with WidgetsBindingObse
           ChoreTrackerScreen(),
           StoreJournalScreen(),
           MemberScreen(),
-          AboutScreen(),
         ],
       ),
       bottomNavigationBar: BottomNavigationBar(
@@ -150,10 +148,6 @@ class _MainHomeScreenState extends State<MainHomeScreen> with WidgetsBindingObse
           BottomNavigationBarItem(
             icon: Icon(Icons.badge_outlined),
             label: '成员',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.info_outline),
-            label: '关于',
           ),
         ],
       ),

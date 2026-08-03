@@ -31,6 +31,12 @@ const List<String> kMovieStatusOptions = [
   '想看', '在追', '看完', '搁置', '抛弃',
 ];
 
+/// 菜篮子：常用计量单位
+const List<String> kUnitOptions = ['斤', '500g', '个', '盒', '袋', '把', '瓶', '包', '份'];
+
+/// 菜篮子：购买渠道（多选 + 可自定义新增）
+const List<String> kBasketChannelOptions = ['菜市场', '超市', '生鲜电商', '社区团购', '批发市场', '其他'];
+
 /// 从店铺 extras 解析媒体类型（兼容旧字段 type）
 String resolveMediaType(Map<String, dynamic> extras) {
   final direct = extras['mediaType']?.toString() ?? '';
@@ -231,6 +237,26 @@ class LifeTemplates {
       ],
     ),
     LifeTemplate(
+      key: 'basket',
+      name: '菜篮子',
+      iconName: 'basket',
+      description: '买菜 / 水果 / 生鲜价格记录，自动生成价格趋势与涨跌对比',
+      itemNameLabel: '商品名称',
+      itemNameHint: '例: 土豆 / 红富士苹果 / 五花肉',
+      itemFields: [
+        TemplateField(key: 'basketTag', label: '果蔬分类', type: TemplateFieldType.choice, hint: '自定义下拉，历史值自动成为选项，用于筛选与总表'),
+        TemplateField(key: 'unit', label: '单位', type: TemplateFieldType.choice, options: kUnitOptions, hint: '例: 斤 / 500g / 个 / 盒 / 袋'),
+        TemplateField(key: 'origin', label: '产地/品牌', type: TemplateFieldType.text, hint: '例: 山东烟台红富士'),
+      ],
+      checkinFields: [
+        TemplateField(key: 'price', label: '单价（元/单位）', type: TemplateFieldType.number, hint: '例: 3.5', required: true),
+        TemplateField(key: 'qty', label: '数量', type: TemplateFieldType.number, hint: '例: 2'),
+        TemplateField(key: 'channel', label: '购买渠道', type: TemplateFieldType.multiChoice, options: kBasketChannelOptions, hint: '菜市场 / 超市 / 生鲜电商等'),
+        TemplateField(key: 'quality', label: '新鲜度/品质', type: TemplateFieldType.rating),
+        TemplateField(key: 'note', label: '备注', type: TemplateFieldType.multiline, hint: '新鲜程度 / 大小 / 回购提醒'),
+      ],
+    ),
+    LifeTemplate(
       key: 'snack',
       name: '零食干货',
       iconName: 'snack',
@@ -278,6 +304,7 @@ class LifeTemplates {
       'dining': ['餐厅', '小吃', '咖啡', '甜品', '小店', '奶茶', '美食', '餐饮', '饭店', '馆', '食堂'],
       'book': ['书', '阅读', '小说', '工具书', 'book'],
       'place': ['景点', '公园', '展馆', '演出', '旅行', '游玩', '旅游', '博物馆'],
+      'basket': ['菜篮子', '买菜', '菜价', '果蔬', '蔬菜', '水果', '菜市场', '菜园', 'basket'],
       'shopping': ['购物', '百货', '数码', '生鲜', '服饰', '好物', '家电'],
       'snack': ['零食', '干货', '速食', '方便面', '零嘴', '膨化', '辣条', '坚果', '薯片', 'snack'],
     };

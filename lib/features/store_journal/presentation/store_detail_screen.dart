@@ -2,11 +2,13 @@ import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:provider/provider.dart';
 import '../../../core/utils/map_launcher.dart';
 import '../domain/store_models.dart';
 import '../domain/life_templates.dart';
 import '../providers/store_provider.dart';
+import '../utils/basket_stats.dart';
 import 'store_checkin_dialog.dart';
 
 class StoreDetailScreen extends StatelessWidget {
@@ -102,6 +104,19 @@ class StoreDetailScreen extends StatelessWidget {
         .map((e) => MapEntry(e.key, e.value.toString()))
         .toList();
     final menuItems = storeProvider.getMenuItemsForStore(storeItem.id ?? 0);
+
+    // 菜篮子：价格统计与走势
+    final isBasket = tpl.key == 'basket';
+    final basketPoints = isBasket
+        ? BasketStats.pricePoints(logs)
+        : const <({StoreLog log, double price})>[];
+    final basketLatest = isBasket ? BasketStats.latestPrice(logs) : null;
+    final basketUnit = (storeItem.extras['unit']?.toString() ?? '').isEmpty
+        ? '斤'
+        : storeItem.extras['unit'].toString();
+    final basketChangePrev = isBasket ? BasketStats.changeVsPrevious(logs) : null;
+    final basketChange7 = isBasket ? BasketStats.changeVsDaysAgo(logs, 7) : null;
+    final basketAvg30 = isBasket ? BasketStats.avgPriceSince(logs, 30) : null;
 
     // 影视摘要：年份 · 导演/主演 · 片长（放在海报右侧信息区）
     final movieMetaParts = <String>[
@@ -449,6 +464,21 @@ class StoreDetailScreen extends StatelessWidget {
                             ),
                           ],
                         ),
+                        if (isBasket) ...[
+                          const SizedBox(height: 14),
+                          const Divider(color: Colors.white12),
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              _basketMetric('最近价',
+                                  basketLatest == null ? '—' : '¥${_fmtPrice(basketLatest)}/$basketUnit'),
+                              _basketMetric('较上次', BasketStats.formatPct(basketChangePrev)),
+                              _basketMetric('较7天', BasketStats.formatPct(basketChange7)),
+                              _basketMetric('30天均价',
+                                  basketAvg30 == null ? '—' : '¥${_fmtPrice(basketAvg30)}'),
+                            ],
+                          ),
+                        ],
                         if (storeItem.address != null && storeItem.address!.isNotEmpty) ...[
                           const SizedBox(height: 14),
                           if (tpl.key == 'dining') ...[
@@ -595,6 +625,13 @@ class StoreDetailScreen extends StatelessWidget {
                         ),
                 ],
 
+                // 菜篮子：价格走势图（范围切换 + 7 日均线叠加）
+                if (isBasket) ...[
+                  const SizedBox(height: 20),
+                  _BasketPriceChart(points: basketPoints, unit: basketUnit),
+                ],
+                const SizedBox(height: 20),
+
                 // 分钟级打卡履约历史时间线 (Timeline)
                 const Row(
                   children: [
@@ -644,6 +681,22 @@ class StoreDetailScreen extends StatelessWidget {
                                           children: [
                                             if (log.cost != null && log.cost! > 0)
                                               Text('¥${log.cost!.toStringAsFixed(1)}', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF10B981), fontSize: 14)),
+                                            if (isBasket && log.extras['price'] is num)
+                                              Container(
+                                                margin: const EdgeInsets.only(right: 6),
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFF10B981).withAlpha(30),
+                                                  borderRadius: BorderRadius.circular(6),
+                                                ),
+                                                child: Text(
+                                                  '单价 ¥${(log.extras['price'] as num).toString()}/$basketUnit',
+                                                  style: const TextStyle(
+                                                      fontSize: 11,
+                                                      color: Color(0xFF10B981),
+                                                      fontWeight: FontWeight.bold),
+                                                ),
+                                              ),
                                             IconButton(
                                               icon: const Icon(Icons.edit_outlined, color: Colors.lightBlueAccent, size: 18),
                                               tooltip: '修改打卡',
@@ -806,7 +859,305 @@ class StoreDetailScreen extends StatelessWidget {
     return widgets;
   }
 
+  Widget _basketMetric(String label, String value) {
+    final up = value.startsWith('+');
+    final down = value.startsWith('-');
+    final color = down
+        ? const Color(0xFF10B981)
+        : (up ? Colors.redAccent : Colors.white);
+    return Expanded(
+      child: Column(
+        children: [
+          Text(label,
+              style: const TextStyle(color: Colors.white54, fontSize: 11)),
+          const SizedBox(height: 4),
+          Text(value,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: color)),
+        ],
+      ),
+    );
+  }
+
   Widget _buildGlassCard({required Widget child}) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white.withAlpha(16),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.white.withAlpha(35), width: 1.2),
+          ),
+          child: child,
+        ),
+      ),
+    );
+  }
+}
+
+/// 菜篮子价格走势图：范围切换（全部/近30天/近90天/今年）+ 7 日均线叠加
+class _BasketPriceChart extends StatefulWidget {
+  final List<({StoreLog log, double price})> points;
+  final String unit;
+
+  const _BasketPriceChart({required this.points, required this.unit});
+
+  @override
+  State<_BasketPriceChart> createState() => _BasketPriceChartState();
+}
+
+class _BasketPriceChartState extends State<_BasketPriceChart> {
+  static const _ranges = ['全部', '近30天', '近90天', '今年'];
+  String _range = '全部';
+  bool _showMa = false;
+
+  List<({StoreLog log, double price})> get _filtered {
+    final now = DateTime.now();
+    final pts = widget.points;
+    switch (_range) {
+      case '近30天':
+        return pts
+            .where((p) =>
+                !p.log.timestamp.isBefore(now.subtract(const Duration(days: 30))))
+            .toList();
+      case '近90天':
+        return pts
+            .where((p) =>
+                !p.log.timestamp.isBefore(now.subtract(const Duration(days: 90))))
+            .toList();
+      case '今年':
+        return pts.where((p) => p.log.timestamp.year == now.year).toList();
+      default:
+        return pts;
+    }
+  }
+
+  String _fmt(double v) {
+    if (v == v.roundToDouble()) return v.toStringAsFixed(0);
+    return v.toStringAsFixed(2);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pts = _filtered;
+    if (pts.isEmpty) {
+      return _buildCard(
+        child: const Padding(
+          padding: EdgeInsets.all(20.0),
+          child: Center(
+            child: Text('该时间范围内暂无价格记录',
+                style: TextStyle(color: Colors.white54, fontSize: 13)),
+          ),
+        ),
+      );
+    }
+
+    final n = pts.length;
+    final prices = pts.map((p) => p.price).toList();
+    var minP = prices.reduce((a, b) => a < b ? a : b);
+    var maxP = prices.reduce((a, b) => a > b ? a : b);
+    if (maxP == minP) {
+      maxP += 1;
+      minP -= 1;
+    }
+    final yPad = (maxP - minP) * 0.15;
+    minP -= yPad;
+    maxP += yPad;
+    final yInterval = (maxP - minP) / 4;
+    final xMax = n > 1 ? (n - 1).toDouble() : 1.0;
+
+    // 7 日均线
+    final ma = <double>[];
+    for (var i = 0; i < n; i++) {
+      final winStart = pts[i].log.timestamp.subtract(const Duration(days: 7));
+      double sum = 0;
+      var cnt = 0;
+      for (var j = 0; j <= i; j++) {
+        if (!pts[j].log.timestamp.isBefore(winStart)) {
+          sum += pts[j].price;
+          cnt++;
+        }
+      }
+      ma.add(cnt > 0 ? sum / cnt : pts[i].price);
+    }
+
+    return _buildCard(
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Text('📈 价格走势',
+                    style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white)),
+                const Spacer(),
+                const Text('7日均线',
+                    style: TextStyle(fontSize: 11, color: Colors.white54)),
+                Switch(
+                  value: _showMa,
+                  activeThumbColor: Colors.amber,
+                  onChanged: (v) => setState(() => _showMa = v),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  for (final r in _ranges)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: FilterChip(
+                        label: Text(r, style: const TextStyle(fontSize: 11)),
+                        selected: _range == r,
+                        selectedColor:
+                            const Color(0xFF10B981).withAlpha(90),
+                        onSelected: (_) => setState(() => _range = r),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 190,
+              child: LineChart(
+                LineChartData(
+                  minX: 0,
+                  maxX: xMax,
+                  minY: minP,
+                  maxY: maxP,
+                  gridData: FlGridData(
+                    show: true,
+                    drawVerticalLine: false,
+                    getDrawingHorizontalLine: (v) =>
+                        const FlLine(color: Colors.white12, strokeWidth: 1),
+                  ),
+                  borderData: FlBorderData(show: false),
+                  titlesData: FlTitlesData(
+                    topTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false)),
+                    rightTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false)),
+                    leftTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 44,
+                        interval: yInterval,
+                        getTitlesWidget: (value, meta) => Text(
+                          _fmt(value),
+                          style: const TextStyle(
+                              fontSize: 9, color: Colors.white38),
+                        ),
+                      ),
+                    ),
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 26,
+                        interval: 1,
+                        getTitlesWidget: (value, meta) {
+                          final i = value.round();
+                          if (i != 0 &&
+                              i != n - 1 &&
+                              !(n > 4 && i == n ~/ 2)) {
+                            return const SizedBox.shrink();
+                          }
+                          final idx = i < 0 ? 0 : (i > n - 1 ? n - 1 : i);
+                          final t = pts[idx].log.timestamp;
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(
+                              '${t.month}/${t.day}',
+                              style: const TextStyle(
+                                  fontSize: 9, color: Colors.white38),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                  lineTouchData: LineTouchData(
+                    touchTooltipData: LineTouchTooltipData(
+                      getTooltipColor: (_) => const Color(0xFF1E293B),
+                      getTooltipItems: (spots) => spots.map((s) {
+                        final raw = s.x.round();
+                        final i = raw < 0 ? 0 : (raw > n - 1 ? n - 1 : raw);
+                        final t = pts[i].log.timestamp;
+                        final isMa = s.bar.color == Colors.amber;
+                        return LineTooltipItem(
+                          '${isMa ? '7日均线' : DateFormat('yyyy-MM-dd').format(t)}: '
+                          '${s.y.toStringAsFixed(2)}',
+                          const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                  lineBarsData: [
+                    LineChartBarData(
+                      spots: [
+                        for (var i = 0; i < n; i++)
+                          FlSpot(i.toDouble(), prices[i]),
+                      ],
+                      color: const Color(0xFF10B981),
+                      barWidth: 3,
+                      isCurved: n > 2,
+                      dotData: FlDotData(
+                        show: n <= 20,
+                        getDotPainter: (spot, percent, bar, index) =>
+                            FlDotCirclePainter(
+                          radius: 3,
+                          color: const Color(0xFF10B981),
+                          strokeWidth: 0,
+                          strokeColor: const Color(0xFF10B981),
+                        ),
+                      ),
+                      belowBarData: BarAreaData(
+                        show: true,
+                        color: const Color(0xFF10B981).withAlpha(35),
+                      ),
+                    ),
+                    if (_showMa && ma.length >= 3)
+                      LineChartBarData(
+                        spots: [
+                          for (var i = 0; i < n; i++)
+                            FlSpot(i.toDouble(), ma[i]),
+                        ],
+                        color: Colors.amber,
+                        barWidth: 2,
+                        isCurved: true,
+                        dotData: const FlDotData(show: false),
+                        belowBarData: BarAreaData(show: false),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '最近价 ¥${_fmt(prices.last)}/${widget.unit} · 共 $n 条价格记录',
+              style: const TextStyle(fontSize: 11, color: Colors.white54),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCard({required Widget child}) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(20),
       child: BackdropFilter(

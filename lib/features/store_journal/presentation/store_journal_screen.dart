@@ -1,11 +1,13 @@
 import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../domain/store_models.dart';
 import '../domain/life_templates.dart';
 import '../providers/store_provider.dart';
+import '../utils/basket_stats.dart';
 import '../../../core/cache/cache_manager.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/network/tmdb_client.dart';
@@ -14,6 +16,7 @@ import '../../../core/settings/settings_provider.dart';
 import '../../../core/utils/map_launcher.dart';
 import '../../../core/utils/location_picker.dart';
 import 'store_detail_screen.dart';
+import 'basket_overview_screen.dart';
 import 'store_checkin_dialog.dart';
 import 'template_gallery.dart';
 import 'template_field_widget.dart';
@@ -404,6 +407,14 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
         snackTagHistory.add(t);
       }
     }
+    // 菜篮子：果蔬分类历史已用值自动成为下拉选项（无预设，全由用户定义）
+    final basketTagHistory = <String>[];
+    for (final it in context.read<StoreProvider>().storeItems) {
+      final t = it.extras['basketTag']?.toString() ?? '';
+      if (t.isNotEmpty && !basketTagHistory.contains(t)) {
+        basketTagHistory.add(t);
+      }
+    }
     final formFields = mergedFields
         .map((f) {
           if (f.key == 'platform') {
@@ -428,6 +439,18 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
               options: f.options,
               defaultValue: f.defaultValue,
               suggestions: snackTagHistory,
+            );
+          }
+          if (f.key == 'basketTag') {
+            return TemplateField(
+              key: f.key,
+              label: f.label,
+              type: f.type,
+              hint: f.hint,
+              required: f.required,
+              options: f.options,
+              defaultValue: f.defaultValue,
+              suggestions: basketTagHistory,
             );
           }
           return f;
@@ -1513,6 +1536,14 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
       if (t.isNotEmpty && !snackTagOptions.contains(t)) snackTagOptions.add(t);
     }
     snackTagOptions.sort((a, b) => a.compareTo(b));
+    // 菜篮子：果蔬分类二级筛选选项（数据中实际使用过的分类）
+    final basketTagOptions = <String>[];
+    for (final it in storeProvider.storeItems) {
+      if (_templateKeyOf(it) != 'basket') continue;
+      final t = it.extras['basketTag']?.toString() ?? '';
+      if (t.isNotEmpty && !basketTagOptions.contains(t)) basketTagOptions.add(t);
+    }
+    basketTagOptions.sort((a, b) => a.compareTo(b));
     final hasOlderYears = yearOptions.length > shownYears.length;
     if (shownYears.isNotEmpty) {
       storeProvider.setEarliestShownYear(int.parse(shownYears.last));
@@ -1783,6 +1814,101 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                       ),
                     ),
                   ],
+                  if (currentTplKey == 'basket') ...[
+                    // 菜篮子：果蔬分类二级筛选 + 涨跌方向筛选 + 总表入口
+                    const SizedBox(height: 8),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          FilterChip(
+                            label: const Text('全部果蔬分类'),
+                            selected: storeProvider.selectedBasketTag == '全部果蔬分类',
+                            onSelected: (_) => storeProvider.selectBasketTag('全部果蔬分类'),
+                          ),
+                          ...basketTagOptions.map((t) => Padding(
+                                padding: const EdgeInsets.only(left: 6),
+                                child: FilterChip(
+                                  label: Text(t),
+                                  selected: storeProvider.selectedBasketTag == t,
+                                  selectedColor: const Color(0xFF10B981).withAlpha(90),
+                                  onSelected: (_) => storeProvider.selectBasketTag(t),
+                                ),
+                              )),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          FilterChip(
+                            label: const Text('全部涨跌'),
+                            selected: storeProvider.selectedBasketTrend == '全部涨跌',
+                            onSelected: (_) => storeProvider.selectBasketTrend('全部涨跌'),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.only(left: 6),
+                            child: FilterChip(
+                              label: const Text('上涨'),
+                              selected: storeProvider.selectedBasketTrend == 'up',
+                              selectedColor: const Color(0xFF10B981).withAlpha(90),
+                              onSelected: (_) => storeProvider.selectBasketTrend('up'),
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.only(left: 6),
+                            child: FilterChip(
+                              label: const Text('下跌'),
+                              selected: storeProvider.selectedBasketTrend == 'down',
+                              selectedColor: Colors.redAccent.withAlpha(90),
+                              onSelected: (_) => storeProvider.selectBasketTrend('down'),
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.only(left: 6),
+                            child: FilterChip(
+                              label: const Text('持平'),
+                              selected: storeProvider.selectedBasketTrend == 'flat',
+                              selectedColor: Colors.amber.withAlpha(90),
+                              onSelected: (_) => storeProvider.selectBasketTrend('flat'),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          ElevatedButton.icon(
+                            onPressed: () async {
+                              final result = await Navigator.of(context).push<String>(
+                                MaterialPageRoute(builder: (_) => const BasketOverviewScreen()),
+                              );
+                              if (result != null &&
+                                  result.startsWith('edit_') &&
+                                  context.mounted) {
+                                final id = int.tryParse(result.substring(5));
+                                StoreItem? target;
+                                for (final i in storeProvider.storeItems) {
+                                  if (i.id == id) {
+                                    target = i;
+                                    break;
+                                  }
+                                }
+                                if (target != null) {
+                                  _showStoreFormDialog(storeToEdit: target);
+                                }
+                              }
+                            },
+                            icon: const Icon(Icons.insert_chart_outlined, size: 16),
+                            label: const Text('总表', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF10B981),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 16),
 
                   storeProvider.filteredStoreItems.isEmpty
@@ -1816,6 +1942,18 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
     final snackTag = store.extras['snackTag']?.toString() ?? '';
     final snackPrices = _snackPricesOf(store);
     final snackComment = store.extras['comment']?.toString() ?? '';
+    // 菜篮子：价格统计
+    final basketLogs = _isBasketItem(store)
+        ? context.read<StoreProvider>().getLogsForStore(store.id ?? 0)
+        : const <StoreLog>[];
+    final basketLatest = basketLogs.isEmpty ? null : BasketStats.latestPrice(basketLogs);
+    final basketUnit = (store.extras['unit']?.toString() ?? '').isEmpty
+        ? '斤'
+        : store.extras['unit'].toString();
+    final basketChangePrev = BasketStats.changeVsPrevious(basketLogs);
+    final basketChangeMonth = BasketStats.changeVsLastMonth(basketLogs);
+    final basketTag = store.extras['basketTag']?.toString() ?? '';
+    final basketLastLog = basketLogs.isEmpty ? null : BasketStats.pricePoints(basketLogs).last.log;
     return Padding(
       padding: const EdgeInsets.only(bottom: 14.0),
       child: _buildGlassCard(
@@ -2178,6 +2316,73 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
+                ] else if (_isBasketItem(store)) ...[
+                  // 菜篮子：最近单价 + 涨跌徽章 + 迷你走势图 + 最近日期/渠道
+                  if (basketLatest != null) ...[
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  const Text('🛒 最近价 ',
+                                      style: TextStyle(fontSize: 12, color: Colors.white70)),
+                                  Text('¥${_fmtPrice(basketLatest)}/$basketUnit',
+                                      style: const TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFF10B981))),
+                                  const SizedBox(width: 8),
+                                  _basketTrendBadge(basketChangePrev, '较上次'),
+                                  if (basketChangeMonth != null) ...[
+                                    const SizedBox(width: 6),
+                                    _basketTrendBadge(basketChangeMonth, '较上月'),
+                                  ],
+                                ],
+                              ),
+                              if (basketLastLog != null) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  '🗓 ${_basketDateText(basketLastLog.timestamp)}${_basketChannelText(basketLastLog).isNotEmpty ? ' · 🛒 ${_basketChannelText(basketLastLog)}' : ''}',
+                                  style: const TextStyle(fontSize: 11, color: Colors.white54),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                        if (basketLogs.isNotEmpty)
+                          SizedBox(
+                            width: 110,
+                            height: 42,
+                            child: _basketSparkline(basketLogs),
+                          ),
+                      ],
+                    ),
+                  ],
+                  if (basketTag.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text('🏷️ $basketTag',
+                          style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF10B981),
+                              fontWeight: FontWeight.w600)),
+                    ),
+                  if (store.notes != null && store.notes!.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 3),
+                      child: Text(
+                        '📝 ${store.notes}',
+                        style: const TextStyle(fontSize: 12, color: Colors.white54, fontStyle: FontStyle.italic),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
                 ] else ...[
                   if (store.address != null && store.address!.isNotEmpty)
                     Text('📍 ${store.address}', style: const TextStyle(fontSize: 12, color: Colors.white70)),
@@ -2306,6 +2511,17 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    if (_isBasketItem(store)) ...[
+                      Text(
+                        _basketSummaryLine(store),
+                        style: const TextStyle(
+                            fontSize: 11,
+                            color: Color(0xFF10B981),
+                            fontWeight: FontWeight.w600),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                    ],
                     Text(
                       '累计 $checkinCount 次 · 总消费 ¥${totalCost.toStringAsFixed(1)}',
                       style: const TextStyle(fontSize: 11, color: Colors.white54),
@@ -2389,6 +2605,108 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
 
   bool _isSnackItem(StoreItem store) =>
       _templateKeyOf(store) == 'snack';
+
+  bool _isBasketItem(StoreItem store) =>
+      _templateKeyOf(store) == 'basket';
+
+  /// 菜篮子：紧凑列表摘要（最近价 + 涨跌 + 次数）
+  String _basketSummaryLine(StoreItem store) {
+    final logs = context.read<StoreProvider>().getLogsForStore(store.id ?? 0);
+    final latest = BasketStats.latestPrice(logs);
+    if (latest == null) return '🛒 暂无价格记录';
+    final unit = (store.extras['unit']?.toString() ?? '').isEmpty
+        ? '斤'
+        : store.extras['unit'].toString();
+    final chg = BasketStats.changeVsPrevious(logs);
+    return '🛒 最近价 ¥${_fmtPrice(latest)}/$unit · ${chg == null ? '暂无涨跌对比' : BasketStats.formatPct(chg)} · ${logs.length} 次';
+  }
+
+  /// 菜篮子：涨跌徽章（红涨绿跌）
+  Widget _basketTrendBadge(double? change, String prefix) {
+    if (change == null) return const SizedBox.shrink();
+    final up = change > 0.001;
+    final down = change < -0.001;
+    final color = up
+        ? Colors.redAccent
+        : (down ? const Color(0xFF10B981) : Colors.amber);
+    final icon = up ? '▲' : (down ? '▼' : '▬');
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+      decoration: BoxDecoration(
+        color: color.withAlpha(35),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        '$prefix $icon ${BasketStats.formatPct(change)}',
+        style: TextStyle(fontSize: 9, color: color, fontWeight: FontWeight.bold),
+      ),
+    );
+  }
+
+  /// 菜篮子：迷你走势图（卡片右侧小图）
+  Widget _basketSparkline(List<StoreLog> logs) {
+    final pts = BasketStats.pricePoints(logs);
+    if (pts.length < 2) {
+      return Center(
+        child: Container(
+          width: 8,
+          height: 8,
+          decoration: const BoxDecoration(
+              color: Color(0xFF10B981), shape: BoxShape.circle),
+        ),
+      );
+    }
+    final prices = pts.map((p) => p.price).toList();
+    var minP = prices.reduce((a, b) => a < b ? a : b);
+    var maxP = prices.reduce((a, b) => a > b ? a : b);
+    if (maxP == minP) {
+      maxP += 1;
+      minP -= 1;
+    }
+    final pad = (maxP - minP) * 0.15;
+    return LineChart(
+      LineChartData(
+        minX: 0,
+        maxX: 1,
+        minY: minP - pad,
+        maxY: maxP + pad,
+        gridData: const FlGridData(show: false),
+        titlesData: const FlTitlesData(show: false),
+        borderData: FlBorderData(show: false),
+        lineTouchData: const LineTouchData(enabled: false),
+        lineBarsData: [
+          LineChartBarData(
+            spots: [
+              for (var i = 0; i < prices.length; i++)
+                FlSpot(i / (prices.length - 1), prices[i]),
+            ],
+            color: const Color(0xFF10B981),
+            barWidth: 2,
+            isCurved: true,
+            dotData: const FlDotData(show: false),
+            belowBarData: BarAreaData(
+              show: true,
+              color: const Color(0xFF10B981).withAlpha(28),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 菜篮子：最近打卡日期短格式
+  String _basketDateText(DateTime t) {
+    return '${t.year}-${t.month.toString().padLeft(2, '0')}-${t.day.toString().padLeft(2, '0')}';
+  }
+
+  /// 菜篮子：购买渠道文本（兼容 List / String）
+  String _basketChannelText(StoreLog log) {
+    final v = log.extras['channel'];
+    if (v == null) return '';
+    return v is List
+        ? v.map((e) => e.toString()).join(' · ')
+        : v.toString();
+  }
 
   /// 按分类绑定的模板解析条目（兜底按分类名关键词匹配），保证新建/编辑/展示一致
   String _templateKeyOf(StoreItem store) {

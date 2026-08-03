@@ -22,6 +22,11 @@ void main() {
       expect(LifeTemplates.matchTemplateKey('方便面'), 'snack');
       expect(LifeTemplates.matchTemplateKey('坚果炒货'), 'snack');
       expect(LifeTemplates.matchTemplateKey('薯片'), 'snack');
+      expect(LifeTemplates.matchTemplateKey('菜篮子'), 'basket');
+      expect(LifeTemplates.matchTemplateKey('买菜'), 'basket');
+      expect(LifeTemplates.matchTemplateKey('蔬菜'), 'basket');
+      expect(LifeTemplates.matchTemplateKey('水果'), 'basket');
+      expect(LifeTemplates.matchTemplateKey('生鲜'), 'shopping');
       expect(LifeTemplates.matchTemplateKey('我的自定义分类'), 'generic');
       expect(LifeTemplates.matchTemplateKey(''), 'generic');
     });
@@ -41,9 +46,9 @@ void main() {
 
   group('内置模板配置', () {
     test('7 个模板且 key 唯一', () {
-      expect(LifeTemplates.all.length, 7);
+      expect(LifeTemplates.all.length, 8);
       final keys = LifeTemplates.all.map((t) => t.key).toSet();
-      expect(keys.length, 7);
+      expect(keys.length, 8);
       expect(LifeTemplates.all.last.key, 'generic');
     });
 
@@ -55,6 +60,16 @@ void main() {
           expect(f.label, isNotEmpty);
         }
       }
+    });
+
+    test('菜篮子模板字段配置', () {
+      final basketTpl = LifeTemplates.byKey('basket');
+      expect(basketTpl.name, '菜篮子');
+      expect(basketTpl.itemFields.map((f) => f.key), contains('basketTag'));
+      expect(basketTpl.itemFields.map((f) => f.key), contains('unit'));
+      final price = basketTpl.checkinFields.firstWhere((f) => f.key == 'price');
+      expect(price.type, TemplateFieldType.number);
+      expect(price.required, isTrue);
     });
 
     test('byKey 未命中回退 generic', () {

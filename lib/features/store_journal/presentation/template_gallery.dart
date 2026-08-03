@@ -26,6 +26,7 @@ class TemplateGallerySheet extends StatelessWidget {
       'landscape' => Icons.landscape_outlined,
       'shopping_bag' => Icons.shopping_bag_outlined,
       'snack' => Icons.fastfood_outlined,
+      'basket' => Icons.shopping_basket_outlined,
       _ => Icons.dashboard_customize_outlined,
     };
     return GestureDetector(
