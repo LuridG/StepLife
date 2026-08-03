@@ -31,6 +31,12 @@ const List<String> kMovieStatusOptions = [
   '想看', '在追', '看完', '搁置', '抛弃',
 ];
 
+/// 零食干货分类：二级筛选标签（新增零食时选择，浏览页可筛选）
+const List<String> kSnackTagOptions = [
+  '方便面', '薯片/膨化', '辣条/豆干', '坚果炒货', '糖果巧克力', '饼干糕点',
+  '肉干卤味', '速食冲泡', '饮品冲调', '果脯蜜饯', '面包烘焙', '其他',
+];
+
 /// 从店铺 extras 解析媒体类型（兼容旧字段 type）
 String resolveMediaType(Map<String, dynamic> extras) {
   final direct = extras['mediaType']?.toString() ?? '';
@@ -231,6 +237,27 @@ class LifeTemplates {
       ],
     ),
     LifeTemplate(
+      key: 'snack',
+      name: '零食干货',
+      iconName: 'snack',
+      description: '方便面 / 薯片 / 辣条 / 坚果 / 速食干货',
+      itemNameLabel: '零食名称',
+      itemNameHint: '例: 康师傅红烧牛肉面',
+      itemFields: [
+        TemplateField(key: 'brand', label: '品牌', type: TemplateFieldType.text, hint: '例: 康师傅 / 卫龙 / 三只松鼠'),
+        TemplateField(key: 'snackTag', label: '零食分类', type: TemplateFieldType.choice, options: kSnackTagOptions, hint: '用于浏览页二级筛选'),
+        TemplateField(key: 'priceTb', label: '淘宝参考价（元）', type: TemplateFieldType.number, hint: '例: 12.9'),
+        TemplateField(key: 'priceJd', label: '京东参考价（元）', type: TemplateFieldType.number, hint: '例: 15.5'),
+        TemplateField(key: 'priceStore', label: '实体店参考价（元）', type: TemplateFieldType.number, hint: '例: 18'),
+        TemplateField(key: 'comment', label: '试吃点评', type: TemplateFieldType.multiline, hint: '口感 / 回购意愿 / 避雷提醒'),
+      ],
+      checkinFields: [
+        TemplateField(key: 'qty', label: '本次购买数量', type: TemplateFieldType.number, hint: '例: 5'),
+        TemplateField(key: 'channel', label: '本次购买渠道', type: TemplateFieldType.choice, options: ['淘宝/天猫', '京东', '拼多多', '实体店/超市', '便利店', '其他']),
+        TemplateField(key: 'review', label: '本次食用感受', type: TemplateFieldType.multiline, hint: '这次吃的感受 / 囤货备注'),
+      ],
+    ),
+        LifeTemplate(
       key: 'generic',
       name: '通用（自定义）',
       iconName: 'dashboard_customize',

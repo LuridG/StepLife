@@ -15,6 +15,7 @@ class StoreProvider extends ChangeNotifier {
   String _selectedMediaType = '全部媒体类型';
   String _selectedGenre = '全部题材';
   String _selectedYear = '全部年份';
+  String _selectedSnackTag = '全部零食分类';
   bool _isCardView = true;
   bool _isLoading = true;
 
@@ -27,6 +28,7 @@ class StoreProvider extends ChangeNotifier {
   String get selectedMediaType => _selectedMediaType;
   String get selectedGenre => _selectedGenre;
   String get selectedYear => _selectedYear;
+  String get selectedSnackTag => _selectedSnackTag;
   bool get isCardView => _isCardView;
   bool get isLoading => _isLoading;
 
@@ -64,6 +66,12 @@ class StoreProvider extends ChangeNotifier {
               int.parse(year) < _earliestShownYear;
         }
         return year == _selectedYear;
+      });
+    }
+    if (_selectedSnackTag != '全部零食分类') {
+      result = result.where((item) {
+        if (LifeTemplates.matchTemplateKey(item.category) != 'snack') return true;
+        return (item.extras['snackTag']?.toString() ?? '') == _selectedSnackTag;
       });
     }
     return result.toList();
@@ -115,6 +123,10 @@ class StoreProvider extends ChangeNotifier {
         _selectedMediaType = '全部媒体类型';
         _selectedGenre = '全部题材';
         _selectedYear = '全部年份';
+        _selectedSnackTag = '全部零食分类';
+      }
+      if (categoryName == '全部分类' || !_storeItems.any((i) => i.category == categoryName && LifeTemplates.matchTemplateKey(i.category) == 'snack')) {
+        _selectedSnackTag = '全部零食分类';
       }
     }
     notifyListeners();
@@ -137,6 +149,11 @@ class StoreProvider extends ChangeNotifier {
 
   void selectYear(String value) {
     _selectedYear = value;
+    notifyListeners();
+  }
+
+  void selectSnackTag(String value) {
+    _selectedSnackTag = value;
     notifyListeners();
   }
 

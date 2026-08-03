@@ -26,10 +26,10 @@ void main() {
   });
 
   group('内置模板配置', () {
-    test('6 个模板且 key 唯一', () {
-      expect(LifeTemplates.all.length, 6);
+    test('7 个模板且 key 唯一', () {
+      expect(LifeTemplates.all.length, 7);
       final keys = LifeTemplates.all.map((t) => t.key).toSet();
-      expect(keys.length, 6);
+      expect(keys.length, 7);
       expect(LifeTemplates.all.last.key, 'generic');
     });
 

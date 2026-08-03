@@ -824,7 +824,10 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text('星级评分 (1-5分):', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                          Text(
+                            tpl.key == 'snack' ? '好吃程度 (1-5分):' : '星级评分 (1-5分):',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                          ),
                           Text('⭐ ${rating.toStringAsFixed(1)} 分', style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold, fontSize: 14)),
                         ],
                       ),
@@ -1466,6 +1469,21 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
     );
     yearOptions.sort((a, b) => int.parse(b).compareTo(int.parse(a)));
     final shownYears = yearOptions.take(4).toList();
+    // 零食二级筛选选项（预设分类兜底 + 数据中实际使用过的分类）
+    final snackTagOptions = <String>[];
+    for (final it in storeProvider.storeItems) {
+      if (LifeTemplates.matchTemplateKey(it.category) != 'snack') continue;
+      final t = it.extras['snackTag']?.toString() ?? '';
+      if (t.isNotEmpty && !snackTagOptions.contains(t)) snackTagOptions.add(t);
+    }
+    snackTagOptions.sort((a, b) {
+      final ia = kSnackTagOptions.indexOf(a);
+      final ib = kSnackTagOptions.indexOf(b);
+      if (ia == -1 && ib == -1) return a.compareTo(b);
+      if (ia == -1) return 1;
+      if (ib == -1) return -1;
+      return ia.compareTo(ib);
+    });
     final hasOlderYears = yearOptions.length > shownYears.length;
     if (shownYears.isNotEmpty) {
       storeProvider.setEarliestShownYear(int.parse(shownYears.last));
@@ -1711,6 +1729,31 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                       ),
                     ),
                   ],
+                  if (currentTplKey == 'snack') ...[
+                    // 零食分类二级筛选
+                    const SizedBox(height: 8),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          FilterChip(
+                            label: const Text('全部零食分类'),
+                            selected: storeProvider.selectedSnackTag == '全部零食分类',
+                            onSelected: (_) => storeProvider.selectSnackTag('全部零食分类'),
+                          ),
+                          ...snackTagOptions.map((t) => Padding(
+                                padding: const EdgeInsets.only(left: 6),
+                                child: FilterChip(
+                                  label: Text(t),
+                                  selected: storeProvider.selectedSnackTag == t,
+                                  selectedColor: const Color(0xFFF59E0B).withAlpha(80),
+                                  onSelected: (_) => storeProvider.selectSnackTag(t),
+                                ),
+                              )),
+                        ],
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 16),
 
                   storeProvider.filteredStoreItems.isEmpty
@@ -1741,6 +1784,9 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
   // Card 模式 (支持点击翻转/跳转至独立 StoreDetailScreen 详情页)
   Widget _buildStoreGlassCard(StoreItem store, int checkinCount, double totalCost) {
     final moviePlatforms = _platformsOf(store);
+    final snackTag = store.extras['snackTag']?.toString() ?? '';
+    final snackPrices = _snackPricesOf(store);
+    final snackComment = store.extras['comment']?.toString() ?? '';
     return Padding(
       padding: const EdgeInsets.only(bottom: 14.0),
       child: _buildGlassCard(
@@ -2034,6 +2080,36 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
+                ] else if (_isSnackItem(store)) ...[
+                  // 零食：分类标签 + 多平台参考价 + 试吃点评
+                  if (snackTag.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 3),
+                      child: Text(
+                        '🏷️ $snackTag',
+                        style: const TextStyle(fontSize: 12, color: Color(0xFFF59E0B), fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  if (snackPrices.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 3),
+                      child: Text(
+                        '💰 ${snackPrices.join(' · ')}',
+                        style: const TextStyle(fontSize: 12, color: Colors.white70, fontWeight: FontWeight.w500),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  if (snackComment.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 3),
+                      child: Text(
+                        '💬 $snackComment',
+                        style: const TextStyle(fontSize: 12, color: Colors.white54, fontStyle: FontStyle.italic),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
                 ] else if (_isDiningItem(store)) ...[
                   // 餐饮：位置（点击打开地图）+ 结算平台
                   if (store.address != null && store.address!.isNotEmpty)
@@ -2281,6 +2357,25 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
 
   bool _isDiningItem(StoreItem store) =>
       LifeTemplates.matchTemplateKey(store.category) == 'dining';
+
+  bool _isSnackItem(StoreItem store) =>
+      LifeTemplates.matchTemplateKey(store.category) == 'snack';
+
+  /// 零食多平台参考价（仅展示已填写的平台）
+  List<String> _snackPricesOf(StoreItem store) {
+    final parts = <String>[];
+    void add(String label, String key) {
+      final v = store.extras[key];
+      if (v != null && v.toString().trim().isNotEmpty) {
+        parts.add('$label ¥${v.toString().trim()}');
+      }
+    }
+
+    add('淘宝', 'priceTb');
+    add('京东', 'priceJd');
+    add('实体店', 'priceStore');
+    return parts;
+  }
 
   /// 观看平台：兼容多选 List 与旧版单值 String
   List<String> _platformsOf(StoreItem store) {
