@@ -9,6 +9,10 @@ import '../db/database_service.dart';
 import '../update/app_updater.dart';
 import '../update/update_dialog.dart';
 import 'settings_provider.dart';
+import '../../features/step_tracker/providers/step_provider.dart';
+import '../../features/chore_tracker/providers/chore_provider.dart';
+import '../../features/store_journal/providers/store_provider.dart';
+import '../../features/profile/providers/profile_provider.dart';
 
 /// 设置中心：外观 / 模板与分类 / WebDAV 同步 / 缓存管理 / 关于
 class SettingsScreen extends StatefulWidget {
@@ -248,6 +252,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
     if (mounted) setState(() => _restoring = false);
     if (result.success) {
+      if (mounted) {
+        // 恢复后强制重载全部数据源，避免界面停留在旧内存数据上
+        context.read<SettingsProvider>().load();
+        context.read<StepProvider>().loadData();
+        context.read<ChoreProvider>().loadData();
+        context.read<StoreProvider>().loadData();
+        context.read<ProfileProvider>().loadProfile();
+        _refreshCacheStats();
+      }
       _toast(result.message);
     } else {
       _toast(result.message, error: true);

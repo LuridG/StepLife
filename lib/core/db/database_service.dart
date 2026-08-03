@@ -1,6 +1,8 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
+import '../cache/cache_manager.dart';
 import '../../features/profile/domain/user_profile.dart';
 import '../../features/step_tracker/domain/step_models.dart';
 import '../../features/chore_tracker/domain/chore_models.dart';
@@ -59,6 +61,114 @@ class DatabaseService {
     } catch (_) {}
   }
 
+
+  /// 一致性快照：VACUUM INTO 生成完整独立备份文件（WAL 安全）
+  Future<void> vacuumInto(String targetPath) async {
+    final db = await database;
+    final escaped = targetPath.replaceAll("'", "''");
+    await db.rawQuery("VACUUM INTO '$escaped'");
+  }
+
+  static const List<String> _syncTables = [
+    'user_profile',
+    'routes',
+    'step_logs',
+    'members',
+    'chore_items',
+    'chore_logs',
+    'store_categories',
+    'store_items',
+    'store_logs',
+    'store_menu_items',
+  ];
+
+  /// 只读校验快照/备份文件：完整性 + 各表行数
+  Future<Map<String, Object>> verifySnapshot(String path) async {
+    final db = await openDatabase(path, readOnly: true);
+    try {
+      final integrity = await db.rawQuery('PRAGMA integrity_check');
+      final ok = integrity.isNotEmpty &&
+          integrity.first.values.first.toString() == 'ok';
+      final counts = <String, int>{};
+      for (final t in _syncTables) {
+        try {
+          final rows = await db.rawQuery('SELECT COUNT(*) AS c FROM $t');
+          counts[t] = (rows.first['c'] as num?)?.toInt() ?? 0;
+        } catch (_) {}
+      }
+      return {'ok': ok, 'counts': counts};
+    } finally {
+      await db.close();
+    }
+  }
+
+  /// 当前库各关键表行数统计
+  Future<Map<String, int>> tableCounts() async {
+    final db = await database;
+    final counts = <String, int>{};
+    for (final t in _syncTables) {
+      try {
+        final rows = await db.rawQuery('SELECT COUNT(*) AS c FROM $t');
+        counts[t] = (rows.first['c'] as num?)?.toInt() ?? 0;
+      } catch (_) {}
+    }
+    return counts;
+  }
+
+  /// 恢复后重映射图片路径：失效的绝对路径按文件名指向当前缓存目录
+  Future<int> relinkImagesAfterRestore() async {
+    final db = await database;
+    final imagesDir = await CacheManager.instance.imagesDir();
+    var relinked = 0;
+
+    Future<String> fix(String path) async {
+      if (path.isEmpty) return path;
+      if (await File(path).exists()) return path;
+      final name = basename(path);
+      final candidate = join(imagesDir.path, name);
+      if (await File(candidate).exists()) {
+        relinked++;
+        return candidate;
+      }
+      return path;
+    }
+
+    // store_items.imagesJson：JSON 数组形式的图片列表
+    final items = await db.query('store_items', columns: ['id', 'imagesJson']);
+    for (final row in items) {
+      final id = row['id'] as int;
+      final raw = (row['imagesJson'] as String?) ?? '[]';
+      try {
+        final list = (jsonDecode(raw) as List).cast<String>();
+        var changed = false;
+        final fixed = <String>[];
+        for (final img in list) {
+          final f = await fix(img);
+          if (f != img) changed = true;
+          fixed.add(f);
+        }
+        if (changed) {
+          await db.update('store_items', {'imagesJson': jsonEncode(fixed)},
+              where: 'id = ?', whereArgs: [id]);
+        }
+      } catch (_) {}
+    }
+
+    // store_menu_items.imagePath：菜品图片
+    final menus =
+        await db.query('store_menu_items', columns: ['id', 'imagePath']);
+    for (final row in menus) {
+      final id = row['id'] as int;
+      final img = row['imagePath'] as String?;
+      if (img == null || img.isEmpty) continue;
+      final f = await fix(img);
+      if (f != img) {
+        await db.update('store_menu_items', {'imagePath': f},
+            where: 'id = ?', whereArgs: [id]);
+      }
+    }
+    return relinked;
+  }
   Future<Database> _initDatabase() async {
     final dbPath = await getDatabasesPath();
     final oldPath = join(dbPath, 'steplife_v8.db');

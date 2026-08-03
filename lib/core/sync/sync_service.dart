@@ -21,7 +21,7 @@ class SyncResult {
 
 /// WebDAV 手动备份 / 恢复编排
 class SyncService {
-  /// 备份：DB 快照整体上传 + 图片增量上传（大小不一致即传）
+  /// 备份：DB 一致性快照整体上传（VACUUM INTO，失败回退 checkpoint+复制）+ 图片增量上传
   static Future<SyncResult> backup({
     required String url,
     required String username,
@@ -40,18 +40,31 @@ class SyncService {
 
       await webdav.ensureRemoteDirs();
 
-      // 1) DB 快照
+      // 1) DB 一致性快照：优先 VACUUM INTO（WAL 安全），失败回退 checkpoint + 复制
       final dbPath = await DatabaseService.instance.databaseFilePath;
-      await DatabaseService.instance.checkpoint();
       final tmpDir = await Directory.systemTemp.createTemp('steplife_sync_');
       final snapshot = p.join(tmpDir.path, 'steplife_v9.db');
-      await File(dbPath).copy(snapshot);
+      var snapshotOk = false;
+      try {
+        await DatabaseService.instance.vacuumInto(snapshot);
+        snapshotOk = await File(snapshot).exists() &&
+            (await File(snapshot).length()) > 0;
+      } catch (_) {}
+      if (!snapshotOk) {
+        await DatabaseService.instance.checkpoint();
+        await File(dbPath).copy(snapshot);
+      }
+
+      // 校验快照完整性并统计各表行数（路线/家务/生活记录全覆盖）
+      final verify = await DatabaseService.instance.verifySnapshot(snapshot);
+      final counts =
+          Map<String, int>.from((verify['counts'] as Map?) ?? const {});
       final dbUploaded = await webdav.uploadFile(snapshot, '/db/steplife_v9.db');
       try {
         await tmpDir.delete(recursive: true);
       } catch (_) {}
 
-      // 2) 图片增量
+      // 2) 图片增量上传（按文件名 + 大小去重）
       final imagesDir = await CacheManager.instance.imagesDir();
       final remoteFiles = await webdav.listFiles('/images');
       final remoteMap = {for (final f in remoteFiles) f.path: f.length};
@@ -69,12 +82,12 @@ class SyncService {
         }
       }
 
-      final ok = dbUploaded;
+      final ok = dbUploaded && verify['ok'] == true;
       return SyncResult(
         success: ok,
         message: ok
-            ? '备份完成：数据库 + ${uploaded.toString()} 张新图片已上传'
-            : '备份失败：数据库上传未成功，请检查网络与账号配置',
+            ? '备份完成：数据库校验通过（${_countsSummary(counts)}），新图片 $uploaded 张已上传'
+            : '备份失败：数据库上传未成功或完整性校验未通过，请检查网络与账号配置',
         uploadedFiles: uploaded + (ok ? 1 : 0),
       );
     } catch (e) {
@@ -82,7 +95,7 @@ class SyncService {
     }
   }
 
-  /// 恢复：下载远端 DB 替换本地（先备份当前库），再按缺失下载图片
+  /// 恢复：下载远端 DB 先校验，再替换本地（先备份当前库），重映射图片路径，按缺失补下载图片
   static Future<SyncResult> restore({
     required String url,
     required String username,
@@ -124,6 +137,20 @@ class SyncService {
         );
       }
 
+      // 先用只读方式校验云端库完整性 + 统计行数
+      final verify = await DatabaseService.instance.verifySnapshot(downloaded);
+      final counts =
+          Map<String, int>.from((verify['counts'] as Map?) ?? const {});
+      if (verify['ok'] != true) {
+        try {
+          await tmpDir.delete(recursive: true);
+        } catch (_) {}
+        return const SyncResult(
+          success: false,
+          message: '恢复失败：云端数据库完整性校验未通过，请重新执行一次上传',
+        );
+      }
+
       // 关闭连接 → 备份当前库 → 替换
       await DatabaseService.instance.close();
       final now = DateTime.now();
@@ -150,6 +177,11 @@ class SyncService {
         await tmpDir.delete(recursive: true);
       } catch (_) {}
 
+      // 重新打开新库（触发幂等 onOpen 补表），并重映射图片路径到当前缓存目录
+      await DatabaseService.instance.database;
+      final relinked =
+          await DatabaseService.instance.relinkImagesAfterRestore();
+
       // 按缺失下载图片
       final imagesDir = await CacheManager.instance.imagesDir();
       final remoteFiles = await webdav.listFiles('/images');
@@ -165,11 +197,16 @@ class SyncService {
       return SyncResult(
         success: true,
         message:
-            '恢复完成：数据库已替换（原库已备份），补下载图片 ${downloadedImages.toString()} 张',
+            '恢复完成：${_countsSummary(counts)}；图片重映射 $relinked 张、补下载 $downloadedImages 张（原库已备份为 steplife_v9_before_restore_*.db）',
         downloadedFiles: 1 + downloadedImages,
       );
     } catch (e) {
       return SyncResult(success: false, message: '恢复异常: $e');
     }
+  }
+
+  static String _countsSummary(Map<String, int> c) {
+    int n(String key) => c[key] ?? 0;
+    return '路线${n('routes')}条/行走打卡${n('step_logs')}条/家务${n('chore_items')}项/家务打卡${n('chore_logs')}条/生活记录${n('store_items')}条/成员${n('members')}人';
   }
 }

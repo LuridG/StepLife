@@ -145,7 +145,7 @@ class WebDavService {
       final isCollection = block.contains('<d:collection/>');
       if (isCollection) continue;
       final lenMatch =
-          RegExp(r'<d:getcontentlength>(d+)</d:getcontentlength>').firstMatch(block);
+          RegExp(r'<d:getcontentlength>(\d+)</d:getcontentlength>').firstMatch(block);
       final mtimeMatch =
           RegExp(r'<d:getlastmodified>(.*?)</d:getlastmodified>', dotAll: true)
               .firstMatch(block);
