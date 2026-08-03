@@ -12,7 +12,7 @@
   <img src="https://img.shields.io/badge/Flutter-3.27+-02569B?logo=flutter" alt="Flutter" />
   <img src="https://img.shields.io/badge/Dart-3.6+-0175C2?logo=dart" alt="Dart" />
   <img src="https://img.shields.io/badge/Platform-Android%20%7C%20Windows-green" alt="Platform" />
-  <img src="https://img.shields.io/badge/Version-v1.4.15-emerald" alt="Version" />
+  <img src="https://img.shields.io/badge/Version-v1.4.16-emerald" alt="Version" />
   <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License" />
 </p>
 
@@ -81,10 +81,10 @@
 
 | 文件名 | 适用 CPU 架构 | 文件大小 | 推荐说明 |
 | :--- | :--- | :---: | :--- |
-| **`StepLife-v1.4.15-arm64-v8a.apk`** | 64 位 ARM (`arm64-v8a`) | **26.9 MB** | 🔥 **最推荐**！适配 99% 的现代 Android 手机 |
-| **`StepLife-v1.4.15-armeabi-v7a.apk`** | 32 位 ARM (`armeabi-v7a`) | 24.7 MB | 适配老旧 32 位 Android 机型 |
-| **`StepLife-v1.4.15-x86_64.apk`** | Intel/AMD (`x86_64`) | 28.3 MB | 适配 Android 模拟器与 x86 平板 |
-| **`StepLife-v1.4.15-universal.apk`** | 通用全架构胖包 | 66.0 MB | 整合全架构二进制，兼容任意设备 |
+| **`StepLife-v1.4.16-arm64-v8a.apk`** | 64 位 ARM (`arm64-v8a`) | **26.9 MB** | 🔥 **最推荐**！适配 99% 的现代 Android 手机 |
+| **`StepLife-v1.4.16-armeabi-v7a.apk`** | 32 位 ARM (`armeabi-v7a`) | 24.7 MB | 适配老旧 32 位 Android 机型 |
+| **`StepLife-v1.4.16-x86_64.apk`** | Intel/AMD (`x86_64`) | 28.3 MB | 适配 Android 模拟器与 x86 平板 |
+| **`StepLife-v1.4.16-universal.apk`** | 通用全架构胖包 | 66.0 MB | 整合全架构二进制，兼容任意设备 |
 
 ---
 
@@ -122,8 +122,8 @@ flutter build apk --release --split-per-abi
 
 ```bash
 # 更新 pubspec.yaml 的 version 后，提交并推送 tag 即可自动发布
-git add -A && git commit -m "chore: release v1.4.15"
-git tag v1.4.15+20260817
+git add -A && git commit -m "chore: release v1.4.16"
+git tag v1.4.16+20260818
 git push origin main --tags
 ```
 

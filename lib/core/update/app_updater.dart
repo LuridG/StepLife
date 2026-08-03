@@ -7,10 +7,10 @@ import 'package:path_provider/path_provider.dart';
 
 /// GitHub Release 信息（用于应用内自动更新）
 class UpdateInfo {
-  final String version; // 新版本号（去掉 v 前缀，含 build 号，如 1.4.8+20260810）
-  final String tagName; // 如 v1.4.8+20260810
+  final String version; // 新版本号（去掉 v 前缀，含 build 号，如 1.4.15+20260817）
+  final String tagName; // 如 v1.4.15+20260817
   final String notes; // 更新说明（Release body）
-  final String apkUrl; // universal APK 下载地址
+  final String apkUrl; // 对应架构 APK 下载地址
   final int apkSize; // APK 大小（字节），未知为 0
 
   const UpdateInfo({
@@ -28,6 +28,23 @@ class UpdateInfo {
 class AppUpdater {
   static const String _repoApi =
       'https://api.github.com/repos/LuridG/StepLife/releases/latest';
+
+  /// 更新检查源：直连 api.github.com 在国内常被拒，按顺序回退到加速镜像
+  static const List<String> _checkEndpoints = [
+    _repoApi,
+    'https://ghproxy.net/$_repoApi',
+    'https://gh-proxy.com/$_repoApi',
+    'https://ghfast.top/$_repoApi',
+    'https://mirror.ghproxy.com/$_repoApi',
+  ];
+
+  /// APK 下载加速镜像（直链失败时按顺序回退）
+  static const List<String> _mirrorHosts = [
+    'https://ghproxy.net',
+    'https://gh-proxy.com',
+    'https://ghfast.top',
+  ];
+
   static const MethodChannel _channel = MethodChannel('steplife/updater');
   static const String _apkFileName = 'StepLife-update.apk';
 
@@ -35,13 +52,27 @@ class AppUpdater {
   static Future<PackageInfo> packageInfo() => PackageInfo.fromPlatform();
 
   /// 检查 GitHub 最新 Release；无新版本返回 null。
-  /// 网络或解析失败会抛出异常，由调用方决定是否提示。
+  /// 全部更新源均失败时抛出异常，由调用方决定是否提示。
   static Future<UpdateInfo?> checkForUpdate() async {
+    Object? lastError;
+    for (final endpoint in _checkEndpoints) {
+      try {
+        return await _fetchLatest(endpoint);
+      } catch (e) {
+        lastError = e;
+      }
+    }
+    throw HttpException(
+      '已尝试 ${_checkEndpoints.length} 个更新源均不可用，请检查网络后重试 ($lastError)',
+    );
+  }
+
+  static Future<UpdateInfo?> _fetchLatest(String endpoint) async {
     final resp = await http
-        .get(Uri.parse(_repoApi), headers: const {'User-Agent': 'StepLife'})
-        .timeout(const Duration(seconds: 12));
+        .get(Uri.parse(endpoint), headers: const {'User-Agent': 'StepLife'})
+        .timeout(const Duration(seconds: 10));
     if (resp.statusCode != 200) {
-      throw HttpException('检查更新失败: HTTP ${resp.statusCode}');
+      throw HttpException('HTTP ${resp.statusCode}');
     }
     final json = jsonDecode(resp.body) as Map<String, dynamic>;
     final tag = (json['tag_name'] as String? ?? '').trim();
@@ -113,7 +144,7 @@ class AppUpdater {
     }
   }
 
-  /// 下载 APK 到应用文档目录，进度回调 (received, total)
+  /// 下载 APK 到应用缓存目录；直链失败时依次回退加速镜像
   static Future<File> downloadApk(
     UpdateInfo info,
     void Function(int received, int total) onProgress, {
@@ -126,12 +157,48 @@ class AppUpdater {
         await file.delete();
       } catch (_) {}
     }
-    final request = http.Request('GET', Uri.parse(info.apkUrl));
-    final resp = await http.Client().send(request);
-    if (resp.statusCode != 200) {
-      throw HttpException('下载失败: HTTP ${resp.statusCode}');
+    final urls = _expandDownloadUrls(info.apkUrl);
+    Object? lastError;
+    for (final url in urls) {
+      try {
+        await _downloadTo(file, url, onProgress, isCancelled);
+        return file;
+      } catch (e) {
+        lastError = e;
+        // 清理半成品，准备用下一个源重试
+        try {
+          if (await file.exists()) await file.delete();
+        } catch (_) {}
+      }
     }
-    final total = resp.contentLength ?? info.apkSize;
+    throw HttpException(
+      '已尝试 ${urls.length} 个下载源均不可用，请检查网络后重试 ($lastError)',
+    );
+  }
+
+  /// 生成下载地址列表：直链 + 镜像前缀
+  static List<String> _expandDownloadUrls(String url) {
+    if (!url.startsWith('https://github.com/')) return [url];
+    return [
+      url,
+      for (final host in _mirrorHosts) '$host/$url',
+    ];
+  }
+
+  static Future<void> _downloadTo(
+    File file,
+    String url,
+    void Function(int received, int total) onProgress,
+    bool Function()? isCancelled,
+  ) async {
+    final request = http.Request('GET', Uri.parse(url));
+    final resp = await http.Client()
+        .send(request)
+        .timeout(const Duration(seconds: 20));
+    if (resp.statusCode != 200) {
+      throw HttpException('HTTP ${resp.statusCode}');
+    }
+    final total = resp.contentLength ?? 0;
     final sink = file.openWrite();
     var received = 0;
     try {
@@ -143,16 +210,9 @@ class AppUpdater {
         sink.add(chunk);
         if (total > 0) onProgress(received, total);
       }
-    } catch (_) {
-      // 下载失败/取消：清理残留文件，避免占用缓存
-      try {
-        if (await file.exists()) await file.delete();
-      } catch (_) {}
-      rethrow;
     } finally {
       await sink.close();
     }
-    return file;
   }
 
   /// 拉起系统安装器安装 APK；返回 false 表示需要先授权「安装未知应用」
