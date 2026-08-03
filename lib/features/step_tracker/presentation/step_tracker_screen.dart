@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../../core/settings/settings_button.dart';
+import '../../../core/db/database_service.dart';
 import '../domain/step_models.dart';
 import '../providers/step_provider.dart';
 import '../utils/step_counter_service.dart';
@@ -46,6 +47,44 @@ class _StepTrackerScreenState extends State<StepTrackerScreen>
     with AutomaticKeepAliveClientMixin {
   @override
   bool get wantKeepAlive => true;
+
+  /// 路线列表排序：created 按创建时间 | steps 按平均步数 | measures 按测量次数
+  String _routeSort = 'created';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRouteSort();
+  }
+
+  Future<void> _loadRouteSort() async {
+    try {
+      final v = await DatabaseService.instance.getSetting('route_sort');
+      if (v != null && mounted) setState(() => _routeSort = v);
+    } catch (_) {}
+  }
+
+  Future<void> _setRouteSort(String v) async {
+    setState(() => _routeSort = v);
+    try {
+      await DatabaseService.instance.setSetting('route_sort', v);
+    } catch (_) {}
+  }
+
+  List<RouteItem> _sortedRoutes(List<RouteItem> routes) {
+    final list = [...routes];
+    if (_routeSort == 'steps') {
+      list.sort((a, b) => b.refSteps.compareTo(a.refSteps));
+    } else if (_routeSort == 'measures') {
+      list.sort((a, b) => context
+          .read<StepProvider>()
+          .measurementCountOf(b.id!)
+          .compareTo(
+            context.read<StepProvider>().measurementCountOf(a.id!),
+          ));
+    }
+    return list;
+  }
 
   void _showAddMemberDialog() {
     showDialog(context: context, builder: (ctx) => const MemberDialog());
@@ -494,6 +533,7 @@ class _StepTrackerScreenState extends State<StepTrackerScreen>
 
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setModalState) {
           void updateSuggestedSteps() {
@@ -502,6 +542,55 @@ class _StepTrackerScreenState extends State<StepTrackerScreen>
           }
 
           final walkerMember = choreProvider.getMemberByName(selectedWalker);
+
+          // —— 计步实测（可选）：监听系统计步器取本次实际总步数 ——
+          bool liveMeasuring = false;
+          int liveDelta = 0;
+          int liveBaseline = 0;
+          Timer? liveTimer;
+          // 通过函数读取，避免分析器将「读取先于回调内写入」误判为恒 false
+          bool liveMode() => liveMeasuring;
+
+          Future<void> startLive() async {
+            final messenger = ScaffoldMessenger.of(context);
+            final ok = await StepCounterService.start();
+            if (!mounted) return;
+            if (!ok) {
+              messenger.showSnackBar(
+                const SnackBar(content: Text('当前设备无计步器，请手动填写实测步数')),
+              );
+              return;
+            }
+            await Future.delayed(const Duration(milliseconds: 600));
+            liveBaseline = StepCounterService.currentSteps;
+            liveDelta = 0;
+            if (!mounted) return;
+            setModalState(() => liveMeasuring = true);
+            liveTimer?.cancel();
+            liveTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+              setModalState(() {
+                liveDelta = (StepCounterService.currentSteps - liveBaseline)
+                    .clamp(0, 1 << 30)
+                    .toInt();
+              });
+            });
+          }
+
+          void stopLive() {
+            liveTimer?.cancel();
+            liveTimer = null;
+            StepCounterService.stop();
+            if (mounted) setModalState(() => liveMeasuring = false);
+          }
+
+          void useLive() {
+            final v = (StepCounterService.currentSteps - liveBaseline)
+                .clamp(0, 1 << 30)
+                .toInt();
+            stopLive();
+            if (v > 0) stepsController.text = '$v';
+            if (mounted) setModalState(() {});
+          }
 
           return AlertDialog(
             shape: RoundedRectangleBorder(
@@ -624,6 +713,76 @@ class _StepTrackerScreenState extends State<StepTrackerScreen>
                       ),
                     ),
                   const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withAlpha(8),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.white.withAlpha(20)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.sensors, color: Color(0xFF10B981), size: 16),
+                            const SizedBox(width: 6),
+                            const Text(
+                              '计步实测（可选）',
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                            ),
+                            const Spacer(),
+                            if (!liveMode())
+                              TextButton.icon(
+                                onPressed: startLive,
+                                icon: const Icon(Icons.play_arrow, size: 15),
+                                label: const Text('开始计步'),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: const Color(0xFF10B981),
+                                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                                  minimumSize: const Size(0, 32),
+                                ),
+                              )
+                            else ...[
+                              Text(
+                                '$liveDelta 步',
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF34D399),
+                                ),
+                              ),
+                              TextButton(
+                                onPressed: useLive,
+                                child: const Text('取用'),
+                              ),
+                              TextButton(
+                                onPressed: stopLive,
+                                child: const Text('停止'),
+                              ),
+                            ],
+                          ],
+                        ),
+                        if (liveMode())
+                          const Padding(
+                            padding: EdgeInsets.only(top: 4),
+                            child: Text(
+                              '正在监听系统计步器…走到终点后点「取用」填入实测步数',
+                              style: TextStyle(fontSize: 11, color: Colors.white54),
+                            ),
+                          )
+                        else
+                          const Padding(
+                            padding: EdgeInsets.only(top: 4),
+                            child: Text(
+                              'Android 计步器实测本次实际步数；桌面端无计步器请手动填写',
+                              style: TextStyle(fontSize: 11, color: Colors.white54),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
                   ListTile(
                     contentPadding: EdgeInsets.zero,
                     leading: const Icon(
@@ -675,6 +834,7 @@ class _StepTrackerScreenState extends State<StepTrackerScreen>
             actions: [
               TextButton(
                 onPressed: () {
+                  stopLive();
                   timesController.dispose();
                   stepsController.dispose();
                   durationController.dispose();
@@ -683,18 +843,56 @@ class _StepTrackerScreenState extends State<StepTrackerScreen>
                 child: const Text('取消'),
               ),
               ElevatedButton(
-                onPressed: () {
+                onPressed: () async {
+                  final messenger = ScaffoldMessenger.of(context);
+                  final navigator = Navigator.of(ctx);
+                  final stepProvider = context.read<StepProvider>();
+                  final profileProvider = context.read<ProfileProvider>();
                   final times = int.tryParse(timesController.text) ?? 1;
                   final steps =
                       int.tryParse(stepsController.text) ??
                       selectedRoute.refSteps;
                   final duration = int.tryParse(durationController.text) ?? 30;
 
-                  final fallbackProfile = context
-                      .read<ProfileProvider>()
-                      .profile;
+                  // 与路线平均步数偏差过大时提示确认
+                  final expected =
+                      selectedRoute.refSteps * (times < 1 ? 1 : times);
+                  final deviation =
+                      expected <= 0
+                          ? 0.0
+                          : (steps - expected).abs() / expected;
+                  if (deviation > 0.5) {
+                    final confirm = await showDialog<bool>(
+                      context: ctx,
+                      builder: (sub) => AlertDialog(
+                        title: const Text('步数偏差较大'),
+                        content: Text(
+                          '本次填写 $steps 步，与路线平均步数 ${selectedRoute.refSteps} 步 × $times 次 = $expected 步相差 ${(deviation * 100).toStringAsFixed(0)}%，确认按本次填写提交吗？',
+                          style: const TextStyle(fontSize: 13),
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(sub).pop(false),
+                            child: const Text('返回修改'),
+                          ),
+                          ElevatedButton(
+                            onPressed: () => Navigator.of(sub).pop(true),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF10B981),
+                              foregroundColor: Colors.white,
+                            ),
+                            child: const Text('确认提交'),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirm != true) return;
+                  }
 
-                  context.read<StepProvider>().recordStepLog(
+                  stopLive();
+                  final fallbackProfile = profileProvider.profile;
+
+                  stepProvider.recordStepLog(
                     routeId: selectedRoute.id,
                     routeName: selectedRoute.name,
                     walkerName: selectedWalker,
@@ -709,9 +907,9 @@ class _StepTrackerScreenState extends State<StepTrackerScreen>
                   timesController.dispose();
                   stepsController.dispose();
                   durationController.dispose();
-                  Navigator.of(ctx).pop();
+                  navigator.pop();
 
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  messenger.showSnackBar(
                     SnackBar(
                       content: Text('路线【${selectedRoute.name}】打卡成功！'),
                       backgroundColor: const Color(0xFF10B981),
@@ -896,6 +1094,10 @@ class _StepTrackerScreenState extends State<StepTrackerScreen>
                             ),
                           ],
                         ),
+                        if (ms.isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          _buildMeasurementSpark(ms),
+                        ],
                         const SizedBox(height: 8),
                         if (ms.isEmpty)
                           const Padding(
@@ -992,6 +1194,75 @@ class _StepTrackerScreenState extends State<StepTrackerScreen>
     );
   }
 
+  /// 测量波动迷你柱状图：从左到右按时间先后，最后一条高亮
+  Widget _buildMeasurementSpark(List<RouteMeasurement> ms) {
+    final ordered = ms.reversed.toList();
+    final values = ordered.map((m) => m.computedSteps).toList();
+    final maxV = values.fold<int>(1, (a, b) => a > b ? a : b);
+    final minV = values.reduce((a, b) => a < b ? a : b);
+    final avgV = (values.reduce((a, b) => a + b) / values.length).round();
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.black.withAlpha(25),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.white.withAlpha(12)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text(
+                '单程步数波动',
+                style: TextStyle(fontSize: 11, color: Colors.white54),
+              ),
+              const Spacer(),
+              Text(
+                '最高 $maxV · 最低 $minV · 平均 $avgV',
+                style: const TextStyle(fontSize: 10, color: Colors.white38),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 52,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: List.generate(values.length, (i) {
+                final h = 10 + (values[i] / maxV) * 34;
+                final last = i == values.length - 1;
+                return Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 1.5),
+                    child: Container(
+                      height: h,
+                      decoration: BoxDecoration(
+                        color: last
+                            ? const Color(0xFF34D399)
+                            : const Color(0xFF10B981).withAlpha(160),
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(3),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            ),
+          ),
+          const Padding(
+            padding: EdgeInsets.only(top: 4),
+            child: Text(
+              '从左到右按时间先后，最后一条高亮',
+              style: TextStyle(fontSize: 10, color: Colors.white38),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
@@ -1038,15 +1309,71 @@ class _StepTrackerScreenState extends State<StepTrackerScreen>
                 children: [
                   // 2. 客观路线资产库 (纵向列表)
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
-                        '客观路线资产库 (列表)',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                      const Expanded(
+                        child: Text(
+                          '客观路线资产库 (列表)',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
                         ),
+                      ),
+                      PopupMenuButton<String>(
+                        initialValue: _routeSort,
+                        tooltip: '路线排序',
+                        icon: const Icon(
+                          Icons.sort,
+                          size: 18,
+                          color: Colors.white70,
+                        ),
+                        color: const Color(0xFF0F172A),
+                        onSelected: _setRouteSort,
+                        itemBuilder: (ctx) => const [
+                          PopupMenuItem(
+                            value: 'created',
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.history,
+                                  size: 16,
+                                  color: Color(0xFF34D399),
+                                ),
+                                SizedBox(width: 8),
+                                Text('按创建时间'),
+                              ],
+                            ),
+                          ),
+                          PopupMenuItem(
+                            value: 'steps',
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.straighten,
+                                  size: 16,
+                                  color: Color(0xFF60A5FA),
+                                ),
+                                SizedBox(width: 8),
+                                Text('按平均步数'),
+                              ],
+                            ),
+                          ),
+                          PopupMenuItem(
+                            value: 'measures',
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.speed,
+                                  size: 16,
+                                  color: Color(0xFFFBBF24),
+                                ),
+                                SizedBox(width: 8),
+                                Text('按测量次数'),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                       TextButton.icon(
                         onPressed: _showAddRouteAssetDialog,
@@ -1065,9 +1392,10 @@ class _StepTrackerScreenState extends State<StepTrackerScreen>
                       : ListView.builder(
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
-                          itemCount: stepProvider.routes.length,
+                          itemCount: _sortedRoutes(stepProvider.routes).length,
                           itemBuilder: (context, index) {
-                            final route = stepProvider.routes[index];
+                            final route =
+                                _sortedRoutes(stepProvider.routes)[index];
                             final stats = stepProvider.getRouteStats(
                               route.name,
                             );
@@ -1765,9 +2093,11 @@ class _MeasureSection extends StatefulWidget {
 
 class _MeasureSectionState extends State<_MeasureSection> {
   bool _measuring = false;
+  bool _paused = false;
   bool _sensorOk = false;
   int _elapsed = 0;
   int _startCounter = 0;
+  int _pauseCounter = 0;
   Timer? _timer;
   _MeasureResult? _lastResult;
 
@@ -1805,8 +2135,27 @@ class _MeasureSectionState extends State<_MeasureSection> {
     if (!mounted) return;
     setState(() {
       _measuring = true;
+      _paused = false;
       _elapsed = 0;
     });
+    _timer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (mounted) setState(() => _elapsed++);
+    });
+  }
+
+  void _pause() {
+    if (_paused) return;
+    _pauseCounter = StepCounterService.currentSteps;
+    _timer?.cancel();
+    _timer = null;
+    if (mounted) setState(() => _paused = true);
+  }
+
+  void _resume() {
+    if (!_paused) return;
+    // 把暂停期间的步数从基线中扣除，恢复后继续累计
+    _startCounter += (StepCounterService.currentSteps - _pauseCounter);
+    if (mounted) setState(() => _paused = false);
     _timer = Timer.periodic(const Duration(seconds: 1), (t) {
       if (mounted) setState(() => _elapsed++);
     });
@@ -1828,6 +2177,7 @@ class _MeasureSectionState extends State<_MeasureSection> {
     if (!mounted) return;
     setState(() {
       _measuring = false;
+      _paused = false;
       if (r != null) _lastResult = r;
     });
     widget.onResult(r);
@@ -1874,6 +2224,7 @@ class _MeasureSectionState extends State<_MeasureSection> {
                   setState(() {
                     _lastResult = null;
                     _measuring = false;
+                    _paused = false;
                   });
                   widget.onResult(null);
                 },
@@ -1884,17 +2235,33 @@ class _MeasureSectionState extends State<_MeasureSection> {
           ] else if (_measuring) ...[
             Row(
               children: [
-                const Icon(Icons.timer_outlined, color: Colors.amber, size: 18),
+                Icon(
+                  _paused
+                      ? Icons.pause_circle_outline
+                      : Icons.timer_outlined,
+                  color: _paused ? Colors.blueGrey : Colors.amber,
+                  size: 18,
+                ),
                 const SizedBox(width: 8),
                 Text(
-                  '测量中 ${_fmtTime(_elapsed)}',
-                  style: const TextStyle(
+                  _paused
+                      ? '已暂停 ${_fmtTime(_elapsed)}'
+                      : '测量中 ${_fmtTime(_elapsed)}',
+                  style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.bold,
-                    color: Colors.amber,
+                    color: _paused ? Colors.blueGrey : Colors.amber,
                   ),
                 ),
                 const Spacer(),
+                TextButton.icon(
+                  onPressed: _paused ? _resume : _pause,
+                  icon: Icon(
+                    _paused ? Icons.play_arrow : Icons.pause,
+                    size: 16,
+                  ),
+                  label: Text(_paused ? '继续' : '暂停'),
+                ),
                 TextButton.icon(
                   onPressed: _end,
                   icon: const Icon(Icons.stop_circle_outlined, size: 16),
