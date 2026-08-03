@@ -446,8 +446,43 @@ class _SettingsScreenState extends State<SettingsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildVersionItem(
-                  version: 'v1.4.13 (2026-08-15)',
+                  version: 'v1.5.0 (2026-08-19)',
                   isLatest: true,
+                  changes: [
+                    '🤖 智能助手（DeepSeek v4-flash）：家务/生活页左上角新增助手入口，一句话或语音即可解析为家务打卡、生活记录、菜篮子记价等结构化动作，全部经确认后才写入。',
+                    '🎤 语音转文字：Android 系统语音识别（RECORD_AUDIO），Windows 自动降级为文字输入。',
+                    '🧠 结构化匹配更细：菜篮子品类+品牌存在性判断、餐饮菜品与份量规格、家务成员与数量提取；AI 匹配值必须命中本地清单，不一致自动降级为新建确认。',
+                    '🔑 设置中心新增 DeepSeek API Key 配置与隐私说明。',
+                  ],
+                ),
+                const Divider(color: Colors.white12, height: 24),
+                _buildVersionItem(
+                  version: 'v1.4.16 (2026-08-18)',
+                  isLatest: false,
+                  changes: [
+                    '🌐 更新检查与 APK 下载支持多源回退：直连 api.github.com 失败自动切换 ghproxy 等加速镜像，国内网络可用。',
+                  ],
+                ),
+                const Divider(color: Colors.white12, height: 24),
+                _buildVersionItem(
+                  version: 'v1.4.15 (2026-08-17)',
+                  isLatest: false,
+                  changes: [
+                    '📏 修复计步器误报「无计步器」与测量中窄屏溢出；自动更新修复 FileProvider 路径，拉起安装器失败改为系统引导授权。',
+                  ],
+                ),
+                const Divider(color: Colors.white12, height: 24),
+                _buildVersionItem(
+                  version: 'v1.4.14 (2026-08-16)',
+                  isLatest: false,
+                  changes: [
+                    '🏃 路线计步测量：开始记录步数、结束填倍数换算单程步数，多次测量取平均并支持手动登记；暂停/继续、排序偏好记忆等五项体验优化。',
+                  ],
+                ),
+                const Divider(color: Colors.white12, height: 24),
+                _buildVersionItem(
+                  version: 'v1.4.13 (2026-08-15)',
+                  isLatest: false,
                   changes: [
                     '🔧 自动更新修复：按设备架构自动选择安装包（arm64-v8a / armeabi-v7a / x86_64），不再固定下载 universal。',
                     '🚀 下载完成后自动拉起系统安装器，不再卡在 100%；取消下载/失败即时清理安装包，启动时兜底清理残留。',

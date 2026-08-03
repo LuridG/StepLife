@@ -42,7 +42,7 @@
 - **规则**：图标必须保持 100% 透明 Alpha 通道 (`RGBA`) DIB ICO 格式，严禁带有白色或浅色背景余边。
 
 ### 8. 版本号与发布同步规范
-- **规则**：应用版本号以 [pubspec.yaml](file:///g:/MiniProject2026/steplife/pubspec.yaml) 的 `version` 为准（当前 `1.4.16+20260818`）；Android 通过 `flutter.versionCode / flutter.versionName` 自动继承，无需手动同步。
+- **规则**：应用版本号以 [pubspec.yaml](file:///g:/MiniProject2026/steplife/pubspec.yaml) 的 `version` 为准（当前 `1.5.0+20260819`）；Android 通过 `flutter.versionCode / flutter.versionName` 自动继承，无需手动同步。
 - **规则**：发布新版本时须同步更新 [lib/features/about/presentation/about_screen.dart](file:///g:/MiniProject2026/steplife/lib/features/about/presentation/about_screen.dart) 的版本号文案与 [assets/walkthrough.md](file:///g:/MiniProject2026/steplife/assets/walkthrough.md) 的更新日志，保持三处一致。
 
 ---
