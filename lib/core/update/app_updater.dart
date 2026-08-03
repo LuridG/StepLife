@@ -119,7 +119,7 @@ class AppUpdater {
     void Function(int received, int total) onProgress, {
     bool Function()? isCancelled,
   }) async {
-    final dir = await getApplicationDocumentsDirectory();
+    final dir = await getApplicationCacheDirectory();
     final file = File('${dir.path}/$_apkFileName');
     if (await file.exists()) {
       try {
@@ -155,9 +155,10 @@ class AppUpdater {
     return file;
   }
 
-  /// 拉起系统安装器安装 APK
-  static Future<void> installApk(File file) async {
-    await _channel.invokeMethod('installApk', {'path': file.path});
+  /// 拉起系统安装器安装 APK；返回 false 表示需要先授权「安装未知应用」
+  static Future<bool> installApk(File file) async {
+    final ok = await _channel.invokeMethod<bool>('installApk', {'path': file.path});
+    return ok ?? false;
   }
 
   /// 删除已下载的安装包（更新完成后清理）
@@ -174,7 +175,7 @@ class AppUpdater {
   /// 清理残留安装包（应用启动时调用，更新完成后下次启动自动删除）
   static Future<void> cleanupStaleApk() async {
     try {
-      final dir = await getApplicationDocumentsDirectory();
+      final dir = await getApplicationCacheDirectory();
       final file = File('${dir.path}/$_apkFileName');
       if (await file.exists()) {
         await file.delete();

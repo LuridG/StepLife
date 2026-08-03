@@ -557,7 +557,7 @@ class _StepTrackerScreenState extends State<StepTrackerScreen>
             if (!mounted) return;
             if (!ok) {
               messenger.showSnackBar(
-                const SnackBar(content: Text('当前设备无计步器，请手动填写实测步数')),
+                const SnackBar(content: Text('计步器不可用（无传感器或未授权），请手动填写实测步数')),
               );
               return;
             }
@@ -2094,7 +2094,7 @@ class _MeasureSection extends StatefulWidget {
 class _MeasureSectionState extends State<_MeasureSection> {
   bool _measuring = false;
   bool _paused = false;
-  bool _sensorOk = false;
+  bool _sensorOk = StepCounterService.isSupported;
   int _elapsed = 0;
   int _startCounter = 0;
   int _pauseCounter = 0;
@@ -2233,7 +2233,10 @@ class _MeasureSectionState extends State<_MeasureSection> {
               ),
             ),
           ] else if (_measuring) ...[
-            Row(
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 Icon(
                   _paused
@@ -2242,7 +2245,6 @@ class _MeasureSectionState extends State<_MeasureSection> {
                   color: _paused ? Colors.blueGrey : Colors.amber,
                   size: 18,
                 ),
-                const SizedBox(width: 8),
                 Text(
                   _paused
                       ? '已暂停 ${_fmtTime(_elapsed)}'
@@ -2253,7 +2255,6 @@ class _MeasureSectionState extends State<_MeasureSection> {
                     color: _paused ? Colors.blueGrey : Colors.amber,
                   ),
                 ),
-                const Spacer(),
                 TextButton.icon(
                   onPressed: _paused ? _resume : _pause,
                   icon: Icon(
@@ -2283,7 +2284,7 @@ class _MeasureSectionState extends State<_MeasureSection> {
                   child: Text(
                     _sensorOk
                         ? '计步测量：点开始后系统自动记录步数，结束时换算单程步数'
-                        : '计步测量：当前设备无计步器，将手动填写本次总步数与倍数',
+                        : '计步测量：计步器不可用（无传感器或未授权），将手动填写本次总步数与倍数',
                     style: const TextStyle(fontSize: 11, color: Colors.white54),
                   ),
                 ),

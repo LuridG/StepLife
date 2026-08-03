@@ -131,7 +131,16 @@ Future<void> _downloadAndInstall(BuildContext context, UpdateInfo info) async {
   if (apkFile == null) return;
 
   try {
-    await AppUpdater.installApk(apkFile!);
+    final ok = await AppUpdater.installApk(apkFile!);
+    if (!ok) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('请先允许「安装未知应用」权限后重试'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
     messenger.showSnackBar(
       const SnackBar(content: Text('安装包已就绪，请在系统安装器中确认安装')),
     );

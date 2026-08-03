@@ -28,7 +28,16 @@ class StepCounterService {
       if (!await _ensurePermission()) return false;
       await stop();
       _stream = Pedometer.stepCountStream.map((sc) => sc.steps);
-      _sub = _stream?.listen((n) => _lastSteps = n);
+      _sub = _stream?.listen(
+        (n) => _lastSteps = n,
+        onError: (Object _) {
+          // 传感器不可用/权限被收回等异常：停止监听，避免流静默失效
+          _listening = false;
+          _sub?.cancel();
+          _sub = null;
+          _stream = null;
+        },
+      );
       _listening = true;
       return true;
     } catch (_) {
