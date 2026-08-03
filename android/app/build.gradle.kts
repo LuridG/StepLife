@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
@@ -31,11 +33,23 @@ android {
         getByName("debug") {
             // Debug signing configuration
         }
+        create("release") {
+            // 正式签名：读取 git-ignored 的 android/key.properties（本地或 CI Secrets 生成）
+            // 缺失时留空，release 构建会直接报错，绝不回退到 debug 签名
+            val propsFile = rootProject.file("key.properties")
+            if (propsFile.exists()) {
+                val props = Properties().apply { load(propsFile.inputStream()) }
+                storeFile = rootProject.file(props["storeFile"] as String)
+                storePassword = props["storePassword"] as String
+                keyAlias = props["keyAlias"] as String
+                keyPassword = props["keyPassword"] as String
+            }
+        }
     }
 
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = false
             isShrinkResources = false
         }

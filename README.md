@@ -12,7 +12,7 @@
   <img src="https://img.shields.io/badge/Flutter-3.27+-02569B?logo=flutter" alt="Flutter" />
   <img src="https://img.shields.io/badge/Dart-3.6+-0175C2?logo=dart" alt="Dart" />
   <img src="https://img.shields.io/badge/Platform-Android%20%7C%20Windows-green" alt="Platform" />
-  <img src="https://img.shields.io/badge/Version-v1.4.8-emerald" alt="Version" />
+  <img src="https://img.shields.io/badge/Version-v1.4.9-emerald" alt="Version" />
   <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License" />
 </p>
 
@@ -81,10 +81,10 @@
 
 | 文件名 | 适用 CPU 架构 | 文件大小 | 推荐说明 |
 | :--- | :--- | :---: | :--- |
-| **`StepLife-v1.4.8-arm64-v8a.apk`** | 64 位 ARM (`arm64-v8a`) | **26.5 MB** | 🔥 **最推荐**！适配 99% 的现代 Android 手机 |
-| **`StepLife-v1.4.8-armeabi-v7a.apk`** | 32 位 ARM (`armeabi-v7a`) | 24.2 MB | 适配老旧 32 位 Android 机型 |
-| **`StepLife-v1.4.8-x86_64.apk`** | Intel/AMD (`x86_64`) | 27.8 MB | 适配 Android 模拟器与 x86 平板 |
-| **`StepLife-v1.4.8-universal.apk`** | 通用全架构胖包 | 64.5 MB | 整合全架构二进制，兼容任意设备 |
+| **`StepLife-v1.4.9-arm64-v8a.apk`** | 64 位 ARM (`arm64-v8a`) | **26.8 MB** | 🔥 **最推荐**！适配 99% 的现代 Android 手机 |
+| **`StepLife-v1.4.9-armeabi-v7a.apk`** | 32 位 ARM (`armeabi-v7a`) | 24.5 MB | 适配老旧 32 位 Android 机型 |
+| **`StepLife-v1.4.9-x86_64.apk`** | Intel/AMD (`x86_64`) | 28.1 MB | 适配 Android 模拟器与 x86 平板 |
+| **`StepLife-v1.4.9-universal.apk`** | 通用全架构胖包 | 65.5 MB | 整合全架构二进制，兼容任意设备 |
 
 ---
 
@@ -122,13 +122,20 @@ flutter build apk --release --split-per-abi
 
 ```bash
 # 更新 pubspec.yaml 的 version 后，提交并推送 tag 即可自动发布
-git add -A && git commit -m "chore: release v1.4.8"
-git tag v1.4.8+20260810
+git add -A && git commit -m "chore: release v1.4.9"
+git tag v1.4.9+20260811
 git push origin main --tags
 ```
 
 也可以在 GitHub Actions 页面手动触发 **Build & Release APKs**（自动读取 pubspec 版本号，可勾选发布为草稿）。
 
+
+### 2.6 正式签名与数据迁移说明
+- **v1.4.9 起使用固定正式签名**（`android/steplife-release.jks`，本仓库 .gitignore 忽略，不随代码分发），所有 Release 签名一致，跨版本升级不再提示「签名不一致」。
+- **一次性卸载说明**：v1.4.8 及更早版本由 CI 临时 debug 密钥签名，与 v1.4.9 正式签名不同，本次升级**必须卸载旧版**一次。卸载前请先在应用内 **设置中心 → 数据与同步（WebDAV）→ 立即上传** 备份，卸载重装后 **立即恢复** 即可，数据不丢。v1.4.9 之后的版本升级不再需要卸载。
+- **CI 签名配置（GitHub Secrets）**：`.github/workflows/release.yml` 从以下 Secrets 读取正式签名，未配置时构建会直接失败（防止再产出 debug 签名包）：
+  - `ANDROID_KEYSTORE_BASE64`：`steplife-release.jks` 的 Base64 内容
+  - `ANDROID_STORE_PASSWORD` / `ANDROID_KEY_PASSWORD` / `ANDROID_KEY_ALIAS`
 ### 3. 构建 Windows Release 桌面程序
 ```bash
 flutter build windows --release

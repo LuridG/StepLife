@@ -303,8 +303,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildVersionItem(
-                  version: 'v1.4.8 (2026-08-10)',
+                  version: 'v1.4.9 (2026-08-11)',
                   isLatest: true,
+                  changes: [
+                    '🔏 正式签名修复：v1.4.9 起所有 Release 使用同一把正式签名密钥，彻底解决跨版本「签名不一致需卸载重装」的问题。',
+                    '⚠️ 一次性升级提示：本次从旧版升级需先卸载旧版（建议先在 数据与同步 → WebDAV 上传备份，重装后恢复，数据不丢）；v1.4.9 之后升级不再需要卸载。',
+                  ],
+                ),
+                const Divider(color: Colors.white12, height: 24),
+                _buildVersionItem(
+                  version: 'v1.4.8 (2026-08-10)',
+                  isLatest: false,
                   changes: [
                     '🧺 菜篮子板块：新增买菜/水果专用模板（果蔬分类 tag/单位/产地 + 单价/数量/购买渠道/新鲜度/备注），浏览卡片展示最近价、涨跌徽章与迷你走势图。',
                     '📈 菜篮子总表：筛选后一键进入总表页，全品类价格一览 + 多商品价格对比走势图（默认全展示，支持涨幅归一化对比）+ 分类月度均价柱状图 + 涨跌榜。',
