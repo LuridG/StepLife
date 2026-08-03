@@ -358,6 +358,9 @@ class StoreMenuItem {
   final DateTime createdAt;
   final List<MenuItemSpec> specs;
 
+  /// 菜品打分：1=推荐招牌菜 / -1=不推荐 / 0=未打分（一般）
+  final int rating;
+
   StoreMenuItem({
     this.id,
     this.storeId = 0,
@@ -366,6 +369,7 @@ class StoreMenuItem {
     this.imagePath,
     this.sortOrder = 0,
     this.specs = const [],
+    this.rating = 0,
     DateTime? createdAt,
   }) : createdAt = createdAt ?? DateTime.now();
 
@@ -377,6 +381,7 @@ class StoreMenuItem {
     String? imagePath,
     int? sortOrder,
     List<MenuItemSpec>? specs,
+    int? rating,
     DateTime? createdAt,
   }) {
     return StoreMenuItem(
@@ -387,6 +392,7 @@ class StoreMenuItem {
       imagePath: imagePath ?? this.imagePath,
       sortOrder: sortOrder ?? this.sortOrder,
       specs: specs ?? this.specs,
+      rating: rating ?? this.rating,
       createdAt: createdAt ?? this.createdAt,
     );
   }
@@ -400,6 +406,7 @@ class StoreMenuItem {
       'imagePath': imagePath,
       'sortOrder': sortOrder,
       'specsJson': jsonEncode(specs.map((s) => s.toJson()).toList()),
+      'rating': rating,
       'createdAt': createdAt.toIso8601String(),
     };
   }
@@ -413,6 +420,7 @@ class StoreMenuItem {
       imagePath: map['imagePath'] as String?,
       sortOrder: (map['sortOrder'] as num?)?.toInt() ?? 0,
       specs: _parseMenuItemSpecs(map['specsJson']),
+      rating: (map['rating'] as num?)?.toInt() ?? 0,
       createdAt:
           DateTime.tryParse(map['createdAt']?.toString() ?? '') ?? DateTime.now(),
     );

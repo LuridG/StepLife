@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import '../../../core/utils/map_launcher.dart';
 import '../domain/store_models.dart';
 import '../domain/life_templates.dart';
 import '../providers/store_provider.dart';
@@ -32,6 +33,31 @@ class StoreDetailScreen extends StatelessWidget {
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
             child: const Text('删除', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmDeleteStore(BuildContext context) {
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('确认删除记录: ${storeItem.name}?'),
+        content: const Text('删除后该条打卡历史及照片关联将被安全移除。'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('取消')),
+          ElevatedButton(
+            onPressed: () {
+              context.read<StoreProvider>().deleteStoreItem(storeItem.id!);
+              Navigator.of(ctx).pop();
+              navigator.pop();
+              messenger.showSnackBar(SnackBar(content: Text('已删除: ${storeItem.name}')));
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+            child: const Text('确认删除', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -105,9 +131,14 @@ class StoreDetailScreen extends StatelessWidget {
         title: Text(storeItem.name),
         actions: [
           IconButton(
-            icon: const Icon(Icons.star, color: Colors.amber),
-            tooltip: '评分 ${storeItem.rating}',
-            onPressed: () {},
+            icon: const Icon(Icons.edit_outlined, color: Colors.lightBlueAccent),
+            tooltip: '编辑该项目',
+            onPressed: () => Navigator.of(context).pop('edit'),
+          ),
+          IconButton(
+            icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+            tooltip: '删除该项目',
+            onPressed: () => _confirmDeleteStore(context),
           ),
         ],
       ),
@@ -420,7 +451,33 @@ class StoreDetailScreen extends StatelessWidget {
                         ),
                         if (storeItem.address != null && storeItem.address!.isNotEmpty) ...[
                           const SizedBox(height: 14),
-                          Text('📍 位置/平台: ${storeItem.address}', style: const TextStyle(color: Colors.white70, fontSize: 13)),
+                          if (tpl.key == 'dining') ...[
+                            GestureDetector(
+                              onTap: () => launchMapForPlace(context, storeItem.address!),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.place_outlined, color: Color(0xFF10B981), size: 16),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: Text(
+                                      '📍 位置: ${storeItem.address}',
+                                      style: const TextStyle(color: Colors.white70, fontSize: 13),
+                                    ),
+                                  ),
+                                  const Icon(Icons.open_in_new, color: Colors.white38, size: 13),
+                                ],
+                              ),
+                            ),
+                            if (_platformsOf(storeItem).isNotEmpty) ...[
+                              const SizedBox(height: 6),
+                              Text(
+                                '🛵 结算平台: ${_platformsOf(storeItem).join(' · ')}',
+                                style: const TextStyle(color: Colors.lightBlueAccent, fontSize: 13, fontWeight: FontWeight.w600),
+                              ),
+                            ],
+                          ] else ...[
+                            Text('📍 位置/平台: ${storeItem.address}', style: const TextStyle(color: Colors.white70, fontSize: 13)),
+                          ],
                         ],
                         if (storeItem.notes != null && storeItem.notes!.isNotEmpty) ...[
                           const SizedBox(height: 6),
@@ -514,6 +571,16 @@ class StoreDetailScreen extends StatelessWidget {
                                             style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white),
                                           ),
                                         ),
+                                        if (menuItems[i].rating == 1)
+                                          const Padding(
+                                            padding: EdgeInsets.only(right: 6),
+                                            child: Icon(Icons.thumb_up, color: Color(0xFF10B981), size: 16),
+                                          )
+                                        else if (menuItems[i].rating == -1)
+                                          const Padding(
+                                            padding: EdgeInsets.only(right: 6),
+                                            child: Icon(Icons.thumb_down, color: Colors.redAccent, size: 16),
+                                          ),
                                         Text(
                                           '¥${_fmtPrice(menuItems[i].price)}',
                                           style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF10B981)),
@@ -684,6 +751,16 @@ class StoreDetailScreen extends StatelessWidget {
   int? _totalEpisodesOf(StoreItem store) {
     final v = store.extras['totalEpisodes'];
     return (v is num) ? v.toInt() : null;
+  }
+
+  /// 结算平台/观看平台：兼容多选 List 与旧版单值 String
+  List<String> _platformsOf(StoreItem store) {
+    final v = store.extras['platform'];
+    if (v == null) return const [];
+    final list = v is List
+        ? v.map((e) => e.toString()).where((e) => e.isNotEmpty).toList()
+        : [v.toString()];
+    return list;
   }
 
   String _formatFieldValue(TemplateField f, dynamic value) {

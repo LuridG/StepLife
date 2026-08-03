@@ -106,7 +106,7 @@ class AboutScreen extends StatelessWidget {
                     border: Border.all(color: const Color(0xFF10B981).withAlpha(80)),
                   ),
                   child: const Text(
-                    '版本号: v1.4.6 (Build 20260808)',
+                    '版本号: v1.4.7 (Build 20260809)',
                     style: TextStyle(color: Color(0xFF10B981), fontSize: 12, fontWeight: FontWeight.bold),
                   ),
                 ),
@@ -133,8 +133,21 @@ class AboutScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 14),
                         _buildVersionItem(
-                          version: 'v1.4.6 (2026-08-08)',
+                          version: 'v1.4.7 (2026-08-09)',
                           isLatest: true,
+                          changes: [
+                            '🖱️ 卡片防误触：生活记录浏览卡片的编辑/删除按钮移入详情页，避免误操作。',
+                            '🍽️ 餐饮位置/结算平台拆分：位置支持点击拉起地图（高德/百度/腾讯/系统地图），结算平台多选并在卡片与详情展示。',
+                            '📍 位置一键定位：位置输入框旁新增定位按钮，GPS 定位 + 逆地理编码自动填写地址，也可手动填写。',
+                            '🍛 菜品打分：菜单项新增 👍 推荐招牌菜 / 👎 不推荐 / 未点即一般，浏览卡片小字展示推荐与不推荐菜品。',
+                            '⭐ 口味评价/环境服务改为 5 星滑杆：与推荐指数一致，更简单直观。',
+                            '🗑️ 移除打卡弹窗中与点菜多选重复的「点了哪些菜」文本框。',
+                          ],
+                        ),
+                        const Divider(color: Colors.white12, height: 24),
+                        _buildVersionItem(
+                          version: 'v1.4.6 (2026-08-08)',
+                          isLatest: false,
                           changes: [
                             '🧩 生活模板化：影视/餐饮/书籍/景点/购物/通用 6 大模板，分类自动绑定，表单各有针对性。',
                             '🛠️ 自定义字段：每个分类可追加文本/数字/单选/日期/图片/开关/标签等专属字段。',

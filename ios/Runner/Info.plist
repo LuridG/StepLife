@@ -6,7 +6,9 @@
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
-	<key>CFBundleDisplayName</key>
+		<key>NSLocationWhenInUseUsageDescription</key>
+	<string>用于记录美食位置时获取当前定位，自动填写位置信息。</string>
+<key>CFBundleDisplayName</key>
 	<string>Steplife</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>

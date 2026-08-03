@@ -160,14 +160,14 @@ class LifeTemplates {
       itemFields: [
         TemplateField(key: 'cuisine', label: '品类', type: TemplateFieldType.choice, options: ['中餐', '西餐', '日料', '火锅', '烧烤', '小吃', '咖啡甜品', '奶茶', '其他']),
         TemplateField(key: 'avgCost', label: '人均参考（元）', type: TemplateFieldType.number, hint: '例: 80'),
-        TemplateField(key: 'signature', label: '招牌推荐菜', type: TemplateFieldType.multiline, hint: '例: 剁椒鱼头、辣子鸡'),
+        // 招牌推荐菜已改为菜单联动「菜品打分」（菜单项 👍/👎，浏览卡片小字展示）
         TemplateField(key: 'queueTip', label: '排队提示', type: TemplateFieldType.text, hint: '例: 晚饭需等位 40 分钟'),
         TemplateField(key: 'bestTime', label: '最佳时段', type: TemplateFieldType.text, hint: '例: 周二晚 7 点人少'),
+        TemplateField(key: 'platform', label: '结算平台', type: TemplateFieldType.multiChoice, options: ['到店堂食', '到店自提', '外卖-美团', '外卖-饿了么', '外卖-京东到家', '外卖-其他', '其他']),
       ],
       checkinFields: [
-        TemplateField(key: 'dishes', label: '点了哪些菜', type: TemplateFieldType.multiline, hint: '例: 毛血旺、冰粉'),
-        TemplateField(key: 'taste', label: '口味评价', type: TemplateFieldType.choice, options: ['惊艳', '不错', '一般', '踩雷']),
-        TemplateField(key: 'ambience', label: '环境服务', type: TemplateFieldType.choice, options: ['很好', '尚可', '一般', '较差']),
+        TemplateField(key: 'taste', label: '口味评价', type: TemplateFieldType.rating),
+        TemplateField(key: 'ambience', label: '环境服务', type: TemplateFieldType.rating),
         TemplateField(key: 'recommend', label: '推荐指数', type: TemplateFieldType.rating),
       ],
     ),

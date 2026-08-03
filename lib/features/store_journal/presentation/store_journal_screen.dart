@@ -11,6 +11,8 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/network/tmdb_client.dart';
 import '../../../core/settings/settings_button.dart';
 import '../../../core/settings/settings_provider.dart';
+import '../../../core/utils/map_launcher.dart';
+import '../../../core/utils/location_picker.dart';
 import 'store_detail_screen.dart';
 import 'store_checkin_dialog.dart';
 import 'template_gallery.dart';
@@ -286,6 +288,8 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
     final notesController = TextEditingController(text: storeToEdit?.notes ?? '');
 
     double rating = storeToEdit?.rating ?? 5.0;
+    // 餐饮位置：地图定位选点进行中标志
+    var locating = false;
     final List<String> images = List.from(storeToEdit?.images ?? []);
     final Map<String, dynamic> extrasValues = Map<String, dynamic>.from(storeToEdit?.extras ?? {});
     // 通用模板：表单内自由追加的自定义字段（仅本次新建/编辑生效）
@@ -691,6 +695,13 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                         ),
                       ],
                     ),
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 6),
+                      child: Text(
+                        '菜品打分：👍 推荐招牌菜 · 👎 不推荐 · 未点即一般（浏览卡片小字展示）',
+                        style: TextStyle(fontSize: 11, color: Colors.white54),
+                      ),
+                    ),
                     if (menuDrafts.isEmpty)
                       const Padding(
                         padding: EdgeInsets.only(bottom: 10),
@@ -752,6 +763,38 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                                         ),
                                     ],
                                   ),
+                                ),
+                                IconButton(
+                                  padding: const EdgeInsets.all(4),
+                                  constraints: const BoxConstraints(),
+                                  icon: Icon(
+                                    item.rating == 1 ? Icons.thumb_up : Icons.thumb_up_outlined,
+                                    color: item.rating == 1 ? const Color(0xFF10B981) : Colors.white38,
+                                    size: 18,
+                                  ),
+                                  tooltip: item.rating == 1 ? '取消推荐招牌菜' : '设为推荐招牌菜',
+                                  onPressed: () => setModalState(() {
+                                    final idx = menuDrafts.indexWhere((x) => identical(x, item) || x.id == item.id);
+                                    if (idx != -1) {
+                                      menuDrafts[idx] = item.copyWith(rating: item.rating == 1 ? 0 : 1);
+                                    }
+                                  }),
+                                ),
+                                IconButton(
+                                  padding: const EdgeInsets.all(4),
+                                  constraints: const BoxConstraints(),
+                                  icon: Icon(
+                                    item.rating == -1 ? Icons.thumb_down : Icons.thumb_down_outlined,
+                                    color: item.rating == -1 ? Colors.redAccent : Colors.white38,
+                                    size: 18,
+                                  ),
+                                  tooltip: item.rating == -1 ? '取消不推荐' : '设为不推荐',
+                                  onPressed: () => setModalState(() {
+                                    final idx = menuDrafts.indexWhere((x) => identical(x, item) || x.id == item.id);
+                                    if (idx != -1) {
+                                      menuDrafts[idx] = item.copyWith(rating: item.rating == -1 ? 0 : -1);
+                                    }
+                                  }),
                                 ),
                                 IconButton(
                                   padding: const EdgeInsets.all(4),
@@ -857,9 +900,59 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                   const SizedBox(height: 14),
 
                   if (tpl.key != 'movie') ...[
-                    TextField(
-                      controller: addressController,
-                      decoration: const InputDecoration(labelText: '位置 / 平台 / 来源说明'),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: addressController,
+                            decoration: InputDecoration(
+                              labelText: tpl.key == 'dining' ? '位置' : '位置 / 平台 / 来源说明',
+                              hintText: tpl.key == 'dining' ? '例: 解放路 88 号（可手动填写，或点右侧定位自动获取）' : null,
+                              hintStyle: AppTheme.hintStyle,
+                            ),
+                          ),
+                        ),
+                        if (tpl.key == 'dining') ...[
+                          const SizedBox(width: 8),
+                          IconButton(
+                            onPressed: locating
+                                ? null
+                                : () async {
+                                    setModalState(() => locating = true);
+                                    try {
+                                      final result = await pickCurrentLocation();
+                                      if (!dialogCtx.mounted) return;
+                                      if (result == null) {
+                                        ScaffoldMessenger.of(dialogCtx).showSnackBar(
+                                          const SnackBar(content: Text('定位失败：请检查定位权限或 GPS 开关后重试')),
+                                        );
+                                      } else {
+                                        addressController.text = result;
+                                        ScaffoldMessenger.of(dialogCtx).showSnackBar(
+                                          const SnackBar(content: Text('已获取当前定位并自动填写，可手动修改')),
+                                        );
+                                      }
+                                    } finally {
+                                      if (dialogCtx.mounted) {
+                                        setModalState(() => locating = false);
+                                      }
+                                    }
+                                  },
+                            icon: locating
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF10B981)),
+                                  )
+                                : const Icon(Icons.my_location, color: Color(0xFF10B981)),
+                            tooltip: '从地图获取当前位置并自动填写',
+                            style: IconButton.styleFrom(
+                              side: BorderSide(color: const Color(0xFF10B981).withAlpha(80)),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                     const SizedBox(height: 12),
                   ],
@@ -1335,28 +1428,6 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
     );
   }
 
-  void _confirmDeleteStore(StoreItem store) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('确认删除记录: ${store.name}?'),
-        content: const Text('删除后该条打卡历史及照片关联将被安全移除。'),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('取消')),
-          ElevatedButton(
-            onPressed: () {
-              context.read<StoreProvider>().deleteStoreItem(store.id!);
-              Navigator.of(ctx).pop();
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('已删除: ${store.name}')));
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
-            child: const Text('确认删除', style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     super.build(context);
@@ -1675,10 +1746,13 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
       child: _buildGlassCard(
         child: InkWell(
           borderRadius: BorderRadius.circular(20),
-          onTap: () {
-            Navigator.of(context).push(
+          onTap: () async {
+            final result = await Navigator.of(context).push<String>(
               MaterialPageRoute(builder: (_) => StoreDetailScreen(storeItem: store)),
             );
+            if (result == 'edit' && context.mounted) {
+              _showStoreFormDialog(storeToEdit: store);
+            }
           },
           child: Padding(
             padding: const EdgeInsets.all(16.0),
@@ -1815,23 +1889,6 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                           ],
                         ),
                       ),
-                      Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            padding: const EdgeInsets.all(4),
-                            constraints: const BoxConstraints(),
-                            icon: const Icon(Icons.edit_outlined, color: Colors.lightBlueAccent, size: 18),
-                            onPressed: () => _showStoreFormDialog(storeToEdit: store),
-                          ),
-                          IconButton(
-                            padding: const EdgeInsets.all(4),
-                            constraints: const BoxConstraints(),
-                            icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 18),
-                            onPressed: () => _confirmDeleteStore(store),
-                          ),
-                        ],
-                      ),
                     ],
                   ),
                 ] else ...[
@@ -1913,19 +1970,6 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                           ],
                         ),
                       ),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.edit_outlined, color: Colors.lightBlueAccent, size: 18),
-                            onPressed: () => _showStoreFormDialog(storeToEdit: store),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 18),
-                            onPressed: () => _confirmDeleteStore(store),
-                          ),
-                        ],
-                      ),
                     ],
                   ),
                   const SizedBox(height: 10),
@@ -1990,6 +2034,45 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
+                ] else if (_isDiningItem(store)) ...[
+                  // 餐饮：位置（点击打开地图）+ 结算平台
+                  if (store.address != null && store.address!.isNotEmpty)
+                    GestureDetector(
+                      onTap: () => launchMapForPlace(context, store.address!),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.place_outlined, color: Color(0xFF10B981), size: 15),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              '${store.address}',
+                              style: const TextStyle(fontSize: 12, color: Colors.white70),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const Icon(Icons.open_in_new, color: Colors.white38, size: 12),
+                        ],
+                      ),
+                    ),
+                  if (_platformsOf(store).isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 3),
+                      child: Text(
+                        '🛵 ${_platformsOf(store).join(' · ')}',
+                        style: const TextStyle(fontSize: 12, color: Colors.lightBlueAccent, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ..._dishPickWidgets(store),
+                  if (store.notes != null && store.notes!.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 3),
+                      child: Text(
+                        '📝 ${store.notes}',
+                        style: const TextStyle(fontSize: 12, color: Colors.white54, fontStyle: FontStyle.italic),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
                 ] else ...[
                   if (store.address != null && store.address!.isNotEmpty)
                     Text('📍 ${store.address}', style: const TextStyle(fontSize: 12, color: Colors.white70)),
@@ -2034,10 +2117,13 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
       padding: const EdgeInsets.only(bottom: 8.0),
       child: _buildGlassCard(
         child: ListTile(
-          onTap: () {
-            Navigator.of(context).push(
+          onTap: () async {
+            final result = await Navigator.of(context).push<String>(
               MaterialPageRoute(builder: (_) => StoreDetailScreen(storeItem: store)),
             );
+            if (result == 'edit' && context.mounted) {
+              _showStoreFormDialog(storeToEdit: store);
+            }
           },
           contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
           leading: LifeTemplates.matchTemplateKey(store.category) == 'movie' && store.images.isNotEmpty
@@ -2103,15 +2189,26 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
               ),
             ],
           ),
-          subtitle: Text(
-            _isMovieItem(store)
-                ? (_isSerialItem(store)
-                    ? '${store.extras['status'] ?? '想看'} · 📺 $_watchedEpisodesOf(store)/${_totalEpisodesOf(store) ?? '?'} 集 · 打卡 $checkinCount 次'
-                    : '${store.extras['status'] ?? '想看'} · 打卡 $checkinCount 次')
-                : '累计 $checkinCount 次 · 总消费 ¥${totalCost.toStringAsFixed(1)}',
-            style: const TextStyle(fontSize: 11, color: Colors.white54),
-            overflow: TextOverflow.ellipsis,
-          ),
+          subtitle: _isMovieItem(store)
+              ? Text(
+                  _isSerialItem(store)
+                      ? '${store.extras['status'] ?? '想看'} · 📺 $_watchedEpisodesOf(store)/${_totalEpisodesOf(store) ?? '?'} 集 · 打卡 $checkinCount 次'
+                      : '${store.extras['status'] ?? '想看'} · 打卡 $checkinCount 次',
+                  style: const TextStyle(fontSize: 11, color: Colors.white54),
+                  overflow: TextOverflow.ellipsis,
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '累计 $checkinCount 次 · 总消费 ¥${totalCost.toStringAsFixed(1)}',
+                      style: const TextStyle(fontSize: 11, color: Colors.white54),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    ..._dishPickWidgets(store),
+                  ],
+                ),
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -2121,18 +2218,6 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                 icon: const Icon(Icons.flash_on, color: Color(0xFF10B981), size: 20),
                 tooltip: '一键打卡',
                 onPressed: () => _showCheckinDialog(store),
-              ),
-              IconButton(
-                padding: const EdgeInsets.all(4),
-                constraints: const BoxConstraints(),
-                icon: const Icon(Icons.edit_outlined, color: Colors.lightBlueAccent, size: 18),
-                onPressed: () => _showStoreFormDialog(storeToEdit: store),
-              ),
-              IconButton(
-                padding: const EdgeInsets.all(4),
-                constraints: const BoxConstraints(),
-                icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 18),
-                onPressed: () => _confirmDeleteStore(store),
               ),
             ],
           ),
@@ -2194,6 +2279,9 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
   bool _isMovieItem(StoreItem store) =>
       LifeTemplates.matchTemplateKey(store.category) == 'movie';
 
+  bool _isDiningItem(StoreItem store) =>
+      LifeTemplates.matchTemplateKey(store.category) == 'dining';
+
   /// 观看平台：兼容多选 List 与旧版单值 String
   List<String> _platformsOf(StoreItem store) {
     final v = store.extras['platform'];
@@ -2202,6 +2290,35 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
         ? v.map((e) => e.toString()).where((e) => e.isNotEmpty).toList()
         : [v.toString()];
     return list;
+  }
+
+  /// 餐饮卡片小字：👍 推荐招牌菜 / 👎 不推荐（未点即一般）
+  List<Widget> _dishPickWidgets(StoreItem store) {
+    final menus = context.read<StoreProvider>().getMenuItemsForStore(store.id ?? 0);
+    final liked = menus.where((m) => m.rating == 1).map((m) => m.name).toList();
+    final disliked = menus.where((m) => m.rating == -1).map((m) => m.name).toList();
+    return [
+      if (liked.isNotEmpty)
+        Padding(
+          padding: const EdgeInsets.only(top: 3),
+          child: Text(
+            '👍 ${liked.join(' · ')}',
+            style: const TextStyle(fontSize: 12, color: Color(0xFF10B981), fontWeight: FontWeight.w600),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      if (disliked.isNotEmpty)
+        Padding(
+          padding: const EdgeInsets.only(top: 3),
+          child: Text(
+            '👎 ${disliked.join(' · ')}',
+            style: const TextStyle(fontSize: 12, color: Colors.redAccent, fontWeight: FontWeight.w500),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+    ];
   }
 
   int _watchedEpisodesOf(StoreItem store) {

@@ -116,6 +116,10 @@ class DatabaseService {
         try {
           await db.execute("ALTER TABLE store_menu_items ADD COLUMN specsJson TEXT NOT NULL DEFAULT '[]'");
         } catch (_) {}
+        // 菜品打分：1=推荐招牌菜 / -1=不推荐 / 0=未打分（幂等，兼容旧库）
+        try {
+          await db.execute('ALTER TABLE store_menu_items ADD COLUMN rating INTEGER NOT NULL DEFAULT 0');
+        } catch (_) {}
       },
     );
 
@@ -330,6 +334,7 @@ class DatabaseService {
         imagePath TEXT,
         sortOrder INTEGER NOT NULL DEFAULT 0,
         specsJson TEXT NOT NULL DEFAULT '[]',
+        rating INTEGER NOT NULL DEFAULT 0,
         createdAt TEXT NOT NULL
       );
 
