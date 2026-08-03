@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
@@ -58,7 +59,9 @@ class WebDavService {
       final uri = _url(rel == '' ? '' : rel);
       final req = http.Request('MKCOL', uri);
       req.headers.addAll(_headers());
-      final streamed = await _createClient().send(req);
+      final streamed = await _createClient()
+          .send(req)
+          .timeout(const Duration(seconds: 15));
       await streamed.stream.drain<void>();
       // 201 创建成功；405/301/409 表示已存在，均可接受
     }
@@ -75,11 +78,13 @@ class WebDavService {
   Future<bool> uploadBytes(List<int> bytes, String remoteRelPath) async {
     final client = _createClient();
     try {
-      final resp = await client.put(
-        _url(remoteRelPath),
-        headers: _headers(contentType: 'application/octet-stream'),
-        body: bytes,
-      );
+      final resp = await client
+          .put(
+            _url(remoteRelPath),
+            headers: _headers(contentType: 'application/octet-stream'),
+            body: bytes,
+          )
+          .timeout(const Duration(seconds: 180));
       return resp.statusCode == 200 ||
           resp.statusCode == 201 ||
           resp.statusCode == 204;
@@ -92,7 +97,9 @@ class WebDavService {
   Future<bool> downloadFile(String remoteRelPath, String localPath) async {
     final client = _createClient();
     try {
-      final resp = await client.get(_url(remoteRelPath), headers: _headers());
+      final resp = await client
+          .get(_url(remoteRelPath), headers: _headers())
+          .timeout(const Duration(seconds: 180));
       if (resp.statusCode != 200) return false;
       final file = File(localPath);
       await file.parent.create(recursive: true);
@@ -120,7 +127,9 @@ class WebDavService {
     <d:resourcetype/>
   </d:prop>
 </d:propfind>''';
-      final streamed = await client.send(req);
+      final streamed = await client
+          .send(req)
+          .timeout(const Duration(seconds: 15));
       final resp = await http.Response.fromStream(streamed);
       if (resp.statusCode != 207 && resp.statusCode != 200) return null;
       final list = _parsePropfind(resp.body);
@@ -146,7 +155,9 @@ class WebDavService {
   </d:prop>
 </d:propfind>''';
       req.body = reqBody;
-      final streamed = await client.send(req);
+      final streamed = await client
+          .send(req)
+          .timeout(const Duration(seconds: 15));
       final resp = await http.Response.fromStream(streamed);
       if (resp.statusCode != 207 && resp.statusCode != 200) {
         return [];

@@ -110,7 +110,7 @@ class SyncService {
         uploadedFiles: uploaded + uploadedTmdb + (ok ? 1 : 0),
       );
     } catch (e) {
-      return SyncResult(success: false, message: '备份异常: $e');
+      return SyncResult(success: false, message: '备份失败：${_friendlyError(e)}');
     }
   }
 
@@ -232,7 +232,7 @@ class SyncService {
         downloadedFiles: 1 + downloadedImages + downloadedTmdb,
       );
     } catch (e) {
-      return SyncResult(success: false, message: '恢复异常: $e');
+      return SyncResult(success: false, message: '恢复失败：${_friendlyError(e)}');
     }
   }
 
@@ -264,7 +264,7 @@ class SyncService {
         message: '远端数据库备份：${_fmtSize(info.length)}，上传时间 ${info.mtime ?? '未知'}',
       );
     } catch (e) {
-      return SyncResult(success: false, message: '查询异常: $e');
+      return SyncResult(success: false, message: '查询失败：${_friendlyError(e)}');
     }
   }
 
@@ -315,7 +315,7 @@ class SyncService {
         counts: counts,
       );
     } catch (e) {
-      return SyncResult(success: false, message: '校验异常: $e');
+      return SyncResult(success: false, message: '校验失败：${_friendlyError(e)}');
     }
   }
 
@@ -330,5 +330,29 @@ class SyncService {
   static String _countsSummary(Map<String, int> c) {
     int n(String key) => c[key] ?? 0;
     return '路线${n('routes')}条/路线测量${n('route_measurements')}条/行走打卡${n('step_logs')}条/家务${n('chore_items')}项/家务打卡${n('chore_logs')}条/生活记录${n('store_items')}条/成员${n('members')}人';
+  }
+
+  /// 将底层网络异常翻译为可操作的中文提示
+  static String _friendlyError(Object e) {
+    final s = e.toString();
+    if (s.contains('SocketException') ||
+        s.contains('Connection refused') ||
+        s.contains('Connection closed') ||
+        s.contains('Failed host lookup')) {
+      return '无法连接 WebDAV 服务器，请检查：① 服务器（NAS/DUFS/坚果云等）是否已启动；② 手机与服务器是否在同一局域网；③ 地址与端口是否填写正确';
+    }
+    if (s.contains('TimeoutException') || s.contains('timed out')) {
+      return '连接 WebDAV 服务器超时，请检查网络或稍后重试';
+    }
+    if (s.contains('401') || s.contains('403') || s.contains('Unauthorized')) {
+      return 'WebDAV 认证失败，请检查用户名与密码';
+    }
+    if (s.contains('404') || s.contains('Not Found')) {
+      return '远端路径不存在，请先执行一次「立即上传」';
+    }
+    if (s.contains('HandshakeException') || s.contains('certificate')) {
+      return 'SSL 证书校验失败，可尝试在设置中开启「允许自签名证书」';
+    }
+    return '操作异常: $e';
   }
 }
