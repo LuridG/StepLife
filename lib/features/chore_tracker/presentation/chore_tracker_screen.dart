@@ -6,6 +6,7 @@ import '../../../core/settings/settings_button.dart';
 import '../domain/chore_models.dart';
 import '../providers/chore_provider.dart';
 import '../../../core/utils/number_formatter.dart';
+import '../../assistant/presentation/assistant_screen.dart';
 import 'chore_detail_screen.dart';
 
 class ChoreTrackerScreen extends StatefulWidget {
@@ -289,6 +290,15 @@ class _ChoreTrackerScreenState extends State<ChoreTrackerScreen>
     return Scaffold(
       appBar: AppBar(
         title: const Text('家务习惯打卡'),
+        leading: IconButton(
+          icon: const Icon(Icons.auto_awesome),
+          tooltip: '智能助手',
+          onPressed: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const AssistantScreen()),
+            );
+          },
+        ),
         actions: [
           const SettingsButton(),
           IconButton(

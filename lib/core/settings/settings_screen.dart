@@ -30,11 +30,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _checkingUpdate = false;
   String _appVersion = '';
   final TextEditingController _tmdbKeyController = TextEditingController();
+  final TextEditingController _deepseekKeyController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _tmdbKeyController.text = context.read<SettingsProvider>().tmdbApiKey;
+    _deepseekKeyController.text = context.read<SettingsProvider>().deepseekApiKey;
     _refreshCacheStats();
     _loadAppVersion();
   }
@@ -42,6 +44,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   void dispose() {
     _tmdbKeyController.dispose();
+    _deepseekKeyController.dispose();
     super.dispose();
   }
 
@@ -819,6 +822,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         border: const OutlineInputBorder(),
                       ),
                     ),
+                    const Text('数据来源 TMDB（themoviedb.org）。可填 v3 API Key（32 位）或 v4 Read Access Token（eyJ 开头），两者都支持', style: TextStyle(fontSize: 11, color: Colors.white38)),
                     const SizedBox(height: 10),
                     Row(
                       children: [
@@ -832,7 +836,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ],
                     ),
                     const SizedBox(height: 8),
-                    const Text('数据来源 TMDB（themoviedb.org）。可填 v3 API Key（32 位）或 v4 Read Access Token（eyJ 开头），两者都支持', style: TextStyle(fontSize: 11, color: Colors.white38)),
+                    const SizedBox(height: 16),
+                    const Text('智能助手（DeepSeek）', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _deepseekKeyController,
+                      obscureText: true,
+                      decoration: InputDecoration(
+                        hintText: '粘贴 DeepSeek API Key (sk-...)',
+                        prefixIcon: const Icon(Icons.auto_awesome_outlined),
+                        suffixIcon: IconButton(
+                          icon: const Icon(Icons.save_outlined, size: 20),
+                          onPressed: () {
+                            settings.setDeepseekApiKey(_deepseekKeyController.text);
+                            _toast('DeepSeek Key 已保存');
+                          },
+                        ),
+                        border: const OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text('说话或输入文字即可让 AI 帮你完成家务打卡、生活记录、菜篮子记价等；留空 = 禁用助手。语音仅本机转文字，成员/家务/生活清单文本会发送至 DeepSeek 处理，所有操作需你确认后才写入', style: TextStyle(fontSize: 11, color: Colors.white38)),
                   ],
                 )),
 

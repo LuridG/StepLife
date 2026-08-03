@@ -30,7 +30,7 @@
 - **规则**：开启量化登记的家务，在主页 5 天日期打卡阵列中**绝对不能显示打勾图标 `✓`**，必须统一调用 `NumberFormatter.formatQuantifiableValue` 转换为 `1.2k` / `15k` / `1.5M` 格式呈现。
 
 ### 6. 生活记录 (Life Journal) 模板化打卡与视图持久化规范
-- **规则**：分类绑定模板（`store_categories.templateKey`）：movie / dining / book / place / shopping / generic，新建走模板画廊，表单按模板动态渲染。
+- **规则**：分类绑定模板（`store_categories.templateKey`）：movie / dining / book / place / shopping / basket / snack / generic，新建走模板画廊，表单按模板动态渲染。
 - **规则**：模板专属字段值统一存 `extrasJson`（store_items 与 store_logs 均有），通用列（name/category/rating/imagesJson/address/notes/cost/memo/visitor*）保留，旧数据无 extras 按通用模板渲染。
 - **规则**：分类自定义字段存 `store_categories.extraFieldsJson`（`TemplateField` JSON 数组），key 自动生成 `custom_N`，新增/删除/排序在分类编辑弹窗中管理。
 - **规则**：打卡履约 `StoreLog` 必须记录分钟级打卡时刻 (`timestamp`)、消费金额 (`cost`) 与同行成员 (`visitorIdsJson` / `visitorNamesJson`)。
@@ -42,7 +42,7 @@
 - **规则**：图标必须保持 100% 透明 Alpha 通道 (`RGBA`) DIB ICO 格式，严禁带有白色或浅色背景余边。
 
 ### 8. 版本号与发布同步规范
-- **规则**：应用版本号以 [pubspec.yaml](file:///g:/MiniProject2026/steplife/pubspec.yaml) 的 `version` 为准（当前 `1.3.0+20260730`）；Android 通过 `flutter.versionCode / flutter.versionName` 自动继承，无需手动同步。
+- **规则**：应用版本号以 [pubspec.yaml](file:///g:/MiniProject2026/steplife/pubspec.yaml) 的 `version` 为准（当前 `1.4.16+20260818`）；Android 通过 `flutter.versionCode / flutter.versionName` 自动继承，无需手动同步。
 - **规则**：发布新版本时须同步更新 [lib/features/about/presentation/about_screen.dart](file:///g:/MiniProject2026/steplife/lib/features/about/presentation/about_screen.dart) 的版本号文案与 [assets/walkthrough.md](file:///g:/MiniProject2026/steplife/assets/walkthrough.md) 的更新日志，保持三处一致。
 
 ---
@@ -62,7 +62,7 @@ steplife/
 │   ├── walkthrough.md              # 内嵌系统架构与更新日志文档
 │   └── screenshots/                # README 应用截图资源
 ├── lib/
-│   ├── main.dart                   # 应用入口：FFI 初始化、MultiProvider、PageView + 底部导航 (5个Tab: 路线/家务/生活/成员/关于)
+│   ├── main.dart                   # 应用入口：FFI 初始化、MultiProvider、PageView + 底部导航 (4个Tab: 路线/家务/生活/成员（关于已合并进设置中心）)
 │   ├── core/
 │   │   ├── db/
 │   │   │   └── database_service.dart # SQLite 单例 DAO (Schema v9, 非破坏迁移+app_settings)
@@ -86,16 +86,16 @@ steplife/
 │   └── features/
 │       ├── step_tracker/           # 路线资产与步量打卡模块 (StepTrackerScreen)
 │       ├── chore_tracker/          # 家务习惯与打卡模块 (主屏/详情热力图/成员弹窗)
-│       ├── store_journal/          # 生活记录 (模板化打卡, 6 大模板+自定义字段, TMDB 导入)
+│       ├── store_journal/          # 生活记录 (模板化打卡, 8 大模板+自定义字段（movie/dining/book/place/shopping/basket/snack/generic）, TMDB 导入)
       │       ├── domain/life_templates.dart  # 模板注册表 + 字段模型 + 分类匹配
       │       └── presentation/template_gallery.dart / template_field_widget.dart # 模板画廊与动态表单
 │       ├── profile/                # 全局生理档案与统一成员管理 (MemberScreen/ProfileDialog)
-│       └── about/                  # 关于程序与版本 Changelog (v1.3.0 Build 20260730)
+│       └── about/                  # 关于程序与版本 Changelog (v1.4.16 Build 20260818)
 ├── test/                           # 单元与组件自动化测试
 │   ├── fitness_calculator_test.dart
 │   ├── number_formatter_test.dart
 │   └── widget_test.dart
-├── pubspec.yaml                    # 依赖与资源声明、版本号 (1.3.0+20260730)
+├── pubspec.yaml                    # 依赖与资源声明、版本号 (1.4.16+20260818)
 ├── ARCHITECTURE.md                 # 完整架构说明文档
 └── update_rules.md                 # 【本文件】AI 协作规范与更新注意事项
 ```
@@ -118,3 +118,38 @@ steplife/
    ```powershell
    flutter build apk --release
    ```
+
+---
+
+## 🆕 近期全局注意点（2026-08 起生效，后续迭代持续遵守）
+
+### 9. WebDAV 备份/恢复完整性
+- **规则**：新增任何数据库表，必须同步加入 `DatabaseService._syncTables`（备份表清单）与恢复校验，并在 WebDAV「数据概览」文案里体现；图片与 TMDB 海报缓存（cache/tmdb）随备份增量上传/按缺失恢复，恢复后自动重映射路径。
+- **规则**：WebDAV 网络异常在 SyncService 统一走 `_friendlyError` 翻译（服务器未启动/跨网段/认证失败/超时/证书），禁止直接暴露原始 SocketException。
+
+### 10. 应用内自动更新链路
+- **规则**：更新检查与 APK 下载均支持多源回退（api.github.com → ghproxy.net / gh-proxy.com / ghfast.top / mirror.ghproxy.com），逐个失败才报错。
+- **规则**：APK 必须下载到应用 **cache 目录**（getApplicationCacheDirectory），FileProvider 的 `cache-path` 已覆盖；改回 documents 目录会导致「无法打开安装器」（FileProvider 找不到匹配根）。
+- **规则**：拉起系统安装器前，Android 8+ 需检查 `canRequestPackageInstalls()`，未授权跳 `ACTION_MANAGE_UNKNOWN_APP_SOURCES` 引导并返回 false 由 UI 提示。
+- **规则**：发布新版本 = 提升 pubspec 版本 → 更新 walkthrough.md 版本历史与 README → 本地 release 构建验证 → commit → push → 远端 tag `v1.4.x+YYYYMMDD` 触发 CI 自动构建 4 架构 APK 并发布。
+
+### 11. Android 权限清单
+- **规则**：AndroidManifest 已含 INTERNET / 定位 / RECORD_AUDIO / ACTIVITY_RECOGNITION / REQUEST_INSTALL_PACKAGES。新增需要系统权限的功能，先核对清单并同步运行时申请与设置引导。
+
+### 12. 生活模板与菜篮子规范
+- **规则**：模板键 8 个（movie/dining/book/place/shopping/basket/snack/generic）；每个模板的图片/备注输入框文案必须专门化（菜篮子=商品图片/备忘，影视=相关图片·剧照/长评，美食=美食图片/特色说明·推荐好菜·备忘）。
+- **规则**：菜篮子同一品类支持多品牌（佳农香蕉/辉众香蕉），打卡记录品牌留空=通用；走势图、总表、浏览卡片需展示品牌信息。
+- **规则**：餐饮菜单支持份量规格（大份/小份、一两/二两）独立定价；招牌推荐菜/不推荐在浏览卡片小字展示。
+
+### 13. 智能助手（DeepSeek）约束
+- **规则**：模型固定 `deepseek-v4-flash`；Key 存 `app_settings`（同 TMDB Key 模式）；入口为家务/生活 AppBar 左上角纯图标（无文字）。
+- **规则**：AI 仅返回结构化 JSON 动作；客户端必须做「存在性二次校验」（AI 的 matchedName 需命中本地清单，未命中降级为新建确认）；**一切动作先渲染确认卡片，用户确认后才调用 provider 落库**。
+- **规则**：语音用 speech_to_text（Android 系统识别），Windows 桌面退化为文本输入；录音权限需运行时申请。
+
+### 14. 计步测量
+- **规则**：计步测量依赖 ACTIVITY_RECOGNITION 权限（Android 10+ 运行时请求）；计步器流需 onError 兜底；测量中状态用 Wrap 布局避免窄屏溢出；「无计步器」文案仅在非 Android 或权限被拒时展示（初始按 Platform 判断，禁止默认 false 误导）。
+
+### 15. 构建与代码环境约定
+- **规则**：本环境 `apply_patch` 不可用，文件读写走 Node REPL；Dart `${...}` 在 JS 模板串中写 `\${...}`；JS 字符串替换用 `split(old).join(new)`。
+- **规则**：git 需拆成单个已批准前缀命令执行（组合命令会被沙箱拦截）；commit 用 `git commit -F <临时文件>`。
+- **规则**：大部分 Dart 文件为 LF 行尾（git 提示 CRLF 警告属正常，勿批量转换行尾）。

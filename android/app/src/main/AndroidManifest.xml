@@ -3,6 +3,8 @@
     <uses-permission android:name="android.permission.INTERNET"/>
     <!-- 计步测量（Android 10+ 需要运行时授权身体活动识别） -->
     <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION"/>
+    <!-- 智能助手语音转文字 -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
     <!-- 美食位置定位（地图选点自动填写） -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>

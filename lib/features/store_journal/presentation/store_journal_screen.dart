@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../domain/store_models.dart';
+import '../../assistant/presentation/assistant_screen.dart';
 import '../domain/life_templates.dart';
 import '../providers/store_provider.dart';
 import '../utils/basket_stats.dart';
@@ -1581,6 +1582,27 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
     return Scaffold(
       appBar: AppBar(
         title: const Text('生活记录'),
+        leadingWidth: 112,
+        leading: Row(
+          children: [
+            IconButton(
+              icon: const Icon(Icons.auto_awesome),
+              tooltip: '智能助手',
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const AssistantScreen()),
+                );
+              },
+            ),
+            Builder(
+              builder: (ctx) => IconButton(
+                icon: const Icon(Icons.menu),
+                tooltip: '生活分类管理',
+                onPressed: () => Scaffold.of(ctx).openDrawer(),
+              ),
+            ),
+          ],
+        ),
         actions: [
           const SettingsButton(),
           PopupMenuButton<String>(

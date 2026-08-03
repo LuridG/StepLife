@@ -13,6 +13,8 @@ class SettingsProvider extends ChangeNotifier {
   int _imageQuality = 75;
   // TMDB API Key（留空 = 不启用）
   String _tmdbApiKey = '';
+  // DeepSeek API Key（智能助手，留空 = 禁用）
+  String _deepseekApiKey = '';
   // WebDAV 配置
   String _webdavUrl = '';
   String _webdavUsername = '';
@@ -35,6 +37,7 @@ class SettingsProvider extends ChangeNotifier {
   int get cacheLimitMB => _cacheLimitMB;
   int get imageQuality => _imageQuality;
   String get tmdbApiKey => _tmdbApiKey;
+  String get deepseekApiKey => _deepseekApiKey;
   String get webdavUrl => _webdavUrl;
   String get webdavUsername => _webdavUsername;
   String get webdavPassword => _webdavPassword;
@@ -55,6 +58,7 @@ class SettingsProvider extends ChangeNotifier {
   static const String kCacheLimitMB = 'cache_limit_mb';
   static const String kImageQuality = 'image_quality';
   static const String kTmdbApiKey = 'tmdb_api_key';
+  static const String kDeepseekApiKey = 'deepseek_api_key';
   static const String kWebdavUrl = 'webdav_url';
   static const String kWebdavUsername = 'webdav_username';
   static const String kWebdavPassword = 'webdav_password';
@@ -75,6 +79,7 @@ class SettingsProvider extends ChangeNotifier {
       _cacheLimitMB = int.tryParse(all[kCacheLimitMB] ?? '') ?? 0;
       _imageQuality = int.tryParse(all[kImageQuality] ?? '') ?? 75;
       _tmdbApiKey = all[kTmdbApiKey] ?? '';
+      _deepseekApiKey = all[kDeepseekApiKey] ?? '';
       _webdavUrl = all[kWebdavUrl] ?? '';
       _webdavUsername = all[kWebdavUsername] ?? '';
       _webdavPassword = all[kWebdavPassword] ?? '';
@@ -126,6 +131,12 @@ class SettingsProvider extends ChangeNotifier {
     _tmdbApiKey = key.trim();
     notifyListeners();
     await _save(kTmdbApiKey, _tmdbApiKey);
+  }
+
+  Future<void> setDeepseekApiKey(String key) async {
+    _deepseekApiKey = key.trim();
+    notifyListeners();
+    await _save(kDeepseekApiKey, _deepseekApiKey);
   }
 
   Future<void> setWebdavConfig({

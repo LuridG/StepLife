@@ -50,6 +50,7 @@ dependencies:
   package_info_plus: ^8.0.0
   pedometer: ^4.2.0
   permission_handler: ^11.3.1
+  speech_to_text: ^7.0.0
 
 dev_dependencies:
   flutter_test:
