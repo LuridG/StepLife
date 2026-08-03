@@ -779,6 +779,7 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                               border: Border.all(color: Colors.white.withAlpha(20)),
                             ),
                             child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
                                 if (item.imagePath != null && item.imagePath!.isNotEmpty)
                                   ClipRRect(
@@ -808,7 +809,12 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Text(item.name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                                      Text(
+                                        item.name,
+                                        style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold),
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
                                       const SizedBox(height: 2),
                                       if (item.specs.isEmpty)
                                         Text(
@@ -819,17 +825,21 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                                         Text(
                                           item.specs.map((s) => '${s.name} ¥${_fmtPrice(s.price)}').join(' · '),
                                           style: const TextStyle(fontSize: 11, color: Color(0xFF10B981), fontWeight: FontWeight.bold),
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
                                         ),
                                     ],
                                   ),
                                 ),
+                                // 菜品打分：大拇指上 / 下（紧凑排列，避免挤占名称与价格）
                                 IconButton(
-                                  padding: const EdgeInsets.all(4),
-                                  constraints: const BoxConstraints(),
+                                  padding: const EdgeInsets.all(2),
+                                  constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+                                  visualDensity: VisualDensity.compact,
                                   icon: Icon(
                                     item.rating == 1 ? Icons.thumb_up : Icons.thumb_up_outlined,
                                     color: item.rating == 1 ? const Color(0xFF10B981) : Colors.white38,
-                                    size: 18,
+                                    size: 17,
                                   ),
                                   tooltip: item.rating == 1 ? '取消推荐招牌菜' : '设为推荐招牌菜',
                                   onPressed: () => setModalState(() {
@@ -840,12 +850,13 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                                   }),
                                 ),
                                 IconButton(
-                                  padding: const EdgeInsets.all(4),
-                                  constraints: const BoxConstraints(),
+                                  padding: const EdgeInsets.all(2),
+                                  constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+                                  visualDensity: VisualDensity.compact,
                                   icon: Icon(
                                     item.rating == -1 ? Icons.thumb_down : Icons.thumb_down_outlined,
                                     color: item.rating == -1 ? Colors.redAccent : Colors.white38,
-                                    size: 18,
+                                    size: 17,
                                   ),
                                   tooltip: item.rating == -1 ? '取消不推荐' : '设为不推荐',
                                   onPressed: () => setModalState(() {
@@ -855,21 +866,40 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                                     }
                                   }),
                                 ),
-                                IconButton(
-                                  padding: const EdgeInsets.all(4),
-                                  constraints: const BoxConstraints(),
-                                  icon: const Icon(Icons.edit_outlined, color: Colors.lightBlueAccent, size: 18),
-                                  tooltip: '编辑菜品',
-                                  onPressed: () => _showMenuItemDialog(dialogCtx, setModalState, menuDrafts, existing: item),
-                                ),
-                                IconButton(
-                                  padding: const EdgeInsets.all(4),
-                                  constraints: const BoxConstraints(),
-                                  icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 18),
-                                  tooltip: '删除菜品',
-                                  onPressed: () => setModalState(() {
-                                    menuDrafts.removeWhere((x) => identical(x, item) || x.id == item.id);
-                                  }),
+                                // 编辑 / 删除收纳进「⋯」菜单，减少图标数量，给名称与价格留足横向空间
+                                PopupMenuButton<String>(
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+                                  tooltip: '更多操作',
+                                  icon: const Icon(Icons.more_vert, color: Colors.white54, size: 18),
+                                  color: const Color(0xFF0F172A),
+                                  onSelected: (action) {
+                                    if (action == 'edit') {
+                                      _showMenuItemDialog(dialogCtx, setModalState, menuDrafts, existing: item);
+                                    } else if (action == 'delete') {
+                                      setModalState(() {
+                                        menuDrafts.removeWhere((x) => identical(x, item) || x.id == item.id);
+                                      });
+                                    }
+                                  },
+                                  itemBuilder: (menuCtx) => [
+                                    const PopupMenuItem(
+                                      value: 'edit',
+                                      child: Row(children: [
+                                        Icon(Icons.edit_outlined, color: Colors.lightBlueAccent, size: 16),
+                                        SizedBox(width: 8),
+                                        Text('编辑菜品'),
+                                      ]),
+                                    ),
+                                    const PopupMenuItem(
+                                      value: 'delete',
+                                      child: Row(children: [
+                                        Icon(Icons.delete_outline, color: Colors.redAccent, size: 16),
+                                        SizedBox(width: 8),
+                                        Text('删除菜品'),
+                                      ]),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),

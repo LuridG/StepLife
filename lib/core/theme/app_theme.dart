@@ -15,6 +15,28 @@ class AppTheme {
     fontWeight: FontWeight.w400,
   );
 
+  /// 文本框浮动标签：品牌绿 + 加粗 + 阴影，与用户输入内容明显区分（深色对话框通用）
+  static const TextStyle inputLabelStyle = TextStyle(
+    color: Color(0xFF34D399),
+    fontSize: 13,
+    fontWeight: FontWeight.w600,
+    letterSpacing: 0.3,
+    shadows: [
+      Shadow(color: Colors.black45, blurRadius: 2.5, offset: Offset(0, 1)),
+    ],
+  );
+
+  /// 浅色主题下的标签样式（白底页面用深一点的品牌绿保证可读性）
+  static const TextStyle inputLabelStyleLight = TextStyle(
+    color: Color(0xFF047857),
+    fontSize: 13,
+    fontWeight: FontWeight.w600,
+    letterSpacing: 0.3,
+    shadows: [
+      Shadow(color: Colors.black26, blurRadius: 2, offset: Offset(0, 1)),
+    ],
+  );
+
 
   /// 浅色主题：页面背景保留品牌深色渐变，对话框保持深色毛玻璃以兼容现有硬编码文字
   static ThemeData get lightTheme {
@@ -67,6 +89,7 @@ class AppTheme {
       ),
       inputDecorationTheme: const InputDecorationTheme(
         hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 10.5, fontWeight: FontWeight.w400),
+        labelStyle: inputLabelStyleLight,
       ),
     );
   }
@@ -119,6 +142,7 @@ class AppTheme {
       ),
       inputDecorationTheme: const InputDecorationTheme(
         hintStyle: hintStyle,
+        labelStyle: inputLabelStyle,
       ),
     );
   }

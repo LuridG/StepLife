@@ -448,6 +448,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   changes: [
                     '🔧 自动更新修复：按设备架构自动选择安装包（arm64-v8a / armeabi-v7a / x86_64），不再固定下载 universal。',
                     '🚀 下载完成后自动拉起系统安装器，不再卡在 100%；取消下载/失败即时清理安装包，启动时兜底清理残留。',
+                    '📱 餐饮菜单卡片排版优化：编辑/删除收纳进「⋯」菜单，名称与价格不再被图标挤成竖排。',
+                    '🏷️ 文本框标签统一格式：品牌绿 + 加粗 + 阴影，与用户输入内容明显区分。',
                   ],
                 ),
                 const Divider(color: Colors.white12, height: 24),
