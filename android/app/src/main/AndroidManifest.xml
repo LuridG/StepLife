@@ -1,6 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- 必需：正式包联网（TMDB 搜索、海报下载、WebDAV 同步等） -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- 计步测量（Android 10+ 需要运行时授权身体活动识别） -->
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION"/>
     <!-- 美食位置定位（地图选点自动填写） -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
