@@ -81,10 +81,10 @@
 
 | 文件名 | 适用 CPU 架构 | 文件大小 | 推荐说明 |
 | :--- | :--- | :---: | :--- |
-| **`StepLife-v1.4.10-arm64-v8a.apk`** | 64 位 ARM (`arm64-v8a`) | **26.8 MB** | 🔥 **最推荐**！适配 99% 的现代 Android 手机 |
-| **`StepLife-v1.4.10-armeabi-v7a.apk`** | 32 位 ARM (`armeabi-v7a`) | 24.5 MB | 适配老旧 32 位 Android 机型 |
-| **`StepLife-v1.4.10-x86_64.apk`** | Intel/AMD (`x86_64`) | 28.1 MB | 适配 Android 模拟器与 x86 平板 |
-| **`StepLife-v1.4.10-universal.apk`** | 通用全架构胖包 | 65.5 MB | 整合全架构二进制，兼容任意设备 |
+| **`StepLife-v1.4.10-arm64-v8a.apk`** | 64 位 ARM (`arm64-v8a`) | **27.1 MB** | 🔥 **最推荐**！适配 99% 的现代 Android 手机 |
+| **`StepLife-v1.4.10-armeabi-v7a.apk`** | 32 位 ARM (`armeabi-v7a`) | 24.8 MB | 适配老旧 32 位 Android 机型 |
+| **`StepLife-v1.4.10-x86_64.apk`** | Intel/AMD (`x86_64`) | 28.6 MB | 适配 Android 模拟器与 x86 平板 |
+| **`StepLife-v1.4.10-universal.apk`** | 通用全架构胖包 | 66.5 MB | 整合全架构二进制，兼容任意设备 |
 
 ---
 
