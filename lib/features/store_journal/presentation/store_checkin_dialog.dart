@@ -52,8 +52,31 @@ class StoreCheckinDialog extends StatelessWidget {
     final mergedCheckinFields = [...tpl.checkinFields, ...customFields];
     // 集数打卡仅对电视剧/动漫/综艺等剧集展示（电影不显示）
     final isSerialMovie = tpl.key == 'movie' && resolveMediaType(store.extras) != '电影';
+    // 菜篮子品牌历史：从打卡记录收集已用品牌，自动成为下拉快捷选项
+    final brandHistory = <String>[];
+    for (final log in storeProvider.getLogsForStore(store.id ?? 0)) {
+      final b = log.extras['brand']?.toString().trim() ?? '';
+      if (b.isNotEmpty && !brandHistory.contains(b)) {
+        brandHistory.add(b);
+      }
+    }
     final checkinFields = mergedCheckinFields
         .where((f) => !(f.key == 'episodesWatched' && !isSerialMovie))
+        .map((f) {
+          if (f.key == 'brand' && brandHistory.isNotEmpty) {
+            return TemplateField(
+              key: f.key,
+              label: f.label,
+              type: f.type,
+              hint: f.hint,
+              required: f.required,
+              options: f.options,
+              defaultValue: f.defaultValue,
+              suggestions: brandHistory,
+            );
+          }
+          return f;
+        })
         .toList();
 
     // 餐饮菜单：打卡时多选菜品，自动合计消费

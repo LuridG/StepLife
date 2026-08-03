@@ -443,8 +443,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildVersionItem(
-                  version: 'v1.4.11 (2026-08-13)',
+                  version: 'v1.4.12 (2026-08-14)',
                   isLatest: true,
+                  changes: [
+                    '🧺 菜篮子品牌管理：同一品类支持多品牌（如 佳农香蕉 / 辉众香蕉），打卡可填品牌（留空视为通用），详情页按品牌筛选，指标区、走势图、总表与浏览卡片同步展示品牌信息。',
+                    '✍️ 模板文案专门化：菜篮子改用「商品图片 / 备忘」，影视改用「相关图片·剧照 / 长评」，美食保留「美食图片 / 特色说明·推荐好菜·备忘」，零食、书籍、景点、购物模板各配专属文案。',
+                  ],
+                ),
+                const Divider(color: Colors.white12, height: 24),
+                _buildVersionItem(
+                  version: 'v1.4.11 (2026-08-13)',
+                  isLatest: false,
                   changes: [
                     '🎬 WebDAV 同步补上 TMDB 海报缓存（cache/tmdb）：海报随图片一起增量备份/按缺失下载，恢复后自动重映射海报路径，影视剧集海报不再丢失。',
                   ],

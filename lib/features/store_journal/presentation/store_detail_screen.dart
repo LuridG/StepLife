@@ -11,13 +11,21 @@ import '../providers/store_provider.dart';
 import '../utils/basket_stats.dart';
 import 'store_checkin_dialog.dart';
 
-class StoreDetailScreen extends StatelessWidget {
+class StoreDetailScreen extends StatefulWidget {
   final StoreItem storeItem;
 
   const StoreDetailScreen({
     super.key,
     required this.storeItem,
   });
+
+  @override
+  State<StoreDetailScreen> createState() => _StoreDetailScreenState();
+}
+
+class _StoreDetailScreenState extends State<StoreDetailScreen> {
+  /// 菜篮子品牌筛选（'全部' 或具体品牌）
+  String _basketBrand = '全部';
 
   void _confirmDeleteLog(BuildContext context, StoreLog log) {
     showDialog(
@@ -47,16 +55,16 @@ class StoreDetailScreen extends StatelessWidget {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('确认删除记录: ${storeItem.name}?'),
+        title: Text('确认删除记录: ${widget.storeItem.name}?'),
         content: const Text('删除后该条打卡历史及照片关联将被安全移除。'),
         actions: [
           TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('取消')),
           ElevatedButton(
             onPressed: () {
-              context.read<StoreProvider>().deleteStoreItem(storeItem.id!);
+              context.read<StoreProvider>().deleteStoreItem(widget.storeItem.id!);
               Navigator.of(ctx).pop();
               navigator.pop();
-              messenger.showSnackBar(SnackBar(content: Text('已删除: ${storeItem.name}')));
+              messenger.showSnackBar(SnackBar(content: Text('已删除: ${widget.storeItem.name}')));
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
             child: const Text('确认删除', style: TextStyle(color: Colors.white)),
@@ -69,18 +77,18 @@ class StoreDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final storeProvider = context.watch<StoreProvider>();
-    final logs = storeProvider.getLogsForStore(storeItem.id!);
-    final totalCost = storeProvider.getTotalCostForStore(storeItem.id!);
+    final logs = storeProvider.getLogsForStore(widget.storeItem.id!);
+    final totalCost = storeProvider.getTotalCostForStore(widget.storeItem.id!);
 
     // 模板专属字段（概览展示）
     StoreCategory? cat;
     for (final c in storeProvider.categories) {
-      if (c.name == storeItem.category) {
+      if (c.name == widget.storeItem.category) {
         cat = c;
         break;
       }
     }
-    final tpl = LifeTemplates.byKey(cat?.templateKey ?? LifeTemplates.matchTemplateKey(storeItem.category));
+    final tpl = LifeTemplates.byKey(cat?.templateKey ?? LifeTemplates.matchTemplateKey(widget.storeItem.category));
     final itemFields = [
       ...tpl.itemFields,
       ...(cat?.extraFields ?? const []).map((m) => TemplateField.fromJson(m)),
@@ -89,12 +97,12 @@ class StoreDetailScreen extends StatelessWidget {
         .where((f) =>
             f.key != 'mediaType' &&
             f.key != 'genre' &&
-            storeItem.extras[f.key] != null &&
-            storeItem.extras[f.key].toString().isNotEmpty)
+            widget.storeItem.extras[f.key] != null &&
+            widget.storeItem.extras[f.key].toString().isNotEmpty)
         .toList();
     // 通用模板在表单内自由添加的自定义字段：按 key 兜底渲染
     final knownKeys = itemFields.map((f) => f.key).toSet();
-    final looseExtras = storeItem.extras.entries
+    final looseExtras = widget.storeItem.extras.entries
         .where((e) =>
             !knownKeys.contains(e.key) &&
             !(tpl.key == 'movie' &&
@@ -103,29 +111,35 @@ class StoreDetailScreen extends StatelessWidget {
             e.value.toString().isNotEmpty)
         .map((e) => MapEntry(e.key, e.value.toString()))
         .toList();
-    final menuItems = storeProvider.getMenuItemsForStore(storeItem.id ?? 0);
+    final menuItems = storeProvider.getMenuItemsForStore(widget.storeItem.id ?? 0);
 
     // 菜篮子：价格统计与走势
     final isBasket = tpl.key == 'basket';
+    final basketBrands = isBasket ? BasketStats.brandsOf(logs) : const <String>[];
+    final visibleBasketLogs = isBasket
+        ? (_basketBrand == '全部'
+            ? logs
+            : logs.where((l) => BasketStats.brandLabel(l) == _basketBrand).toList())
+        : const <StoreLog>[];
     final basketPoints = isBasket
-        ? BasketStats.pricePoints(logs)
+        ? BasketStats.pricePoints(visibleBasketLogs)
         : const <({StoreLog log, double price})>[];
-    final basketLatest = isBasket ? BasketStats.latestPrice(logs) : null;
-    final basketUnit = (storeItem.extras['unit']?.toString() ?? '').isEmpty
+    final basketLatest = isBasket ? BasketStats.latestPrice(visibleBasketLogs) : null;
+    final basketUnit = (widget.storeItem.extras['unit']?.toString() ?? '').isEmpty
         ? '斤'
-        : storeItem.extras['unit'].toString();
-    final basketChangePrev = isBasket ? BasketStats.changeVsPrevious(logs) : null;
-    final basketChange7 = isBasket ? BasketStats.changeVsDaysAgo(logs, 7) : null;
-    final basketAvg30 = isBasket ? BasketStats.avgPriceSince(logs, 30) : null;
+        : widget.storeItem.extras['unit'].toString();
+    final basketChangePrev = isBasket ? BasketStats.changeVsPrevious(visibleBasketLogs) : null;
+    final basketChange7 = isBasket ? BasketStats.changeVsDaysAgo(visibleBasketLogs, 7) : null;
+    final basketAvg30 = isBasket ? BasketStats.avgPriceSince(visibleBasketLogs, 30) : null;
 
     // 影视摘要：年份 · 导演/主演 · 片长（放在海报右侧信息区）
     final movieMetaParts = <String>[
-      if ((storeItem.extras['year']?.toString() ?? '').isNotEmpty)
-        storeItem.extras['year'].toString(),
-      if ((storeItem.extras['director']?.toString() ?? '').isNotEmpty)
-        storeItem.extras['director'].toString(),
-      if (storeItem.extras['duration'] is num)
-        '${storeItem.extras['duration']}分钟',
+      if ((widget.storeItem.extras['year']?.toString() ?? '').isNotEmpty)
+        widget.storeItem.extras['year'].toString(),
+      if ((widget.storeItem.extras['director']?.toString() ?? '').isNotEmpty)
+        widget.storeItem.extras['director'].toString(),
+      if (widget.storeItem.extras['duration'] is num)
+        '${widget.storeItem.extras['duration']}分钟',
     ];
 
     final logFieldLabels = {
@@ -143,7 +157,7 @@ class StoreDetailScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(storeItem.name),
+        title: Text(widget.storeItem.name),
         actions: [
           IconButton(
             icon: const Icon(Icons.edit_outlined, color: Colors.lightBlueAccent),
@@ -174,21 +188,21 @@ class StoreDetailScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // 高清照片画廊：非影视模板保留横滑大图（cover，无黑边）
-                if (storeItem.images.isNotEmpty && tpl.key != 'movie')
+                if (widget.storeItem.images.isNotEmpty && tpl.key != 'movie')
                   Padding(
                     padding: const EdgeInsets.only(bottom: 16.0),
                     child: SizedBox(
                       height: 180,
                       child: ListView.builder(
                         scrollDirection: Axis.horizontal,
-                        itemCount: storeItem.images.length,
+                        itemCount: widget.storeItem.images.length,
                         itemBuilder: (ctx, idx) {
                           return Padding(
                             padding: const EdgeInsets.only(right: 12.0),
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(16),
                               child: Image.file(
-                                File(storeItem.images[idx]),
+                                File(widget.storeItem.images[idx]),
                                 width: 260,
                                 height: 180,
                                 fit: BoxFit.cover,
@@ -220,9 +234,9 @@ class StoreDetailScreen extends StatelessWidget {
                             children: [
                               ClipRRect(
                                 borderRadius: BorderRadius.circular(14),
-                                child: storeItem.images.isNotEmpty
+                                child: widget.storeItem.images.isNotEmpty
                                     ? Image.file(
-                                        File(storeItem.images.first),
+                                        File(widget.storeItem.images.first),
                                         width: 112,
                                         height: 168,
                                         fit: BoxFit.cover,
@@ -258,7 +272,7 @@ class StoreDetailScreen extends StatelessWidget {
                                             color: const Color(0xFF10B981).withAlpha(40),
                                             borderRadius: BorderRadius.circular(7),
                                           ),
-                                          child: Text(storeItem.category, style: const TextStyle(fontSize: 11, color: Color(0xFF10B981), fontWeight: FontWeight.bold)),
+                                          child: Text(widget.storeItem.category, style: const TextStyle(fontSize: 11, color: Color(0xFF10B981), fontWeight: FontWeight.bold)),
                                         ),
                                         Container(
                                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -268,13 +282,13 @@ class StoreDetailScreen extends StatelessWidget {
                                             border: Border.all(color: Colors.indigoAccent.withAlpha(110)),
                                           ),
                                           child: Text(
-                                            resolveMediaType(storeItem.extras) == '电影'
+                                            resolveMediaType(widget.storeItem.extras) == '电影'
                                                 ? '🎬 电影'
-                                                : '📺 ${resolveMediaType(storeItem.extras)}',
+                                                : '📺 ${resolveMediaType(widget.storeItem.extras)}',
                                             style: const TextStyle(fontSize: 11, color: Colors.lightBlueAccent, fontWeight: FontWeight.bold),
                                           ),
                                         ),
-                                        if (resolveGenre(storeItem.extras).isNotEmpty)
+                                        if (resolveGenre(widget.storeItem.extras).isNotEmpty)
                                           Container(
                                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                             decoration: BoxDecoration(
@@ -283,7 +297,7 @@ class StoreDetailScreen extends StatelessWidget {
                                               border: Border.all(color: Colors.purpleAccent.withAlpha(90)),
                                             ),
                                             child: Text(
-                                              '${resolveGenre(storeItem.extras)} 题材',
+                                              '${resolveGenre(widget.storeItem.extras)} 题材',
                                               style: const TextStyle(fontSize: 11, color: Colors.purpleAccent, fontWeight: FontWeight.bold),
                                             ),
                                           ),
@@ -291,7 +305,7 @@ class StoreDetailScreen extends StatelessWidget {
                                     ),
                                     const SizedBox(height: 10),
                                     Text(
-                                      storeItem.name,
+                                      widget.storeItem.name,
                                       style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
                                     ),
                                     const SizedBox(height: 8),
@@ -300,14 +314,14 @@ class StoreDetailScreen extends StatelessWidget {
                                         Row(
                                           children: List.generate(5, (sIdx) {
                                             return Icon(
-                                              sIdx < storeItem.rating.floor() ? Icons.star : Icons.star_border,
+                                              sIdx < widget.storeItem.rating.floor() ? Icons.star : Icons.star_border,
                                               color: Colors.amber,
                                               size: 18,
                                             );
                                           }),
                                         ),
                                         const SizedBox(width: 6),
-                                        Text('${storeItem.rating.toStringAsFixed(1)} 分', style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold, fontSize: 14)),
+                                        Text('${widget.storeItem.rating.toStringAsFixed(1)} 分', style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold, fontSize: 14)),
                                       ],
                                     ),
                                     if (movieMetaParts.isNotEmpty) ...[
@@ -318,18 +332,18 @@ class StoreDetailScreen extends StatelessWidget {
                                       ),
                                     ],
                                     if (tpl.key == 'movie' &&
-                                        resolveMediaType(storeItem.extras) != '电影') ...[
+                                        resolveMediaType(widget.storeItem.extras) != '电影') ...[
                                       const SizedBox(height: 10),
                                       Text(
-                                        '📺 观看进度 ${_watchedEpisodesOf(storeItem)}/${_totalEpisodesOf(storeItem) ?? '?'} 集',
+                                        '📺 观看进度 ${_watchedEpisodesOf(widget.storeItem)}/${_totalEpisodesOf(widget.storeItem) ?? '?'} 集',
                                         style: const TextStyle(fontSize: 12, color: Colors.lightBlueAccent, fontWeight: FontWeight.bold),
                                       ),
                                       const SizedBox(height: 6),
                                       ClipRRect(
                                         borderRadius: BorderRadius.circular(4),
                                         child: LinearProgressIndicator(
-                                          value: (_totalEpisodesOf(storeItem) ?? 0) > 0
-                                              ? (_watchedEpisodesOf(storeItem) / _totalEpisodesOf(storeItem)!).clamp(0.0, 1.0)
+                                          value: (_totalEpisodesOf(widget.storeItem) ?? 0) > 0
+                                              ? (_watchedEpisodesOf(widget.storeItem) / _totalEpisodesOf(widget.storeItem)!).clamp(0.0, 1.0)
                                               : 0,
                                           minHeight: 6,
                                           backgroundColor: Colors.white12,
@@ -343,15 +357,15 @@ class StoreDetailScreen extends StatelessWidget {
                             ],
                           ),
                           // 第 2/3 张图：小缩略图横滑
-                          if (storeItem.images.length > 1) ...[
+                          if (widget.storeItem.images.length > 1) ...[
                             const SizedBox(height: 12),
                             SizedBox(
                               height: 88,
                               child: ListView.builder(
                                 scrollDirection: Axis.horizontal,
-                                itemCount: storeItem.images.length - 1,
+                                itemCount: widget.storeItem.images.length - 1,
                                 itemBuilder: (ctx, i) {
-                                  final path = storeItem.images[i + 1];
+                                  final path = widget.storeItem.images[i + 1];
                                   return Padding(
                                     padding: const EdgeInsets.only(right: 8.0),
                                     child: ClipRRect(
@@ -384,12 +398,12 @@ class StoreDetailScreen extends StatelessWidget {
                                   color: const Color(0xFF10B981).withAlpha(40),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
-                                child: Text(storeItem.category, style: const TextStyle(fontSize: 12, color: Color(0xFF10B981), fontWeight: FontWeight.bold)),
+                                child: Text(widget.storeItem.category, style: const TextStyle(fontSize: 12, color: Color(0xFF10B981), fontWeight: FontWeight.bold)),
                               ),
                               const SizedBox(width: 10),
                               Expanded(
                                 child: Text(
-                                  storeItem.name,
+                                  widget.storeItem.name,
                                   style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
                                 ),
                               ),
@@ -401,14 +415,14 @@ class StoreDetailScreen extends StatelessWidget {
                               Row(
                                 children: List.generate(5, (sIdx) {
                                   return Icon(
-                                    sIdx < storeItem.rating.floor() ? Icons.star : Icons.star_border,
+                                    sIdx < widget.storeItem.rating.floor() ? Icons.star : Icons.star_border,
                                     color: Colors.amber,
                                     size: 20,
                                   );
                                 }),
                               ),
                               const SizedBox(width: 8),
-                              Text('${storeItem.rating.toStringAsFixed(1)} 分', style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold, fontSize: 15)),
+                              Text('${widget.storeItem.rating.toStringAsFixed(1)} 分', style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold, fontSize: 15)),
                             ],
                           ),
                         ],
@@ -420,7 +434,7 @@ class StoreDetailScreen extends StatelessWidget {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     SizedBox(width: 92, child: Text(f.label, style: const TextStyle(fontSize: 12, color: Colors.white54))),
-                                    Expanded(child: Text(_formatFieldValue(f, storeItem.extras[f.key]), style: const TextStyle(fontSize: 12, color: Colors.white))),
+                                    Expanded(child: Text(_formatFieldValue(f, widget.storeItem.extras[f.key]), style: const TextStyle(fontSize: 12, color: Colors.white))),
                                   ],
                                 ),
                               )),
@@ -468,9 +482,36 @@ class StoreDetailScreen extends StatelessWidget {
                           const SizedBox(height: 14),
                           const Divider(color: Colors.white12),
                           const SizedBox(height: 10),
+                          if (basketBrands.length > 1) ...[
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 6,
+                              children: [
+                                for (final b in ['全部', ...basketBrands])
+                                  ChoiceChip(
+                                    label: Text(b,
+                                        style: const TextStyle(fontSize: 11)),
+                                    selected: _basketBrand == b,
+                                    selectedColor: const Color(0xFF10B981).withAlpha(70),
+                                    backgroundColor: Colors.white10,
+                                    side: BorderSide(
+                                        color: _basketBrand == b
+                                            ? const Color(0xFF10B981)
+                                            : Colors.white24),
+                                    labelStyle: TextStyle(
+                                        fontSize: 11,
+                                        color: _basketBrand == b ? Colors.white : Colors.white70),
+                                    onSelected: (_) =>
+                                        setState(() => _basketBrand = b),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                          ],
                           Row(
                             children: [
-                              _basketMetric('最近价',
+                              _basketMetric(
+                                  _basketBrand == '全部' ? '最近价' : '最近价 · $_basketBrand',
                                   basketLatest == null ? '—' : '¥${_fmtPrice(basketLatest)}/$basketUnit'),
                               _basketMetric('较上次', BasketStats.formatPct(basketChangePrev)),
                               _basketMetric('较7天', BasketStats.formatPct(basketChange7)),
@@ -479,18 +520,18 @@ class StoreDetailScreen extends StatelessWidget {
                             ],
                           ),
                         ],
-                        if (storeItem.address != null && storeItem.address!.isNotEmpty) ...[
+                        if (widget.storeItem.address != null && widget.storeItem.address!.isNotEmpty) ...[
                           const SizedBox(height: 14),
                           if (tpl.key == 'dining') ...[
                             GestureDetector(
-                              onTap: () => launchMapForPlace(context, storeItem.address!),
+                              onTap: () => launchMapForPlace(context, widget.storeItem.address!),
                               child: Row(
                                 children: [
                                   const Icon(Icons.place_outlined, color: Color(0xFF10B981), size: 16),
                                   const SizedBox(width: 4),
                                   Expanded(
                                     child: Text(
-                                      '📍 位置: ${storeItem.address}',
+                                      '📍 位置: ${widget.storeItem.address}',
                                       style: const TextStyle(color: Colors.white70, fontSize: 13),
                                     ),
                                   ),
@@ -498,21 +539,21 @@ class StoreDetailScreen extends StatelessWidget {
                                 ],
                               ),
                             ),
-                            if (_platformsOf(storeItem).isNotEmpty) ...[
+                            if (_platformsOf(widget.storeItem).isNotEmpty) ...[
                               const SizedBox(height: 6),
                               Text(
-                                '🛵 结算平台: ${_platformsOf(storeItem).join(' · ')}',
+                                '🛵 结算平台: ${_platformsOf(widget.storeItem).join(' · ')}',
                                 style: const TextStyle(color: Colors.lightBlueAccent, fontSize: 13, fontWeight: FontWeight.w600),
                               ),
                             ],
                           ] else ...[
-                            Text('📍 位置/平台: ${storeItem.address}', style: const TextStyle(color: Colors.white70, fontSize: 13)),
+                            Text('📍 位置/平台: ${widget.storeItem.address}', style: const TextStyle(color: Colors.white70, fontSize: 13)),
                           ],
                         ],
-                        if (storeItem.notes != null && storeItem.notes!.isNotEmpty) ...[
+                        if (widget.storeItem.notes != null && widget.storeItem.notes!.isNotEmpty) ...[
                           const SizedBox(height: 6),
                           Text(
-                            tpl.key == 'movie' ? '📝 长评: ${storeItem.notes}' : '📝 特色备忘: ${storeItem.notes}',
+                            '📝 ${tpl.notesFieldLabel}: ${widget.storeItem.notes}',
                             style: const TextStyle(color: Colors.white54, fontSize: 12, fontStyle: FontStyle.italic),
                           ),
                         ],
@@ -628,7 +669,7 @@ class StoreDetailScreen extends StatelessWidget {
                 // 菜篮子：价格走势图（范围切换 + 7 日均线叠加）
                 if (isBasket) ...[
                   const SizedBox(height: 20),
-                  _BasketPriceChart(points: basketPoints, unit: basketUnit),
+                  _BasketPriceChart(points: basketPoints, unit: basketUnit, brand: _basketBrand),
                 ],
                 const SizedBox(height: 20),
 
@@ -697,6 +738,24 @@ class StoreDetailScreen extends StatelessWidget {
                                                       fontWeight: FontWeight.bold),
                                                 ),
                                               ),
+                                            if ((log.extras['brand']?.toString() ?? '').trim().isNotEmpty)
+                                              Padding(
+                                                padding: const EdgeInsets.only(left: 6),
+                                                child: Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                                                  decoration: BoxDecoration(
+                                                    color: const Color(0xFFF59E0B).withAlpha(35),
+                                                    borderRadius: BorderRadius.circular(6),
+                                                  ),
+                                                  child: Text(
+                                                    '🏷️ ${log.extras['brand']}',
+                                                    style: const TextStyle(
+                                                        fontSize: 11,
+                                                        color: Color(0xFFF59E0B),
+                                                        fontWeight: FontWeight.w600),
+                                                  ),
+                                                ),
+                                              ),
                                             IconButton(
                                               icon: const Icon(Icons.edit_outlined, color: Colors.lightBlueAccent, size: 18),
                                               tooltip: '修改打卡',
@@ -704,7 +763,7 @@ class StoreDetailScreen extends StatelessWidget {
                                                 showDialog(
                                                   context: context,
                                                   builder: (ctx) => StoreCheckinDialog(
-                                                    store: storeItem,
+                                                    store: widget.storeItem,
                                                     existingLog: log,
                                                   ),
                                                 );
@@ -904,8 +963,13 @@ class StoreDetailScreen extends StatelessWidget {
 class _BasketPriceChart extends StatefulWidget {
   final List<({StoreLog log, double price})> points;
   final String unit;
+  final String brand;
 
-  const _BasketPriceChart({required this.points, required this.unit});
+  const _BasketPriceChart({
+    required this.points,
+    required this.unit,
+    this.brand = '全部',
+  });
 
   @override
   State<_BasketPriceChart> createState() => _BasketPriceChartState();
@@ -1148,7 +1212,7 @@ class _BasketPriceChartState extends State<_BasketPriceChart> {
             ),
             const SizedBox(height: 6),
             Text(
-              '最近价 ¥${_fmt(prices.last)}/${widget.unit} · 共 $n 条价格记录',
+              '最近价 ¥${_fmt(prices.last)}/${widget.unit} · 共 $n 条价格记录${widget.brand == '全部' ? '' : ' · 品牌: ${widget.brand}'}',
               style: const TextStyle(fontSize: 11, color: Colors.white54),
             ),
           ],

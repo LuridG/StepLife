@@ -108,6 +108,7 @@ class _BasketOverviewScreenState extends State<BasketOverviewScreen> {
         changeMonth: BasketStats.changeVsLastMonth(logs),
         checkinCount: logs.length,
         lastChannel: channel,
+        lastBrand: BasketStats.brandLabel(last.log),
       ));
     }
 
@@ -428,6 +429,8 @@ class _BasketOverviewScreenState extends State<BasketOverviewScreen> {
                               if ((rows[i].item.extras['origin']?.toString() ?? '')
                                   .isNotEmpty)
                                 '📍 ${rows[i].item.extras['origin']}',
+                              if (rows[i].lastBrand.isNotEmpty && rows[i].lastBrand != '通用')
+                                '🔖 ${rows[i].lastBrand}',
                               if (rows[i].lastChannel.isNotEmpty)
                                 '🛒 ${rows[i].lastChannel}',
                               '${rows[i].checkinCount} 次',
@@ -899,6 +902,7 @@ class _BasketRow {
   final double? changeMonth;
   final int checkinCount;
   final String lastChannel;
+  final String lastBrand;
 
   const _BasketRow({
     required this.item,
@@ -909,5 +913,6 @@ class _BasketRow {
     required this.changeMonth,
     required this.checkinCount,
     required this.lastChannel,
+    required this.lastBrand,
   });
 }

@@ -115,6 +115,8 @@ class LifeTemplate {
   final String itemNameHint;
   final List<TemplateField> itemFields; // 新建项目字段
   final List<TemplateField> checkinFields; // 打卡字段
+  final String imageFieldLabel; // 图片选择区标题（模板专用文案）
+  final String notesFieldLabel; // 备注/长评输入框标题（模板专用文案）
 
   const LifeTemplate({
     required this.key,
@@ -125,6 +127,8 @@ class LifeTemplate {
     required this.itemNameHint,
     this.itemFields = const [],
     this.checkinFields = const [],
+    this.imageFieldLabel = '相关图片',
+    this.notesFieldLabel = '备注 / 备忘',
   });
 }
 
@@ -138,6 +142,8 @@ class LifeTemplates {
       description: '电影 / 电视剧 / 动漫 / 纪录片，支持 TMDB 导入',
       itemNameLabel: '片名',
       itemNameHint: '例: 《流浪地球2》',
+      imageFieldLabel: '相关图片/剧照',
+      notesFieldLabel: '长评',
       itemFields: [
         TemplateField(key: 'mediaType', label: '媒体类型', type: TemplateFieldType.choice, options: kMovieMediaTypeOptions, defaultValue: '电影'),
         TemplateField(key: 'genre', label: '题材', type: TemplateFieldType.choice, options: kMovieGenreOptions, hint: '可选：科幻 / 动作 / 喜剧…'),
@@ -163,6 +169,8 @@ class LifeTemplates {
       description: '餐厅 / 小吃 / 咖啡甜品 / 日常小店',
       itemNameLabel: '店名',
       itemNameHint: '例: 川湘阁',
+      imageFieldLabel: '美食图片',
+      notesFieldLabel: '特色说明 / 推荐好菜 / 备忘',
       itemFields: [
         TemplateField(key: 'cuisine', label: '品类', type: TemplateFieldType.choice, options: ['中餐', '西餐', '日料', '火锅', '烧烤', '小吃', '咖啡甜品', '奶茶', '其他']),
         TemplateField(key: 'avgCost', label: '人均参考（元）', type: TemplateFieldType.number, hint: '例: 80'),
@@ -184,6 +192,8 @@ class LifeTemplates {
       description: '小说 / 社科 / 工具书阅读记录',
       itemNameLabel: '书名',
       itemNameHint: '例: 《三体》',
+      imageFieldLabel: '书影 / 插图',
+      notesFieldLabel: '读书笔记 / 备忘',
       itemFields: [
         TemplateField(key: 'author', label: '作者', type: TemplateFieldType.text, hint: '例: 刘慈欣'),
         TemplateField(key: 'publisher', label: '出版社', type: TemplateFieldType.text),
@@ -204,6 +214,8 @@ class LifeTemplates {
       description: '景点 / 公园 / 展馆 / 演出',
       itemNameLabel: '地点名称',
       itemNameHint: '例: 西湖',
+      imageFieldLabel: '景点照片',
+      notesFieldLabel: '游览备忘',
       itemFields: [
         TemplateField(key: 'ticket', label: '门票参考（元）', type: TemplateFieldType.number, hint: '例: 0 免费'),
         TemplateField(key: 'suggestDuration', label: '建议游玩时长', type: TemplateFieldType.text, hint: '例: 半天'),
@@ -224,6 +236,8 @@ class LifeTemplates {
       description: '百货 / 数码 / 生鲜 / 服饰好物',
       itemNameLabel: '商品名称',
       itemNameHint: '例: 无线降噪耳机',
+      imageFieldLabel: '商品照片',
+      notesFieldLabel: '购物备忘',
       itemFields: [
         TemplateField(key: 'brand', label: '品牌', type: TemplateFieldType.text),
         TemplateField(key: 'sku', label: '规格型号', type: TemplateFieldType.text, hint: '例: 256G 黑色'),
@@ -243,6 +257,8 @@ class LifeTemplates {
       description: '买菜 / 水果 / 生鲜价格记录，自动生成价格趋势与涨跌对比',
       itemNameLabel: '商品名称',
       itemNameHint: '例: 土豆 / 红富士苹果 / 五花肉',
+      imageFieldLabel: '商品图片',
+      notesFieldLabel: '备忘',
       itemFields: [
         TemplateField(key: 'basketTag', label: '果蔬分类', type: TemplateFieldType.choice, hint: '自定义下拉，历史值自动成为选项，用于筛选与总表'),
         TemplateField(key: 'unit', label: '单位', type: TemplateFieldType.choice, options: kUnitOptions, hint: '例: 斤 / 500g / 个 / 盒 / 袋'),
@@ -250,6 +266,7 @@ class LifeTemplates {
       ],
       checkinFields: [
         TemplateField(key: 'price', label: '单价（元/单位）', type: TemplateFieldType.number, hint: '例: 3.5', required: true),
+        TemplateField(key: 'brand', label: '品牌（可自定义）', type: TemplateFieldType.choice, hint: '例: 佳农 / 辉众 / 散装，留空视为通用；同一商品可混记多品牌'),
         TemplateField(key: 'qty', label: '数量', type: TemplateFieldType.number, hint: '例: 2'),
         TemplateField(key: 'channel', label: '购买渠道', type: TemplateFieldType.multiChoice, options: kBasketChannelOptions, hint: '菜市场 / 超市 / 生鲜电商等'),
         TemplateField(key: 'quality', label: '新鲜度/品质', type: TemplateFieldType.rating),
@@ -263,6 +280,8 @@ class LifeTemplates {
       description: '方便面 / 薯片 / 辣条 / 坚果 / 速食干货',
       itemNameLabel: '零食名称',
       itemNameHint: '例: 康师傅红烧牛肉面',
+      imageFieldLabel: '零食图片',
+      notesFieldLabel: '备忘 / 点评',
       itemFields: [
         TemplateField(key: 'brand', label: '品牌', type: TemplateFieldType.text, hint: '例: 康师傅 / 卫龙 / 三只松鼠'),
         TemplateField(key: 'snackTag', label: '零食分类', type: TemplateFieldType.choice, hint: '自定义下拉，历史值自动成为选项，可手动新增'),

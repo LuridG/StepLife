@@ -573,7 +573,7 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
           Future<void> pickImage() async {
             if (images.length >= 3) {
               ScaffoldMessenger.of(dialogCtx).showSnackBar(
-                const SnackBar(content: Text('至多上传 3 张照片/剧照/海报')),
+                SnackBar(content: Text('至多上传 3 张${tpl.imageFieldLabel}')),
               );
               return;
             }
@@ -909,7 +909,7 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('相关图片/剧照 (已选 ${images.length}/3 张):', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      Text('${tpl.imageFieldLabel} (已选 ${images.length}/3 张):', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                       if (images.length < 3)
                         TextButton.icon(
                           onPressed: pickImage,
@@ -1021,7 +1021,7 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                   TextField(
                     controller: notesController,
                     decoration: InputDecoration(
-                      labelText: tpl.key == 'movie' ? '长评 (仅详情页展示)' : '特色说明 / 推荐好菜 / 备忘',
+                      labelText: tpl.notesFieldLabel,
                       hintText: tpl.key == 'movie' ? '写下详细长评，只在详情页展示' : null,
                       hintStyle: AppTheme.hintStyle,
                     ),
@@ -2346,7 +2346,7 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                               if (basketLastLog != null) ...[
                                 const SizedBox(height: 4),
                                 Text(
-                                  '🗓 ${_basketDateText(basketLastLog.timestamp)}${_basketChannelText(basketLastLog).isNotEmpty ? ' · 🛒 ${_basketChannelText(basketLastLog)}' : ''}',
+                                  '🗓 ${_basketDateText(basketLastLog.timestamp)}${(basketLastLog.extras['brand']?.toString() ?? '').trim().isNotEmpty ? ' · 🏷️ ${basketLastLog.extras['brand']}' : ''}${_basketChannelText(basketLastLog).isNotEmpty ? ' · 🛒 ${_basketChannelText(basketLastLog)}' : ''}',
                                   style: const TextStyle(fontSize: 11, color: Colors.white54),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
@@ -2618,7 +2618,9 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
         ? '斤'
         : store.extras['unit'].toString();
     final chg = BasketStats.changeVsPrevious(logs);
-    return '🛒 最近价 ¥${_fmtPrice(latest)}/$unit · ${chg == null ? '暂无涨跌对比' : BasketStats.formatPct(chg)} · ${logs.length} 次';
+    final lastLog = logs.isEmpty ? null : BasketStats.pricePoints(logs).last.log;
+    final brand = lastLog == null ? '' : BasketStats.brandLabel(lastLog);
+    return '🛒 最近价 ¥${_fmtPrice(latest)}/$unit · ${chg == null ? '暂无涨跌对比' : BasketStats.formatPct(chg)} · ${logs.length} 次${brand.isNotEmpty && brand != '通用' ? ' · 🏷️ $brand' : ''}';
   }
 
   /// 菜篮子：涨跌徽章（红涨绿跌）
