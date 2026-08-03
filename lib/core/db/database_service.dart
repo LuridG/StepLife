@@ -23,14 +23,17 @@ class DatabaseService {
     if (existing != null) return Future.value(existing);
     final pending = _initFuture;
     if (pending != null) return pending;
-    final future = _initDatabase().then((db) {
-      _database = db;
-      _initFuture = null;
-      return db;
-    }, onError: (Object e, StackTrace st) {
-      _initFuture = null;
-      throw e;
-    });
+    final future = _initDatabase().then(
+      (db) {
+        _database = db;
+        _initFuture = null;
+        return db;
+      },
+      onError: (Object e, StackTrace st) {
+        _initFuture = null;
+        throw e;
+      },
+    );
     _initFuture = future;
     return future;
   }
@@ -61,7 +64,6 @@ class DatabaseService {
     } catch (_) {}
   }
 
-
   /// 一致性快照：VACUUM INTO 生成完整独立备份文件（WAL 安全）
   Future<void> vacuumInto(String targetPath) async {
     final db = await database;
@@ -73,6 +75,7 @@ class DatabaseService {
     'user_profile',
     'routes',
     'step_logs',
+    'route_measurements',
     'members',
     'chore_items',
     'chore_logs',
@@ -87,7 +90,8 @@ class DatabaseService {
     final db = await openDatabase(path, readOnly: true);
     try {
       final integrity = await db.rawQuery('PRAGMA integrity_check');
-      final ok = integrity.isNotEmpty &&
+      final ok =
+          integrity.isNotEmpty &&
           integrity.first.values.first.toString() == 'ok';
       final counts = <String, int>{};
       for (final t in _syncTables) {
@@ -151,27 +155,38 @@ class DatabaseService {
           fixed.add(f);
         }
         if (changed) {
-          await db.update('store_items', {'imagesJson': jsonEncode(fixed)},
-              where: 'id = ?', whereArgs: [id]);
+          await db.update(
+            'store_items',
+            {'imagesJson': jsonEncode(fixed)},
+            where: 'id = ?',
+            whereArgs: [id],
+          );
         }
       } catch (_) {}
     }
 
     // store_menu_items.imagePath：菜品图片
-    final menus =
-        await db.query('store_menu_items', columns: ['id', 'imagePath']);
+    final menus = await db.query(
+      'store_menu_items',
+      columns: ['id', 'imagePath'],
+    );
     for (final row in menus) {
       final id = row['id'] as int;
       final img = row['imagePath'] as String?;
       if (img == null || img.isEmpty) continue;
       final f = await fix(img);
       if (f != img) {
-        await db.update('store_menu_items', {'imagePath': f},
-            where: 'id = ?', whereArgs: [id]);
+        await db.update(
+          'store_menu_items',
+          {'imagePath': f},
+          where: 'id = ?',
+          whereArgs: [id],
+        );
       }
     }
     return relinked;
   }
+
   Future<Database> _initDatabase() async {
     final dbPath = await getDatabasesPath();
     final oldPath = join(dbPath, 'steplife_v8.db');
@@ -218,20 +233,44 @@ class DatabaseService {
           ''');
         } catch (_) {}
         try {
-          await db.execute("ALTER TABLE store_logs ADD COLUMN menuItemIdsJson TEXT NOT NULL DEFAULT '[]'");
+          await db.execute(
+            "ALTER TABLE store_logs ADD COLUMN menuItemIdsJson TEXT NOT NULL DEFAULT '[]'",
+          );
         } catch (_) {}
         try {
-          await db.execute("ALTER TABLE store_logs ADD COLUMN menuNamesJson TEXT NOT NULL DEFAULT '[]'");
+          await db.execute(
+            "ALTER TABLE store_logs ADD COLUMN menuNamesJson TEXT NOT NULL DEFAULT '[]'",
+          );
         } catch (_) {}
         try {
-          await db.execute("ALTER TABLE store_logs ADD COLUMN menuSpecsJson TEXT NOT NULL DEFAULT '[]'");
+          await db.execute(
+            "ALTER TABLE store_logs ADD COLUMN menuSpecsJson TEXT NOT NULL DEFAULT '[]'",
+          );
         } catch (_) {}
         try {
-          await db.execute("ALTER TABLE store_menu_items ADD COLUMN specsJson TEXT NOT NULL DEFAULT '[]'");
+          await db.execute(
+            "ALTER TABLE store_menu_items ADD COLUMN specsJson TEXT NOT NULL DEFAULT '[]'",
+          );
         } catch (_) {}
         // 菜品打分：1=推荐招牌菜 / -1=不推荐 / 0=未打分（幂等，兼容旧库）
         try {
-          await db.execute('ALTER TABLE store_menu_items ADD COLUMN rating INTEGER NOT NULL DEFAULT 0');
+          await db.execute(
+            'ALTER TABLE store_menu_items ADD COLUMN rating INTEGER NOT NULL DEFAULT 0',
+          );
+        } catch (_) {}
+        // 路线测量记录表（兼容已存在的旧库）
+        try {
+          await db.execute('''
+            CREATE TABLE IF NOT EXISTS route_measurements (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              routeId INTEGER NOT NULL,
+              steps INTEGER NOT NULL,
+              multiplier REAL NOT NULL DEFAULT 1.0,
+              computedSteps INTEGER NOT NULL,
+              measuredBy TEXT NOT NULL DEFAULT '自己',
+              createdAt TEXT NOT NULL
+            )
+          ''');
         } catch (_) {}
       },
     );
@@ -253,18 +292,16 @@ class DatabaseService {
           String two(int v) => v.toString().padLeft(2, '0');
           final stamp =
               '${now.year}${two(now.month)}${two(now.day)}_${two(now.hour)}${two(now.minute)}${two(now.second)}';
-          await db.insert(
-            'app_settings',
-            {'key': 'last_schema_migration', 'value': 'v8_import:$stamp:ok'},
-            conflictAlgorithm: ConflictAlgorithm.replace,
-          );
+          await db.insert('app_settings', {
+            'key': 'last_schema_migration',
+            'value': 'v8_import:$stamp:ok',
+          }, conflictAlgorithm: ConflictAlgorithm.replace);
         } catch (e) {
           try {
-            await db.insert(
-              'app_settings',
-              {'key': 'v8_import_error', 'value': '$e'},
-              conflictAlgorithm: ConflictAlgorithm.replace,
-            );
+            await db.insert('app_settings', {
+              'key': 'v8_import_error',
+              'value': '$e',
+            }, conflictAlgorithm: ConflictAlgorithm.replace);
           } catch (_) {}
         }
       }
@@ -294,7 +331,12 @@ class DatabaseService {
       final dir = Directory(dbPath);
       final backups = await dir
           .list()
-          .where((e) => e is File && basename(e.path).startsWith('steplife_v8_backup_') && basename(e.path).endsWith('.db'))
+          .where(
+            (e) =>
+                e is File &&
+                basename(e.path).startsWith('steplife_v8_backup_') &&
+                basename(e.path).endsWith('.db'),
+          )
           .cast<File>()
           .toList();
       backups.sort((a, b) => b.path.compareTo(a.path));
@@ -332,6 +374,19 @@ class DatabaseService {
         measuredBy TEXT NOT NULL DEFAULT '自己',
         refSteps INTEGER DEFAULT 2000,
         isLocked INTEGER DEFAULT 0,
+        createdAt TEXT NOT NULL
+      )
+    ''');
+
+    // 路线单程步数测量记录表（多次测量取平均）
+    await db.execute('''
+      CREATE TABLE route_measurements (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        routeId INTEGER NOT NULL,
+        steps INTEGER NOT NULL,
+        multiplier REAL NOT NULL DEFAULT 1.0,
+        computedSteps INTEGER NOT NULL,
+        measuredBy TEXT NOT NULL DEFAULT '自己',
         createdAt TEXT NOT NULL
       )
     ''');
@@ -500,14 +555,30 @@ class DatabaseService {
       'category': '日常家务',
       'iconName': 'cleaning_services',
       'isQuantifiable': 0,
-      'unit': '次'
+      'unit': '次',
     });
 
     // 默认通用生活分类（绑定对应模板，新建即带出专属字段）
-    await db.insert('store_categories', {'name': '影视剧集', 'iconName': 'movie', 'templateKey': 'movie'});
-    await db.insert('store_categories', {'name': '书籍阅读', 'iconName': 'book', 'templateKey': 'book'});
-    await db.insert('store_categories', {'name': '餐饮美食', 'iconName': 'restaurant', 'templateKey': 'dining'});
-    await db.insert('store_categories', {'name': '景点场所', 'iconName': 'place', 'templateKey': 'place'});
+    await db.insert('store_categories', {
+      'name': '影视剧集',
+      'iconName': 'movie',
+      'templateKey': 'movie',
+    });
+    await db.insert('store_categories', {
+      'name': '书籍阅读',
+      'iconName': 'book',
+      'templateKey': 'book',
+    });
+    await db.insert('store_categories', {
+      'name': '餐饮美食',
+      'iconName': 'restaurant',
+      'templateKey': 'dining',
+    });
+    await db.insert('store_categories', {
+      'name': '景点场所',
+      'iconName': 'place',
+      'templateKey': 'place',
+    });
 
     // 预设默认探店/影视示例项目 (客观属性)
     final store1Id = await db.insert('store_items', {
@@ -537,7 +608,9 @@ class DatabaseService {
       'visitorIdsJson': '[1, 2]',
       'visitorNamesJson': '["成员A", "成员B"]',
       'memo': '影院双人观影，效果拔群',
-      'timestamp': DateTime.now().subtract(const Duration(days: 2)).toIso8601String(),
+      'timestamp': DateTime.now()
+          .subtract(const Duration(days: 2))
+          .toIso8601String(),
     });
     await db.insert('store_logs', {
       'storeId': store2Id,
@@ -546,7 +619,9 @@ class DatabaseService {
       'visitorIdsJson': '[1, 2, 3]',
       'visitorNamesJson': '["成员A", "成员B", "成员C"]',
       'memo': '家庭聚餐，剁椒鱼头非常地道',
-      'timestamp': DateTime.now().subtract(const Duration(days: 5)).toIso8601String(),
+      'timestamp': DateTime.now()
+          .subtract(const Duration(days: 5))
+          .toIso8601String(),
     });
   }
 
@@ -554,8 +629,12 @@ class DatabaseService {
     // 兼容更早版本：补 visitor 列
     if (oldVersion < 8) {
       try {
-        await db.execute('ALTER TABLE store_logs ADD COLUMN visitorIdsJson TEXT NOT NULL DEFAULT "[]"');
-        await db.execute('ALTER TABLE store_logs ADD COLUMN visitorNamesJson TEXT NOT NULL DEFAULT "[]"');
+        await db.execute(
+          'ALTER TABLE store_logs ADD COLUMN visitorIdsJson TEXT NOT NULL DEFAULT "[]"',
+        );
+        await db.execute(
+          'ALTER TABLE store_logs ADD COLUMN visitorNamesJson TEXT NOT NULL DEFAULT "[]"',
+        );
       } catch (_) {}
     }
     // Schema v9：非破坏迁移（只增列 + 新表，全程单事务，失败整体回滚）
@@ -570,13 +649,20 @@ class DatabaseService {
     final legacy = await openDatabase(oldPath);
     try {
       await db.transaction((txn) async {
-        await txn.execute('CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT)');
+        await txn.execute(
+          'CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT)',
+        );
 
         // 成员：同名缺失补插；出生日期为空时回填 v8 数据
         final members = await legacy.query('members');
         for (final m in members) {
           final name = m['name'] as String;
-          final exists = await txn.query('members', where: 'name = ?', whereArgs: [name], limit: 1);
+          final exists = await txn.query(
+            'members',
+            where: 'name = ?',
+            whereArgs: [name],
+            limit: 1,
+          );
           if (exists.isEmpty) {
             final row = Map<String, dynamic>.from(m)..remove('id');
             await txn.insert('members', row);
@@ -621,16 +707,25 @@ class DatabaseService {
             if (dup.isEmpty) {
               final insertRow = Map<String, dynamic>.from(row)..remove('id');
               if (table == 'store_categories') {
-                insertRow['templateKey'] =
-                    LifeTemplates.matchTemplateKey(row['name']?.toString() ?? '');
+                insertRow['templateKey'] = LifeTemplates.matchTemplateKey(
+                  row['name']?.toString() ?? '',
+                );
               }
               await txn.insert(table, insertRow);
             }
           }
         }
 
-        await importByKey(table: 'routes', rows: await legacy.query('routes'), keyColumn: 'name');
-        await importByKey(table: 'chore_items', rows: await legacy.query('chore_items'), keyColumn: 'title');
+        await importByKey(
+          table: 'routes',
+          rows: await legacy.query('routes'),
+          keyColumn: 'name',
+        );
+        await importByKey(
+          table: 'chore_items',
+          rows: await legacy.query('chore_items'),
+          keyColumn: 'title',
+        );
         await importByKey(
           table: 'store_categories',
           rows: await legacy.query('store_categories'),
@@ -668,7 +763,12 @@ class DatabaseService {
           for (final row in rows) {
             final where = dedupCols.map((c) => '$c = ?').join(' AND ');
             final args = dedupCols.map((c) => row[c]).toList();
-            final dup = await txn.query(table, where: where, whereArgs: args, limit: 1);
+            final dup = await txn.query(
+              table,
+              where: where,
+              whereArgs: args,
+              limit: 1,
+            );
             if (dup.isEmpty) {
               final insertRow = Map<String, dynamic>.from(row)..remove('id');
               await txn.insert(table, insertRow);
@@ -676,8 +776,14 @@ class DatabaseService {
           }
         }
 
-        await importLogs('chore_logs', await legacy.query('chore_logs'), ['choreTitle', 'timestamp']);
-        await importLogs('step_logs', await legacy.query('step_logs'), ['routeName', 'timestamp']);
+        await importLogs('chore_logs', await legacy.query('chore_logs'), [
+          'choreTitle',
+          'timestamp',
+        ]);
+        await importLogs('step_logs', await legacy.query('step_logs'), [
+          'routeName',
+          'timestamp',
+        ]);
         // 生活打卡日志：按 店铺+金额+备注 语义去重（种子副本时间戳不同），
         // 命中即回填 v8 的原始时间戳，避免把同一笔打卡复制成两条
         {
@@ -718,18 +824,28 @@ class DatabaseService {
     await db.transaction((txn) async {
       // 幂等：列已存在则跳过，绝不重建/清空表
       if (!await _hasColumn(txn, 'store_categories', 'templateKey')) {
-        await txn.execute("ALTER TABLE store_categories ADD COLUMN templateKey TEXT NOT NULL DEFAULT 'generic'");
+        await txn.execute(
+          "ALTER TABLE store_categories ADD COLUMN templateKey TEXT NOT NULL DEFAULT 'generic'",
+        );
       }
       if (!await _hasColumn(txn, 'store_categories', 'extraFieldsJson')) {
-        await txn.execute("ALTER TABLE store_categories ADD COLUMN extraFieldsJson TEXT NOT NULL DEFAULT '[]'");
+        await txn.execute(
+          "ALTER TABLE store_categories ADD COLUMN extraFieldsJson TEXT NOT NULL DEFAULT '[]'",
+        );
       }
       if (!await _hasColumn(txn, 'store_items', 'extrasJson')) {
-        await txn.execute("ALTER TABLE store_items ADD COLUMN extrasJson TEXT NOT NULL DEFAULT '{}'");
+        await txn.execute(
+          "ALTER TABLE store_items ADD COLUMN extrasJson TEXT NOT NULL DEFAULT '{}'",
+        );
       }
       if (!await _hasColumn(txn, 'store_logs', 'extrasJson')) {
-        await txn.execute("ALTER TABLE store_logs ADD COLUMN extrasJson TEXT NOT NULL DEFAULT '{}'");
+        await txn.execute(
+          "ALTER TABLE store_logs ADD COLUMN extrasJson TEXT NOT NULL DEFAULT '{}'",
+        );
       }
-      await txn.execute('CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT)');
+      await txn.execute(
+        'CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT)',
+      );
 
       // 分类按名称智能绑定模板
       final cats = await txn.query('store_categories');
@@ -745,15 +861,18 @@ class DatabaseService {
       }
 
       // 迁移视图偏好：user_profile.preferredViewMode → app_settings（旧字段保留作回退）
-      final profile = await txn.query('user_profile', where: 'id = 1', limit: 1);
+      final profile = await txn.query(
+        'user_profile',
+        where: 'id = 1',
+        limit: 1,
+      );
       if (profile.isNotEmpty) {
         final mode = profile.first['preferredViewMode'] as String?;
         if (mode != null && mode.isNotEmpty) {
-          await txn.insert(
-            'app_settings',
-            {'key': 'preferredViewMode', 'value': mode},
-            conflictAlgorithm: ConflictAlgorithm.ignore,
-          );
+          await txn.insert('app_settings', {
+            'key': 'preferredViewMode',
+            'value': mode,
+          }, conflictAlgorithm: ConflictAlgorithm.ignore);
         }
       }
 
@@ -762,18 +881,19 @@ class DatabaseService {
       String two(int v) => v.toString().padLeft(2, '0');
       final stamp =
           '${now.year}${two(now.month)}${two(now.day)}_${two(now.hour)}${two(now.minute)}${two(now.second)}';
-      await txn.insert(
-        'app_settings',
-        {'key': 'last_schema_migration', 'value': 'v8_to_v9:$stamp:ok'},
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
+      await txn.insert('app_settings', {
+        'key': 'last_schema_migration',
+        'value': 'v8_to_v9:$stamp:ok',
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
 
       // 行数对账：迁移前后每张表行数必须一致
       final after = await _countRows(txn);
       for (final entry in before.entries) {
         final afterCount = after[entry.key];
         if (afterCount != entry.value) {
-          throw StateError('迁移行数对账失败: ${entry.key} before=${entry.value} after=${afterCount?.toString() ?? 'null'}');
+          throw StateError(
+            '迁移行数对账失败: ${entry.key} before=${entry.value} after=${afterCount?.toString() ?? 'null'}',
+          );
         }
       }
 
@@ -799,7 +919,11 @@ class DatabaseService {
   }
 
   /// 检测表是否已包含某列（幂等迁移用）
-  Future<bool> _hasColumn(DatabaseExecutor db, String table, String column) async {
+  Future<bool> _hasColumn(
+    DatabaseExecutor db,
+    String table,
+    String column,
+  ) async {
     final rows = await db.rawQuery('PRAGMA table_info($table)');
     return rows.any((r) => r['name'] == column);
   }
@@ -833,7 +957,11 @@ class DatabaseService {
       return appMode;
     }
     final db = await database;
-    final maps = await db.query('user_profile', columns: ['preferredViewMode'], limit: 1);
+    final maps = await db.query(
+      'user_profile',
+      columns: ['preferredViewMode'],
+      limit: 1,
+    );
     if (maps.isNotEmpty && maps.first['preferredViewMode'] != null) {
       return maps.first['preferredViewMode'] as String;
     }
@@ -846,7 +974,9 @@ class DatabaseService {
     final db = await database;
     final existing = await db.query('user_profile', limit: 1);
     if (existing.isNotEmpty) {
-      await db.update('user_profile', {'preferredViewMode': mode}, where: 'id = 1');
+      await db.update('user_profile', {
+        'preferredViewMode': mode,
+      }, where: 'id = 1');
     } else {
       await db.insert('user_profile', {'id': 1, 'preferredViewMode': mode});
     }
@@ -855,23 +985,29 @@ class DatabaseService {
   // --- App Settings CRUD ---
   Future<String?> getSetting(String key) async {
     final db = await database;
-    final rows = await db.query('app_settings', where: 'key = ?', whereArgs: [key], limit: 1);
+    final rows = await db.query(
+      'app_settings',
+      where: 'key = ?',
+      whereArgs: [key],
+      limit: 1,
+    );
     return rows.isEmpty ? null : rows.first['value'] as String?;
   }
 
   Future<void> setSetting(String key, String value) async {
     final db = await database;
-    await db.insert(
-      'app_settings',
-      {'key': key, 'value': value},
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    await db.insert('app_settings', {
+      'key': key,
+      'value': value,
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   Future<Map<String, String>> getAllSettings() async {
     final db = await database;
     final rows = await db.query('app_settings');
-    return {for (final r in rows) r['key'] as String: (r['value'] as String?) ?? ''};
+    return {
+      for (final r in rows) r['key'] as String: (r['value'] as String?) ?? '',
+    };
   }
 
   // --- Profile CRUD ---
@@ -889,11 +1025,10 @@ class DatabaseService {
 
   Future<void> saveUserProfile(UserProfile profile) async {
     final db = await database;
-    await db.insert(
-      'user_profile',
-      {'id': 1, ...profile.toMap()},
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    await db.insert('user_profile', {
+      'id': 1,
+      ...profile.toMap(),
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   // --- Routes & Step Logs CRUD ---
@@ -931,6 +1066,25 @@ class DatabaseService {
   Future<void> deleteRoute(int routeId) async {
     final db = await database;
     await db.delete('routes', where: 'id = ?', whereArgs: [routeId]);
+  }
+
+  Future<List<RouteMeasurement>> getRouteMeasurements() async {
+    final db = await database;
+    final maps = await db.query(
+      'route_measurements',
+      orderBy: 'createdAt DESC, id DESC',
+    );
+    return maps.map((e) => RouteMeasurement.fromMap(e)).toList();
+  }
+
+  Future<int> insertRouteMeasurement(RouteMeasurement m) async {
+    final db = await database;
+    return await db.insert('route_measurements', m.toMap());
+  }
+
+  Future<void> deleteRouteMeasurement(int id) async {
+    final db = await database;
+    await db.delete('route_measurements', where: 'id = ?', whereArgs: [id]);
   }
 
   Future<List<StepLog>> getStepLogs() async {
@@ -973,11 +1127,7 @@ class DatabaseService {
 
   Future<void> deleteMember(int id) async {
     final db = await database;
-    await db.delete(
-      'members',
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+    await db.delete('members', where: 'id = ?', whereArgs: [id]);
   }
 
   Future<List<ChoreItem>> getChoreItems() async {
@@ -1016,13 +1166,31 @@ class DatabaseService {
 
   Future<int> insertStoreCategory(StoreCategory category) async {
     final db = await database;
-    return await db.insert('store_categories', category.toMap(), conflictAlgorithm: ConflictAlgorithm.ignore);
+    return await db.insert(
+      'store_categories',
+      category.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.ignore,
+    );
   }
 
-  Future<void> updateStoreCategory(int catId, String newName, String oldName) async {
+  Future<void> updateStoreCategory(
+    int catId,
+    String newName,
+    String oldName,
+  ) async {
     final db = await database;
-    await db.update('store_categories', {'name': newName}, where: 'id = ?', whereArgs: [catId]);
-    await db.update('store_items', {'category': newName}, where: 'category = ?', whereArgs: [oldName]);
+    await db.update(
+      'store_categories',
+      {'name': newName},
+      where: 'id = ?',
+      whereArgs: [catId],
+    );
+    await db.update(
+      'store_items',
+      {'category': newName},
+      where: 'category = ?',
+      whereArgs: [oldName],
+    );
   }
 
   /// 按名称重新匹配模板绑定（设置中心"恢复内置模板"）
@@ -1055,7 +1223,10 @@ class DatabaseService {
   }
 
   /// 保存分类自定义字段定义
-  Future<void> updateCategoryExtraFields(int catId, String extraFieldsJson) async {
+  Future<void> updateCategoryExtraFields(
+    int catId,
+    String extraFieldsJson,
+  ) async {
     final db = await database;
     await db.update(
       'store_categories',
@@ -1068,7 +1239,12 @@ class DatabaseService {
   Future<void> deleteStoreCategory(int catId, String catName) async {
     final db = await database;
     await db.delete('store_categories', where: 'id = ?', whereArgs: [catId]);
-    await db.update('store_items', {'category': '通用未分类'}, where: 'category = ?', whereArgs: [catName]);
+    await db.update(
+      'store_items',
+      {'category': '通用未分类'},
+      where: 'category = ?',
+      whereArgs: [catName],
+    );
   }
 
   Future<List<StoreItem>> getStoreItems() async {
@@ -1096,7 +1272,11 @@ class DatabaseService {
     final db = await database;
     await db.delete('store_items', where: 'id = ?', whereArgs: [itemId]);
     await db.delete('store_logs', where: 'storeId = ?', whereArgs: [itemId]);
-    await db.delete('store_menu_items', where: 'storeId = ?', whereArgs: [itemId]);
+    await db.delete(
+      'store_menu_items',
+      where: 'storeId = ?',
+      whereArgs: [itemId],
+    );
   }
 
   Future<List<StoreLog>> getStoreLogs() async {
@@ -1128,8 +1308,10 @@ class DatabaseService {
   // --- 餐饮菜单 CRUD ---
   Future<List<StoreMenuItem>> getStoreMenuItems() async {
     final db = await database;
-    final maps =
-        await db.query('store_menu_items', orderBy: 'sortOrder ASC, id ASC');
+    final maps = await db.query(
+      'store_menu_items',
+      orderBy: 'sortOrder ASC, id ASC',
+    );
     return maps.map((e) => StoreMenuItem.fromMap(e)).toList();
   }
 
@@ -1166,6 +1348,10 @@ class DatabaseService {
 
   Future<void> deleteStoreMenuItems(int storeId) async {
     final db = await database;
-    await db.delete('store_menu_items', where: 'storeId = ?', whereArgs: [storeId]);
+    await db.delete(
+      'store_menu_items',
+      where: 'storeId = ?',
+      whereArgs: [storeId],
+    );
   }
 }

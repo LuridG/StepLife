@@ -329,6 +329,6 @@ class SyncService {
 
   static String _countsSummary(Map<String, int> c) {
     int n(String key) => c[key] ?? 0;
-    return '路线${n('routes')}条/行走打卡${n('step_logs')}条/家务${n('chore_items')}项/家务打卡${n('chore_logs')}条/生活记录${n('store_items')}条/成员${n('members')}人';
+    return '路线${n('routes')}条/路线测量${n('route_measurements')}条/行走打卡${n('step_logs')}条/家务${n('chore_items')}项/家务打卡${n('chore_logs')}条/生活记录${n('store_items')}条/成员${n('members')}人';
   }
 }

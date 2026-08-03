@@ -117,3 +117,74 @@ class StepLog {
     );
   }
 }
+
+/// 路线单程步数测量记录：一次测量 = 实际总步数 ÷ 倍数（如往返 2 倍）
+class RouteMeasurement {
+  final int? id;
+  final int routeId;
+  final int steps; // 本次实际走的总步数
+  final double multiplier; // 倍数（支持一位小数，如 1.5 / 2.0 / 1.8）
+  final int computedSteps; // 单程步数 = round(steps / multiplier)
+  final String measuredBy;
+  final DateTime createdAt;
+
+  RouteMeasurement({
+    this.id,
+    required this.routeId,
+    required this.steps,
+    required this.multiplier,
+    required this.computedSteps,
+    this.measuredBy = '自己',
+    DateTime? createdAt,
+  }) : createdAt = createdAt ?? DateTime.now();
+
+  /// 由实际总步数与倍数计算单程步数（四舍五入）
+  static int computeSingleSteps(int steps, double multiplier) {
+    if (multiplier <= 0) return steps;
+    return (steps / multiplier).round();
+  }
+
+  RouteMeasurement copyWith({
+    int? id,
+    int? routeId,
+    int? steps,
+    double? multiplier,
+    int? computedSteps,
+    String? measuredBy,
+    DateTime? createdAt,
+  }) {
+    return RouteMeasurement(
+      id: id ?? this.id,
+      routeId: routeId ?? this.routeId,
+      steps: steps ?? this.steps,
+      multiplier: multiplier ?? this.multiplier,
+      computedSteps: computedSteps ?? this.computedSteps,
+      measuredBy: measuredBy ?? this.measuredBy,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'routeId': routeId,
+      'steps': steps,
+      'multiplier': multiplier,
+      'computedSteps': computedSteps,
+      'measuredBy': measuredBy,
+      'createdAt': createdAt.toIso8601String(),
+    };
+  }
+
+  factory RouteMeasurement.fromMap(Map<String, dynamic> map) {
+    return RouteMeasurement(
+      id: map['id'] as int?,
+      routeId: map['routeId'] as int,
+      steps: map['steps'] as int,
+      multiplier: (map['multiplier'] as num).toDouble(),
+      computedSteps: map['computedSteps'] as int,
+      measuredBy: map['measuredBy'] as String? ?? '自己',
+      createdAt: DateTime.parse(map['createdAt'] as String),
+    );
+  }
+}
