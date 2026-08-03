@@ -1,0 +1,79 @@
+# 自动构建并发布 GitHub Release
+# 触发方式：
+#   1. 推送形如 v1.4.7 的 tag（如 git push origin v1.4.7+20260809）
+#   2. 在 Actions 页面手动 Run workflow（自动读取 pubspec 版本号）
+# 产物：StepLife-v<版本>-universal / arm64-v8a / armeabi-v7a / x86_64 四个 APK
+
+name: Build & Release APKs
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      draft:
+        description: '发布为草稿（确认后手动点 Publish）'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Build APKs & Publish Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: 安装 Flutter (stable)
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: 解析版本号
+        id: version
+        shell: bash
+        run: |
+          VER=$(grep '^version:' pubspec.yaml | head -n1 | sed 's/version:[[:space:]]*//' | tr -d '\r')
+          echo "version=$VER" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VER" >> "$GITHUB_OUTPUT"
+          echo "name=StepLife v$(echo "$VER" | cut -d'+' -f1)" >> "$GITHUB_OUTPUT"
+
+      - name: 构建 Release APK（全 ABI + 通用包）
+        run: |
+          flutter pub get
+          flutter build apk --release
+
+      - name: 校验构建产物
+        shell: bash
+        run: |
+          ls -lh build/app/outputs/flutter-apk/
+          test -n "$(ls build/app/outputs/flutter-apk/StepLife-*.apk 2>/dev/null)" || { echo '未找到 APK 产物'; exit 1; }
+
+      - name: 发布 GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.name }}
+          body: |
+            自动构建产物（Flutter ${{ steps.version.outputs.version }}）
+
+            - **universal**：通用包，所有设备可用
+            - **arm64-v8a**：主流 64 位 Android 设备
+            - **armeabi-v7a**：旧款 32 位设备
+            - **x86_64**：模拟器 / 平板
+
+            安装说明：日常使用优先选择 **universal** 或 **arm64-v8a**。
+          files: |
+            build/app/outputs/flutter-apk/StepLife-*.apk
+          draft: ${{ github.event.inputs.draft == 'true' }}

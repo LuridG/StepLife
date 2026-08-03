@@ -117,6 +117,18 @@
 flutter build apk --release --split-per-abi
 ```
 
+### 2.5 自动发布 GitHub Release（CI 一键发布）
+项目内置 GitHub Actions 工作流（`.github/workflows/release.yml`），推送版本 tag 后自动在 CI 构建 4 个 APK（universal / arm64-v8a / armeabi-v7a / x86_64）并发布到 Releases：
+
+```bash
+# 更新 pubspec.yaml 的 version 后，提交并推送 tag 即可自动发布
+git add -A && git commit -m "chore: release v1.4.7"
+git tag v1.4.7+20260809
+git push origin main --tags
+```
+
+也可以在 GitHub Actions 页面手动触发 **Build & Release APKs**（自动读取 pubspec 版本号，可勾选发布为草稿）。
+
 ### 3. 构建 Windows Release 桌面程序
 ```bash
 flutter build windows --release
