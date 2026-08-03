@@ -1,3 +1,5 @@
+> 📌 历史方案文档（2026-07）：原计划中的 `update_rules.md` 与 `ARCHITECTURE.md` 已于 2026-08 重组为 [architecture.md](architecture.md)（红线并入 [AGENTS.md](../AGENTS.md)），文中相关引用仅代表当时计划。
+
 ﻿# StepLife 生活模板化 + 设置中心 + 缓存管理 + WebDAV 同步 方案 v2.1
 
 > 版本：v2.1 讨论稿（2026-08-02）

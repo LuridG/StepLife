@@ -1,41 +1,50 @@
 # StepLife 项目 AI 协作注意事项（每次修改代码前必读）
 
-本文件会被 AI 自动加载并约束所有改动。完整规范与架构详见 [update_rules.md](update_rules.md) 与 [ARCHITECTURE.md](ARCHITECTURE.md)；发布节奏与用户偏好见文末。
+本文件会被 AI 自动加载并约束所有改动；完整架构与规则细则见 [docs/architecture.md](docs/architecture.md)。发布节奏与用户偏好见文末。
 
 ## 🔴 红线（违反即破坏用户数据/流程，绝对禁止）
-1. **数据库非破坏迁移**：库文件 `steplife_v9.db`（schema version 9）。改表结构必须：升级前备份旧库、单事务内「只增列不重建表」、幂等（`PRAGMA table_info` 探测）、行数对账 + `integrity_check`、迁移留痕；新装与升级双路径一致。
+1. **数据库非破坏迁移**：库文件 `steplife_v9.db`（schema version 9）。改表结构必须：升级前备份旧库（保留最近 3 份，含 WAL/SHM）、单事务内「只增列不重建表」、幂等（`PRAGMA table_info` 探测）、行数对账 + `integrity_check`、迁移留痕；新装与升级双路径一致。
 2. **新表/新列必须同步 WebDAV 备份**：凡新增数据库表，必须加入 `database_service._syncTables`（备份表清单）与 WebDAV 恢复逻辑，否则云端备份缺表。
-3. **用户数据零丢失**：禁止破坏性更新、禁止随意删除种子/默认数据（成员 A/B/C、默认分类依赖初始化逻辑）；升级必须可逆（旧库备份保留最近 3 份）。
+3. **用户数据零丢失**：禁止破坏性更新、禁止随意删除种子/默认数据（成员 A/B/C、默认分类依赖初始化逻辑）；升级必须可逆。
 4. **正式签名不可回退**：release 构建签名由 `android/app/build.gradle.kts` 的 key.properties 决定，禁止改为 debug 签名；CI 用 GitHub Secrets 签名并校验指纹。
 5. **打卡时间语义**：所有打卡时间精确到分钟（`yyyy-MM-dd HH:mm`），支持补卡/改时；展示一律按时间倒序（新→旧），与插入先后无关。
 
-## 🧭 全局架构要点（改动前先对齐）
-- 入口 `lib/main.dart`：`sqfliteFfiInit()` 桌面初始化**不可删**；底部 4 个 Tab（路线/家务/生活/成员），「关于」已合并进设置中心。
-- 成员系统：`Member` 全局共享（步量/家务/生活记录共用），`age` 由 `birthDate` 动态计算，禁止存固定年龄；换算用成员身高体重。
-- 模板系统：`store_categories.templateKey` 现有 **movie / dining / book / place / shopping / basket / snack / generic** 八种；表单按 `LifeTemplates` 动态渲染，专属字段存 `extrasJson`；每个模板的图片/备注输入框文案必须专门化（菜篮子=商品图片/备忘，影视=剧照/长评等）。
-- 菜篮子：品类+品牌双维度（如 佳农香蕉/辉众香蕉），价格记录/走势/总表/月份筛选。
-- 图片：选图必须 `CacheManager.copyToCache` 复制进应用缓存目录后再存路径，禁止存相册原路径；质量读 `app_settings['image_quality']`。
-- 版本号：`pubspec.yaml` `version: 1.4.x+YYYYMMDD`，构建号用打包日期且必须递增。
+## 📐 核心规范（必须遵守，细则见 docs/architecture.md）
+- **数据库升级**：改表结构必须递增 version，`_onUpgrade` 写 `ALTER TABLE` / `CREATE TABLE IF NOT EXISTS` 兼容逻辑且与 `_onCreate` 新建逻辑一致；`onOpen` 幂等补齐 `members.birthDate`（报错忽略）；`preferredViewMode` 新读 `app_settings`、缺省回退旧 `user_profile` 字段、写入双写保持降级兼容。
+- **桌面端 FFI**：`lib/main.dart` 顶部的 `sqfliteFfiInit()` 与 `databaseFactory = databaseFactoryFfi` 判断不可删除（Windows / Linux / macOS 读写 SQLite 的关键前置）。
+- **路线/打卡解耦**：客观路线资产 `RouteItem`（含 `isLocked` 锁定）与打卡履约 `StepLog` 严格解耦；锁定路线禁止删除/误编辑；打卡按 `timestamp` 倒序管理。
+- **成员系统**：`Member` 全局共享（步量/家务/生活记录共用一套），换算优先用成员身高 (`heightCm`) 体重 (`weightKg`)，缺失回退全局 `UserProfile`；`age` 由 `birthDate` 动态计算，禁止持久化固定年龄。
+- **量化展示**：开启量化登记的家务在主页 5 天日期阵列中**绝不显示 ✓**，统一 `NumberFormatter.formatQuantifiableValue`（1.2k / 15k / 1.5M）。
+- **生活模板**：8 个模板键 movie / dining / book / place / shopping / basket / snack / generic；专属字段存 `extrasJson`（store_items 与 store_logs 均有），分类自定义字段存 `store_categories.extraFieldsJson`（`custom_N`）；`StoreLog` 必须记录分钟级时刻 / 消费 / 同行成员；Card ↔ 紧凑列表双视图经 `app_settings['preferredViewMode']` 持久化；Drawer 分类可创建/重命名（含模板绑定与自定义字段）/安全删除（记录归「通用分类」）。
+- **图片**：选图必须 `CacheManager.copyToCache` 复制进应用缓存目录后再存路径，禁止存相册原路径；质量读 `app_settings['image_quality']`。
+- **图标**：保持 100% 透明 Alpha 通道（RGBA）DIB ICO，严禁白色/浅色背景余边。
+- **版本发布**：`pubspec.yaml` `version: 1.5.x+YYYYMMDD`，构建号用打包日期且必须递增；发布时同步更新 `assets/walkthrough.md` 更新日志、设置中心「更新记录与版本历史」与 README，保持多处一致。
+
+## 🧭 全局架构要点
+- 入口 `lib/main.dart`：底部 4 个 Tab（路线/家务/生活/成员），「关于」已合并进设置中心；桌面 FFI 初始化不可删。
+- 分层：presentation（页面，只渲染不碰库）→ providers（`ChangeNotifier`，先落库再更新内存并 `notifyListeners()`）→ domain（纯模型）→ core/db（`DatabaseService` 单例集中 SQL）；核心算法放 core/utils 可单测。
 - 设置中心：TMDB Key / DeepSeek Key / WebDAV / 缓存上限与质量 / 主题 / 自动更新开关等，均存 `app_settings`（Key 明文）。
+- 智能助手入口：家务/生活 AppBar 左上角纯图标（无文字）。
 
 ## 🔐 Android 权限清单（新增功能前先核对）
-`INTERNET`（联网）、`ACCESS_*_LOCATION`（美食定位）、`RECORD_AUDIO`（智能助手语音）、`ACTIVITY_RECOGNITION`（计步测量，Android 10+ 需运行时授权）、`REQUEST_INSTALL_PACKAGES`（自动更新安装）。加新权限记得同步运行时申请与设置引导。
+`INTERNET`（联网）、`ACCESS_*_LOCATION`（美食定位）、`RECORD_AUDIO`（智能助手语音）、`ACTIVITY_RECOGNITION`（计步测量，Android 10+ 运行时授权）、`REQUEST_INSTALL_PACKAGES`（自动更新安装）。加新权限记得同步运行时申请与设置引导。
 
 ## 📦 自动更新（核心链路，勿破坏）
-- 检查/下载均有多源回退：直连 `api.github.com` 失败→ghproxy 镜像；下载直链失败→镜像。
+- 检查/下载均有多源回退：直连 `api.github.com` 失败 → ghproxy 镜像（ghproxy.net / gh-proxy.com / ghfast.top / mirror.ghproxy.com），逐个失败才报错。
 - APK 下载到应用 **cache 目录**（`getApplicationCacheDirectory()`），`file_paths.xml` 的 `cache-path` 已覆盖；勿改回 documents 目录（会导致 FileProvider 找不到路径、安装器拉起失败）。
-- 拉起安装器前检查「安装未知应用」授权，未授权先跳系统设置。
-- 发布：推远端 tag `v1.4.x+YYYYMMDD` 触发 `.github/workflows/release.yml` 自动构建 4 架构 APK 并发布。
+- 拉起安装器前检查「安装未知应用」授权，未授权先跳系统设置引导。
+- 发布：本地 release 构建验证 → commit → push → 远端 tag `v1.5.x+YYYYMMDD` 触发 `.github/workflows/release.yml` 自动构建 4 架构 APK 并发布。
 
 ## 🤖 智能助手（DeepSeek）
-- 模型 `deepseek-v4-flash`，Key 存 `app_settings`，入口为家务/生活 AppBar 左上角纯图标。
-- AI 只返回结构化 JSON 动作；客户端做「名称存在性二次校验」（AI 匹配值必须命中本地清单，否则降级为新建确认）；**所有动作必须经用户确认后才落库**，禁止 AI 输出直接写库。
+- 模型固定 `deepseek-v4-flash`；Key 存 `app_settings`；入口为家务/生活 AppBar 左上角纯图标。
+- AI 只返回结构化 JSON 动作；客户端做「名称存在性二次校验」（AI 匹配值必须命中本地清单，否则降级为新建确认）；**所有动作必须渲染确认卡片、用户确认后才落库**，禁止 AI 输出直接写库。
+- 语音用 speech_to_text（Android 系统识别 + 运行时申请），Windows 桌面退化为文本输入。
 
 ## 🧪 交付前验证
-依次运行且 0 错误：`flutter analyze` → `flutter test`（如涉及）→ release 构建。本仓库中文交互为主，改动保持与现有风格一致。
+依次运行且 0 错误：`flutter analyze` → `flutter test`（如涉及）→ release 构建。
 
-## 🤝 协作约定（用户偏好）
+## 🛠 环境与协作约定（用户偏好）
 - 中文沟通；大改动先出方案，用户确认后再实施。
-- 常规节奏：改代码→验证→commit→push→升版本→打包→发布（用户会明确下令，不要擅自发布）。
+- 常规节奏：改代码 → 验证 → commit → push → 升版本 → 打包 → 发布（用户会明确下令，不要擅自发布）。
 - 本环境 `apply_patch` 不可用，文件读写用 Node REPL；Dart 模板字符串 `${...}` 在 JS 模板串中要写成 `\${...}`；JS 替换一律用 `split(old).join(new)`。
-- commit 通过临时文件 `git commit -F`；git 只读/写命令需按已批准前缀执行（组合命令会被沙箱拦截，需拆开单独跑）。
+- commit 通过临时文件 `git commit -F`；git 只读/写命令需按已批准前缀执行（组合命令会被沙箱拦截，需拆开单独跑）；大部分 Dart 文件 LF 行尾，git 的 CRLF 警告属正常，勿批量转换行尾。

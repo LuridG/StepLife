@@ -145,7 +145,7 @@ flutter build windows --release
 
 ## 📄 AI 协作规范与更新规则
 
-项目根目录下附带有 [update_rules.md](file:///g:/MiniProject2026/steplife/update_rules.md) 说明文档，包含详细的数据库 Upgrade 升版规则、桌面 FFI 适配规则、解耦与成员换算规则，方便后续无缝接续维护。
+项目内附带有 [docs/architecture.md](file:///g:/MiniProject2026/steplife/docs/architecture.md) 架构说明与 [AGENTS.md](file:///g:/MiniProject2026/steplife/AGENTS.md) AI 协作规范，包含详细的数据库 Upgrade 升版规则、桌面 FFI 适配规则、解耦与成员换算规则，方便后续无缝接续维护。
 
 ---
 

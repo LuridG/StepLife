@@ -42,7 +42,7 @@
   - 🎤 语音转文字：Android 调用系统语音识别（RECORD_AUDIO 运行时授权），说话自动转文字；Windows 桌面端自动降级为手动输入。
   - 🧠 结构化识别更细：菜篮子先匹配品类再匹配品牌（佳农香蕉 / 辉众香蕉等，含存在性二次校验）、餐饮识别菜品与份量规格（大份 / 小份 / 二两）、家务成员与量化数值提取；AI 匹配值必须命中本地清单，不一致时自动降级为「新建确认」。
   - 🔑 设置中心新增 DeepSeek API Key 配置（含隐私说明），未配置时助手引导跳转设置。
-  - 📋 新增 AGENTS.md 全局 AI 协作规范，update_rules.md 补全 WebDAV 同步、自动更新、Android 权限、模板规范等全局注意点，后续迭代持续遵守。
+  - 📋 新增 AGENTS.md 全局 AI 协作规范；update_rules.md 与 ARCHITECTURE.md 重组为 docs/architecture.md（红线进 AGENTS，细则进架构文档），后续迭代持续遵守。
 - **v1.4.16 (Build 20260818) (2026-08-18)**
   - 🌐 更新检查多源回退：直连 api.github.com 失败时自动切换 ghproxy.net / gh-proxy.com / ghfast.top / mirror.ghproxy.com 加速镜像，国内网络也能正常检查更新。
   - 📥 APK 下载同样支持镜像回退：直链失败自动换源续传，失败后清理半成品再重试，全部源失败才提示。
