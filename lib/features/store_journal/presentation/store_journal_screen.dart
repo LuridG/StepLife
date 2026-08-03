@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:fl_chart/fl_chart.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../domain/store_models.dart';
@@ -1584,6 +1583,18 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
         title: const Text('生活记录'),
         actions: [
           const SettingsButton(),
+          PopupMenuButton<String>(
+            icon: _sortModeIcon(storeProvider.activeSortMode),
+            tooltip: '专项排序',
+            color: const Color(0xFF0F172A),
+            onSelected: (mode) =>
+                storeProvider.setSortMode(storeProvider.selectedCategory, mode),
+            itemBuilder: (ctx) => [
+              _buildSortMenuItem('time', '添加时间', Icons.schedule, storeProvider.activeSortMode),
+              _buildSortMenuItem('rating', '星级', Icons.star, storeProvider.activeSortMode),
+              _buildSortMenuItem('checkin', '打卡次数', Icons.flash_on, storeProvider.activeSortMode),
+            ],
+          ),
           IconButton(
             icon: Icon(storeProvider.isCardView ? Icons.view_headline : Icons.grid_view),
             tooltip: storeProvider.isCardView ? '切换为紧凑列表模式' : '切换为 Card 卡片模式',
@@ -2385,12 +2396,6 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                             ],
                           ),
                         ),
-                        if (basketLogs.isNotEmpty)
-                          SizedBox(
-                            width: 110,
-                            height: 42,
-                            child: _basketSparkline(basketLogs),
-                          ),
                       ],
                     ),
                   ],
@@ -2653,6 +2658,34 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
     return '🛒 最近价 ¥${_fmtPrice(latest)}/$unit · ${chg == null ? '暂无涨跌对比' : BasketStats.formatPct(chg)} · ${logs.length} 次${brand.isNotEmpty && brand != '通用' ? ' · 🏷️ $brand' : ''}';
   }
 
+  /// 排序按钮图标：按当前模式显示（时间/星级/次数）
+  Icon _sortModeIcon(String mode) {
+    switch (mode) {
+      case StoreProvider.kSortRating:
+        return const Icon(Icons.star_rounded, color: Colors.amber);
+      case StoreProvider.kSortCheckin:
+        return const Icon(Icons.flash_on_rounded, color: Color(0xFF10B981));
+      default:
+        return const Icon(Icons.schedule_rounded, color: Colors.lightBlueAccent);
+    }
+  }
+
+  /// 排序弹窗菜单项：图标 + 短标签（选中项打勾）
+  CheckedPopupMenuItem<String> _buildSortMenuItem(
+      String value, String label, IconData icon, String activeMode) {
+    return CheckedPopupMenuItem(
+      value: value,
+      checked: activeMode == value,
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: Colors.white70),
+          const SizedBox(width: 8),
+          Text(label, style: const TextStyle(fontSize: 13)),
+        ],
+      ),
+    );
+  }
+
   /// 菜篮子：涨跌徽章（红涨绿跌）
   Widget _basketTrendBadge(double? change, String prefix) {
     if (change == null) return const SizedBox.shrink();
@@ -2661,65 +2694,24 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
     final color = up
         ? Colors.redAccent
         : (down ? const Color(0xFF10B981) : Colors.amber);
-    final icon = up ? '▲' : (down ? '▼' : '▬');
+    // 方向箭头：↑ 涨 / ↓ 跌 / → 持平，替代迷你走势图
+    final icon = up
+        ? Icons.arrow_upward
+        : (down ? Icons.arrow_downward : Icons.arrow_forward);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
       decoration: BoxDecoration(
         color: color.withAlpha(35),
         borderRadius: BorderRadius.circular(6),
       ),
-      child: Text(
-        '$prefix $icon ${BasketStats.formatPct(change)}',
-        style: TextStyle(fontSize: 9, color: color, fontWeight: FontWeight.bold),
-      ),
-    );
-  }
-
-  /// 菜篮子：迷你走势图（卡片右侧小图）
-  Widget _basketSparkline(List<StoreLog> logs) {
-    final pts = BasketStats.pricePoints(logs);
-    if (pts.length < 2) {
-      return Center(
-        child: Container(
-          width: 8,
-          height: 8,
-          decoration: const BoxDecoration(
-              color: Color(0xFF10B981), shape: BoxShape.circle),
-        ),
-      );
-    }
-    final prices = pts.map((p) => p.price).toList();
-    var minP = prices.reduce((a, b) => a < b ? a : b);
-    var maxP = prices.reduce((a, b) => a > b ? a : b);
-    if (maxP == minP) {
-      maxP += 1;
-      minP -= 1;
-    }
-    final pad = (maxP - minP) * 0.15;
-    return LineChart(
-      LineChartData(
-        minX: 0,
-        maxX: 1,
-        minY: minP - pad,
-        maxY: maxP + pad,
-        gridData: const FlGridData(show: false),
-        titlesData: const FlTitlesData(show: false),
-        borderData: FlBorderData(show: false),
-        lineTouchData: const LineTouchData(enabled: false),
-        lineBarsData: [
-          LineChartBarData(
-            spots: [
-              for (var i = 0; i < prices.length; i++)
-                FlSpot(i / (prices.length - 1), prices[i]),
-            ],
-            color: const Color(0xFF10B981),
-            barWidth: 2,
-            isCurved: true,
-            dotData: const FlDotData(show: false),
-            belowBarData: BarAreaData(
-              show: true,
-              color: const Color(0xFF10B981).withAlpha(28),
-            ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 11, color: color),
+          const SizedBox(width: 2),
+          Text(
+            '$prefix ${BasketStats.formatPct(change)}',
+            style: TextStyle(fontSize: 9, color: color, fontWeight: FontWeight.bold),
           ),
         ],
       ),

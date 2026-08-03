@@ -22,6 +22,12 @@ class StoreProvider extends ChangeNotifier {
   bool _isCardView = true;
   bool _isLoading = true;
 
+  /// 专项排序偏好：分类名 -> 排序模式（time 添加时间 / rating 星级 / checkin 打卡次数）
+  static const String kSortTime = 'time';
+  static const String kSortRating = 'rating';
+  static const String kSortCheckin = 'checkin';
+  Map<String, String> _sortPrefs = {};
+
   List<StoreCategory> get categories => _categories;
   List<StoreItem> get storeItems => _storeItems;
   List<StoreLog> get storeLogs => _storeLogs;
@@ -36,6 +42,9 @@ class StoreProvider extends ChangeNotifier {
   String get selectedBasketTrend => _selectedBasketTrend;
   bool get isCardView => _isCardView;
   bool get isLoading => _isLoading;
+
+  /// 当前分类的排序模式（未设置过则默认按添加时间）
+  String get activeSortMode => _sortPrefs[_selectedCategory] ?? kSortTime;
 
   List<StoreItem> get filteredStoreItems {
     Iterable<StoreItem> result = _storeItems;
@@ -93,7 +102,43 @@ class StoreProvider extends ChangeNotifier {
         return (dir ?? 'flat') == _selectedBasketTrend;
       });
     }
-    return result.toList();
+    final list = result.toList();
+    _applySort(list);
+    return list;
+  }
+
+  /// 按当前分类的排序偏好对卡片列表排序
+  void _applySort(List<StoreItem> list) {
+    switch (activeSortMode) {
+      case kSortRating:
+        list.sort((a, b) => b.rating.compareTo(a.rating));
+        break;
+      case kSortCheckin:
+        final counts = <int, int>{};
+        for (final it in list) {
+          counts[it.id ?? 0] = getCheckinCountForStore(it.id ?? 0);
+        }
+        list.sort((a, b) =>
+            (counts[b.id ?? 0] ?? 0).compareTo(counts[a.id ?? 0] ?? 0));
+        break;
+      case kSortTime:
+      default:
+        list.sort((a, b) {
+          final c = b.createdAt.compareTo(a.createdAt);
+          if (c != 0) return c;
+          return (b.id ?? 0).compareTo(a.id ?? 0);
+        });
+    }
+  }
+
+  /// 切换某分类的排序方式（持久化到 app_settings，重启后保留）
+  Future<void> setSortMode(String category, String mode) async {
+    _sortPrefs[category] = mode;
+    try {
+      await DatabaseService.instance
+          .setSetting('storeSortPrefs', jsonEncode(_sortPrefs));
+    } catch (_) {}
+    notifyListeners();
   }
 
   StoreProvider() {
@@ -108,6 +153,17 @@ class StoreProvider extends ChangeNotifier {
     _storeItems = await DatabaseService.instance.getStoreItems();
     _storeLogs = await DatabaseService.instance.getStoreLogs();
     _menuItems = await DatabaseService.instance.getStoreMenuItems();
+
+    // 加载各分类的排序偏好（无则默认按添加时间）
+    try {
+      final prefsJson = await DatabaseService.instance.getSetting('storeSortPrefs');
+      if (prefsJson != null && prefsJson.isNotEmpty) {
+        final dec = jsonDecode(prefsJson);
+        if (dec is Map) {
+          _sortPrefs = dec.map((k, v) => MapEntry(k.toString(), v.toString()));
+        }
+      }
+    } catch (_) {}
 
     // 旧数据自愈：误存到其他分类的零食条目自动归位
     await _repairMisplacedSnackItems();
@@ -415,6 +471,8 @@ class StoreProvider extends ChangeNotifier {
         timestamp: log.timestamp,
       ),
     );
+    // 补卡/改时后始终按打卡时间倒序展示（新→旧），不随插入先后变化
+    _storeLogs.sort((a, b) => b.timestamp.compareTo(a.timestamp));
     notifyListeners();
   }
 
@@ -455,6 +513,7 @@ class StoreProvider extends ChangeNotifier {
     await DatabaseService.instance.updateStoreLog(log);
     final i = _storeLogs.indexWhere((l) => l.id == logId);
     if (i != -1) _storeLogs[i] = log;
+    _storeLogs.sort((a, b) => b.timestamp.compareTo(a.timestamp));
     notifyListeners();
   }
 
