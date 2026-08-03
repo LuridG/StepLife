@@ -54,7 +54,7 @@ class WebDavService {
 
   /// 确保远程目录存在（逐级 MKCOL，已存在忽略错误）
   Future<void> ensureRemoteDirs() async {
-    for (final rel in ['', '/db', '/images']) {
+    for (final rel in ['', '/db', '/images', '/tmdb']) {
       final uri = _url(rel == '' ? '' : rel);
       final req = http.Request('MKCOL', uri);
       req.headers.addAll(_headers());

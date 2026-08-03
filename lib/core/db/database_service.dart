@@ -119,16 +119,19 @@ class DatabaseService {
   Future<int> relinkImagesAfterRestore() async {
     final db = await database;
     final imagesDir = await CacheManager.instance.imagesDir();
+    final tmdbDir = await CacheManager.instance.tmdbDir();
     var relinked = 0;
 
     Future<String> fix(String path) async {
       if (path.isEmpty) return path;
       if (await File(path).exists()) return path;
       final name = basename(path);
-      final candidate = join(imagesDir.path, name);
-      if (await File(candidate).exists()) {
-        relinked++;
-        return candidate;
+      for (final dir in [imagesDir, tmdbDir]) {
+        final candidate = join(dir.path, name);
+        if (await File(candidate).exists()) {
+          relinked++;
+          return candidate;
+        }
       }
       return path;
     }

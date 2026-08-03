@@ -84,13 +84,30 @@ class SyncService {
         }
       }
 
+      // 3) TMDB 海报缓存增量上传
+      final tmdbDir = await CacheManager.instance.tmdbDir();
+      final remoteTmdb = await webdav.listFiles('/tmdb');
+      final remoteTmdbMap = {for (final f in remoteTmdb) f.path: f.length};
+      var uploadedTmdb = 0;
+      if (await tmdbDir.exists()) {
+        await for (final entity in tmdbDir.list(followLinks: false)) {
+          if (entity is! File) continue;
+          final name = p.basename(entity.path);
+          final localLen = await entity.length();
+          if (remoteTmdbMap[name] != localLen) {
+            final ok = await webdav.uploadFile(entity.path, '/tmdb/$name');
+            if (ok) uploadedTmdb++;
+          }
+        }
+      }
+
       final ok = dbUploaded && verify['ok'] == true;
       return SyncResult(
         success: ok,
         message: ok
-            ? '备份完成：数据库校验通过（${_countsSummary(counts)}），新图片 $uploaded 张已上传'
+            ? '备份完成：数据库校验通过（${_countsSummary(counts)}），新图片 $uploaded 张、海报 $uploadedTmdb 张已上传'
             : '备份失败：数据库上传未成功或完整性校验未通过，请检查网络与账号配置',
-        uploadedFiles: uploaded + (ok ? 1 : 0),
+        uploadedFiles: uploaded + uploadedTmdb + (ok ? 1 : 0),
       );
     } catch (e) {
       return SyncResult(success: false, message: '备份异常: $e');
@@ -196,11 +213,23 @@ class SyncService {
         }
       }
 
+      // 按缺失下载 TMDB 海报
+      final tmdbDir = await CacheManager.instance.tmdbDir();
+      final remoteTmdb = await webdav.listFiles('/tmdb');
+      var downloadedTmdb = 0;
+      for (final f in remoteTmdb) {
+        final local = p.join(tmdbDir.path, f.path);
+        if (!await File(local).exists()) {
+          final ok = await webdav.downloadFile('/tmdb/${f.path}', local);
+          if (ok) downloadedTmdb++;
+        }
+      }
+
       return SyncResult(
         success: true,
         message:
-            '恢复完成：${_countsSummary(counts)}；图片重映射 $relinked 张、补下载 $downloadedImages 张（原库已备份为 steplife_v9_before_restore_*.db）',
-        downloadedFiles: 1 + downloadedImages,
+            '恢复完成：${_countsSummary(counts)}；图片重映射 $relinked 张、补下载图片 $downloadedImages 张、海报 $downloadedTmdb 张（原库已备份为 steplife_v9_before_restore_*.db）',
+        downloadedFiles: 1 + downloadedImages + downloadedTmdb,
       );
     } catch (e) {
       return SyncResult(success: false, message: '恢复异常: $e');

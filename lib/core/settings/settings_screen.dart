@@ -443,8 +443,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildVersionItem(
-                  version: 'v1.4.10 (2026-08-12)',
+                  version: 'v1.4.11 (2026-08-13)',
                   isLatest: true,
+                  changes: [
+                    '🎬 WebDAV 同步补上 TMDB 海报缓存（cache/tmdb）：海报随图片一起增量备份/按缺失下载，恢复后自动重映射海报路径，影视剧集海报不再丢失。',
+                  ],
+                ),
+                const Divider(color: Colors.white12, height: 24),
+                _buildVersionItem(
+                  version: 'v1.4.10 (2026-08-12)',
+                  isLatest: false,
                   changes: [
                     '☁️ WebDAV 同步大修：修复 PROPFIND 大小写兼容（DUFS 等大写 D: 前缀服务器图片列表解析失败，导致恢复时图片拉不回来）。',
                     '🔍 新增「校验远端 / 数据概览 / 上传时间」：恢复前先确认备份库完整性、各表条数（路线/行走打卡/家务/生活记录/成员等）与上传时间。',
