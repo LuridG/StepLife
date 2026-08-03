@@ -1,7 +1,9 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../../../core/settings/settings_button.dart';
+import '../../../core/update/app_updater.dart';
 
 class AboutScreen extends StatelessWidget {
   const AboutScreen({super.key});
@@ -105,9 +107,18 @@ class AboutScreen extends StatelessWidget {
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: const Color(0xFF10B981).withAlpha(80)),
                   ),
-                  child: const Text(
-                    '版本号: v1.4.7 (Build 20260809)',
-                    style: TextStyle(color: Color(0xFF10B981), fontSize: 12, fontWeight: FontWeight.bold),
+                  child: FutureBuilder<PackageInfo>(
+                    future: AppUpdater.packageInfo(),
+                    builder: (context, snap) {
+                      final info = snap.data;
+                      final label = info == null
+                          ? '版本号: 获取中…'
+                          : '版本号: v${info.version} (Build ${info.buildNumber})';
+                      return Text(
+                        label,
+                        style: const TextStyle(color: Color(0xFF10B981), fontSize: 12, fontWeight: FontWeight.bold),
+                      );
+                    },
                   ),
                 ),
                 const SizedBox(height: 12),

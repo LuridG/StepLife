@@ -26,6 +26,8 @@ class SettingsProvider extends ChangeNotifier {
   String _lastCheckinMemberIds = '';
   // 上次备份状态提示（如备份失败）
   String _backupWarning = '';
+  // 启动时自动检查更新（仅 Android）
+  bool _autoCheckUpdate = true;
   bool _loaded = false;
 
   String get themeMode => _themeMode;
@@ -46,6 +48,7 @@ class SettingsProvider extends ChangeNotifier {
   bool get tmdbEnabled => _tmdbApiKey.trim().isNotEmpty;
   bool get webdavConfigured =>
       _webdavUrl.trim().isNotEmpty && _webdavUsername.trim().isNotEmpty;
+  bool get autoCheckUpdate => _autoCheckUpdate;
 
   static const String kThemeMode = 'theme_mode';
   static const String kPreferredViewMode = 'preferredViewMode';
@@ -61,6 +64,7 @@ class SettingsProvider extends ChangeNotifier {
   static const String kDefaultMember = 'default_member';
   static const String kLastCheckinMemberIds = 'last_checkin_member_ids';
   static const String kBackupWarning = 'backup_warning';
+  static const String kAutoCheckUpdate = 'auto_check_update';
 
   /// 从 app_settings 加载全部设置
   Future<void> load() async {
@@ -80,6 +84,7 @@ class SettingsProvider extends ChangeNotifier {
       _defaultMember = all[kDefaultMember] ?? 'self';
       _lastCheckinMemberIds = all[kLastCheckinMemberIds] ?? '';
       _backupWarning = all[kBackupWarning] ?? '';
+      _autoCheckUpdate = all[kAutoCheckUpdate] != 'false';
       _loaded = true;
       notifyListeners();
     } catch (_) {
@@ -164,5 +169,11 @@ class SettingsProvider extends ChangeNotifier {
     _backupWarning = message;
     notifyListeners();
     await _save(kBackupWarning, message);
+  }
+
+  Future<void> setAutoCheckUpdate(bool value) async {
+    _autoCheckUpdate = value;
+    notifyListeners();
+    await _save(kAutoCheckUpdate, value.toString());
   }
 }

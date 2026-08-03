@@ -1,9 +1,12 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'core/theme/app_theme.dart';
 import 'core/settings/settings_provider.dart';
+import 'core/update/app_updater.dart';
+import 'core/update/update_dialog.dart';
 import 'features/profile/providers/profile_provider.dart';
 import 'features/step_tracker/providers/step_provider.dart';
 import 'features/chore_tracker/providers/chore_provider.dart';
@@ -22,6 +25,9 @@ void main() async {
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
   }
+
+  // 清理上次更新残留的安装包（更新完成后下次启动自动删除）
+  unawaited(AppUpdater.cleanupStaleApk());
 
   runApp(
     MultiProvider(
@@ -83,6 +89,21 @@ class _MainHomeScreenState extends State<MainHomeScreen> with WidgetsBindingObse
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeAutoCheckUpdate());
+  }
+
+  /// 启动自动检查更新（仅 Android，且设置开启时）
+  Future<void> _maybeAutoCheckUpdate() async {
+    if (!Platform.isAndroid) return;
+    try {
+      final settings = context.read<SettingsProvider>();
+      if (!settings.autoCheckUpdate) return;
+    } catch (_) {
+      return;
+    }
+    final info = await AppUpdater.safeCheckForUpdate();
+    if (!mounted || info == null) return;
+    await showUpdateDialog(context, info);
   }
 
   @override

@@ -66,3 +66,8 @@ android {
 flutter {
     source = "../.."
 }
+
+dependencies {
+    // 应用内更新：FileProvider 提供 APK 给系统安装器
+    implementation("androidx.core:core-ktx:1.13.1")
+}

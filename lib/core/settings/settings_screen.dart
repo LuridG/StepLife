@@ -5,6 +5,8 @@ import 'package:provider/provider.dart';
 import '../cache/cache_manager.dart';
 import '../sync/sync_service.dart';
 import '../db/database_service.dart';
+import '../update/app_updater.dart';
+import '../update/update_dialog.dart';
 import 'settings_provider.dart';
 
 /// 设置中心：外观 / 模板与分类 / WebDAV 同步 / 缓存管理 / 关于
@@ -19,6 +21,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   CacheStats? _cacheStats;
   bool _syncing = false;
   bool _restoring = false;
+  bool _checkingUpdate = false;
+  String _appVersion = '';
   final TextEditingController _tmdbKeyController = TextEditingController();
 
   @override
@@ -26,6 +30,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     super.initState();
     _tmdbKeyController.text = context.read<SettingsProvider>().tmdbApiKey;
     _refreshCacheStats();
+    _loadAppVersion();
   }
 
   @override
@@ -37,6 +42,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _refreshCacheStats() async {
     final stats = await CacheManager.instance.stats();
     if (mounted) setState(() => _cacheStats = stats);
+  }
+
+  Future<void> _loadAppVersion() async {
+    try {
+      final info = await AppUpdater.packageInfo();
+      if (mounted) setState(() => _appVersion = '${info.version}+${info.buildNumber}');
+    } catch (_) {}
+  }
+
+  Future<void> _checkUpdateNow() async {
+    if (_checkingUpdate) return;
+    setState(() => _checkingUpdate = true);
+    try {
+      final info = await AppUpdater.checkForUpdate();
+      if (!mounted) return;
+      if (info == null) {
+        _toast(_appVersion.isEmpty ? '已是最新版本' : '已是最新版本 v$_appVersion');
+      } else {
+        await showUpdateDialog(context, info);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      _toast('检查更新失败: $e', error: true);
+    } finally {
+      if (mounted) setState(() => _checkingUpdate = false);
+    }
   }
 
   void _toast(String message, {bool error = false}) {
@@ -544,15 +575,50 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ],
                 )),
 
+                // 应用更新
+                _section('应用更新', Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      secondary: const Icon(Icons.autorenew, color: Color(0xFF10B981)),
+                      title: const Text('启动时自动检查更新', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
+                      subtitle: const Text('发现新版本时弹出提示，手动确认后下载安装', style: TextStyle(fontSize: 11, color: Colors.white54)),
+                      value: settings.autoCheckUpdate,
+                      onChanged: (v) => settings.setAutoCheckUpdate(v),
+                    ),
+                    const Divider(height: 8, color: Colors.white12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: FilledButton.icon(
+                            onPressed: _checkingUpdate ? null : _checkUpdateNow,
+                            icon: _checkingUpdate
+                                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                                : const Icon(Icons.system_update_alt, size: 18),
+                            label: Text(_checkingUpdate ? '检查中…' : '检查更新'),
+                            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF10B981)),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    const Text('更新包来源为 GitHub Releases，安装完成后下次启动自动清理下载的 APK', style: TextStyle(fontSize: 11, color: Colors.white38)),
+                  ],
+                )),
+
                 // 关于
                 _section('关于', Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const ListTile(
+                    ListTile(
                       contentPadding: EdgeInsets.zero,
-                      leading: Icon(Icons.info_outline, color: Color(0xFF06B6D4)),
-                      title: Text('StepLife 步履生活', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
-                      subtitle: Text('v1.4.6+20260808 · 数据来源 TMDB', style: TextStyle(fontSize: 12, color: Colors.white54)),
+                      leading: const Icon(Icons.info_outline, color: Color(0xFF06B6D4)),
+                      title: const Text('StepLife 步履生活', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
+                      subtitle: Text(
+                        _appVersion.isEmpty ? '获取版本号中… · 数据来源 TMDB' : 'v$_appVersion · 数据来源 TMDB',
+                        style: const TextStyle(fontSize: 12, color: Colors.white54),
+                      ),
                     ),
                     const SizedBox(height: 4),
                     if (settings.backupWarning.isNotEmpty)
