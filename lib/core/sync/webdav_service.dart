@@ -103,6 +103,32 @@ class WebDavService {
     }
   }
 
+
+  /// 查询远端单个文件信息（大小 + 修改时间），不存在返回 null
+  Future<RemoteFileInfo?> fileInfo(String remoteRelPath) async {
+    final client = _createClient();
+    try {
+      final req = http.Request('PROPFIND', _url(remoteRelPath));
+      req.headers.addAll(_headers(contentType: 'application/xml'));
+      req.headers['Depth'] = '0';
+      req.body = '''
+<?xml version="1.0" encoding="utf-8"?>
+<d:propfind xmlns:d="DAV:">
+  <d:prop>
+    <d:getcontentlength/>
+    <d:getlastmodified/>
+    <d:resourcetype/>
+  </d:prop>
+</d:propfind>''';
+      final streamed = await client.send(req);
+      final resp = await http.Response.fromStream(streamed);
+      if (resp.statusCode != 207 && resp.statusCode != 200) return null;
+      final list = _parsePropfind(resp.body);
+      return list.isEmpty ? null : list.first;
+    } finally {
+      client.close();
+    }
+  }
   /// PROPFIND 列出远端目录下的文件信息（含子目录深度 1）
   Future<List<RemoteFileInfo>> listFiles(String remoteDirRel) async {
     final client = _createClient();
@@ -134,20 +160,20 @@ class WebDavService {
   List<RemoteFileInfo> _parsePropfind(String xml) {
     final result = <RemoteFileInfo>[];
     // 极简 XML 解析：按 <response> 块提取 href / getcontentlength / getlastmodified
-    final responseBlocks = RegExp(r'<d:response>(.*?)</d:response>', dotAll: true)
+    final responseBlocks = RegExp(r'<d:response>(.*?)</d:response>', dotAll: true, caseSensitive: false)
         .allMatches(xml)
         .map((m) => m.group(1) ?? '')
         .toList();
     for (final block in responseBlocks) {
-      final hrefMatch = RegExp(r'<d:href>(.*?)</d:href>', dotAll: true).firstMatch(block);
+      final hrefMatch = RegExp(r'<d:href>(.*?)</d:href>', dotAll: true, caseSensitive: false).firstMatch(block);
       if (hrefMatch == null) continue;
       final href = hrefMatch.group(1)!.trim();
-      final isCollection = block.contains('<d:collection/>');
+      final isCollection = RegExp(r'<d:collection/>', caseSensitive: false).hasMatch(block);
       if (isCollection) continue;
       final lenMatch =
-          RegExp(r'<d:getcontentlength>(\d+)</d:getcontentlength>').firstMatch(block);
+          RegExp(r'<d:getcontentlength>(\d+)</d:getcontentlength>', caseSensitive: false).firstMatch(block);
       final mtimeMatch =
-          RegExp(r'<d:getlastmodified>(.*?)</d:getlastmodified>', dotAll: true)
+          RegExp(r'<d:getlastmodified>(.*?)</d:getlastmodified>', dotAll: true, caseSensitive: false)
               .firstMatch(block);
       result.add(RemoteFileInfo(
         path: Uri.decodeComponent(href.split('/').last),

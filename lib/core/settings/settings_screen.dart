@@ -26,6 +26,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   CacheStats? _cacheStats;
   bool _syncing = false;
   bool _restoring = false;
+  bool _inspecting = false;
   bool _checkingUpdate = false;
   String _appVersion = '';
   final TextEditingController _tmdbKeyController = TextEditingController();
@@ -267,6 +268,132 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  Future<void> _verifyRemote() async {
+    final settings = context.read<SettingsProvider>();
+    if (!settings.webdavConfigured) {
+      _toast('请先配置 WebDAV 服务器', error: true);
+      return;
+    }
+    setState(() => _inspecting = true);
+    final result = await SyncService.inspectRemoteBackup(
+      url: settings.webdavUrl,
+      username: settings.webdavUsername,
+      password: settings.webdavPassword,
+      prefix: settings.webdavPrefix,
+      allowSelfSigned: settings.webdavAllowSelfSigned,
+    );
+    if (mounted) setState(() => _inspecting = false);
+    _showInspectDialog(result.success ? '远端校验通过' : '远端校验未通过', result);
+  }
+
+  Future<void> _analyzeRemote() async {
+    final settings = context.read<SettingsProvider>();
+    if (!settings.webdavConfigured) {
+      _toast('请先配置 WebDAV 服务器', error: true);
+      return;
+    }
+    setState(() => _inspecting = true);
+    final result = await SyncService.inspectRemoteBackup(
+      url: settings.webdavUrl,
+      username: settings.webdavUsername,
+      password: settings.webdavPassword,
+      prefix: settings.webdavPrefix,
+      allowSelfSigned: settings.webdavAllowSelfSigned,
+    );
+    if (mounted) setState(() => _inspecting = false);
+    _showInspectDialog('远端备份数据概览', result);
+  }
+
+  Future<void> _remoteInfo() async {
+    final settings = context.read<SettingsProvider>();
+    if (!settings.webdavConfigured) {
+      _toast('请先配置 WebDAV 服务器', error: true);
+      return;
+    }
+    setState(() => _inspecting = true);
+    final result = await SyncService.remoteBackupInfo(
+      url: settings.webdavUrl,
+      username: settings.webdavUsername,
+      password: settings.webdavPassword,
+      prefix: settings.webdavPrefix,
+      allowSelfSigned: settings.webdavAllowSelfSigned,
+    );
+    if (mounted) setState(() => _inspecting = false);
+    _toast(result.message, error: !result.success);
+  }
+
+  void _showInspectDialog(String title, SyncResult result) {
+    if (!mounted) return;
+    const labels = <String, String>{
+      'routes': '路线',
+      'step_logs': '行走打卡',
+      'members': '成员',
+      'chore_items': '家务项目',
+      'chore_logs': '家务打卡',
+      'store_categories': '生活分类',
+      'store_items': '生活记录',
+      'store_logs': '生活打卡',
+      'store_menu_items': '菜品菜单',
+      'user_profile': '个人档案',
+    };
+    final counts = result.counts;
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(title),
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 480, maxHeight: 420),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      result.success ? Icons.check_circle : Icons.error,
+                      color: result.success ? const Color(0xFF10B981) : Colors.redAccent,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(result.message,
+                          style: const TextStyle(fontSize: 13, color: Colors.white70)),
+                    ),
+                  ],
+                ),
+                if (counts != null) ...[
+                  const SizedBox(height: 12),
+                  const Divider(color: Colors.white12, height: 1),
+                  const SizedBox(height: 8),
+                  for (final entry in labels.entries)
+                    if ((counts[entry.key] ?? 0) > 0)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 3),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(entry.value,
+                                style: const TextStyle(fontSize: 13, color: Colors.white70)),
+                            Text('${counts[entry.key]} 条',
+                                style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white)),
+                          ],
+                        ),
+                      ),
+                ],
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('关闭')),
+        ],
+      ),
+    );
+  }
   Future<void> _resetTemplateBindings() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -316,8 +443,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildVersionItem(
-                  version: 'v1.4.9 (2026-08-11)',
+                  version: 'v1.4.10 (2026-08-12)',
                   isLatest: true,
+                  changes: [
+                    '☁️ WebDAV 同步大修：修复 PROPFIND 大小写兼容（DUFS 等大写 D: 前缀服务器图片列表解析失败，导致恢复时图片拉不回来）。',
+                    '🔍 新增「校验远端 / 数据概览 / 上传时间」：恢复前先确认备份库完整性、各表条数（路线/行走打卡/家务/生活记录/成员等）与上传时间。',
+                    '🛡️ 备份升级为 VACUUM INTO 一致性快照并校验各表行数；恢复前先校验云端库，恢复后自动重映射图片路径到当前设备，并强制刷新路线/家务/生活/成员全部数据源。',
+                  ],
+                ),
+                const Divider(color: Colors.white12, height: 24),
+                _buildVersionItem(
+                  version: 'v1.4.9 (2026-08-11)',
+                  isLatest: false,
                   changes: [
                     '🔏 正式签名修复：v1.4.9 起所有 Release 使用同一把正式签名密钥，彻底解决跨版本「签名不一致需卸载重装」的问题。',
                     '⚠️ 一次性升级提示：本次从旧版升级需先卸载旧版（建议先在 数据与同步 → WebDAV 上传备份，重装后恢复，数据不丢）；v1.4.9 之后升级不再需要卸载。',
@@ -715,6 +852,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ],
                     ),
                     const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _inspecting ? null : _verifyRemote,
+                            icon: _inspecting
+                                ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                                : const Icon(Icons.fact_check_outlined, size: 17),
+                            label: const Text('校验远端'),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _inspecting ? null : _analyzeRemote,
+                            icon: _inspecting
+                                ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                                : const Icon(Icons.analytics_outlined, size: 17),
+                            label: const Text('数据概览'),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _inspecting ? null : _remoteInfo,
+                            icon: _inspecting
+                                ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                                : const Icon(Icons.schedule_outlined, size: 17),
+                            label: const Text('上传时间'),
+                          ),
+                        ),
+                      ],
+                    ),                    const SizedBox(height: 10),
                     Text(
                       settings.webdavLastSync.isEmpty
                           ? '尚未同步过'

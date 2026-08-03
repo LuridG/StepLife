@@ -10,12 +10,14 @@ class SyncResult {
   final String message;
   final int uploadedFiles;
   final int downloadedFiles;
+  final Map<String, int>? counts;
 
   const SyncResult({
     required this.success,
     required this.message,
     this.uploadedFiles = 0,
     this.downloadedFiles = 0,
+    this.counts,
   });
 }
 
@@ -203,6 +205,97 @@ class SyncService {
     } catch (e) {
       return SyncResult(success: false, message: '恢复异常: $e');
     }
+  }
+
+  /// 远端备份文件信息（大小 + 上传时间），只查不下载
+  static Future<SyncResult> remoteBackupInfo({
+    required String url,
+    required String username,
+    required String password,
+    required String prefix,
+    required bool allowSelfSigned,
+  }) async {
+    try {
+      final webdav = WebDavService(
+        baseUrl: url,
+        username: username,
+        password: password,
+        prefix: prefix,
+        allowSelfSigned: allowSelfSigned,
+      );
+      final info = await webdav.fileInfo('/db/steplife_v9.db');
+      if (info == null) {
+        return const SyncResult(
+          success: false,
+          message: '远端未找到数据库备份，请先执行一次「立即上传」',
+        );
+      }
+      return SyncResult(
+        success: true,
+        message: '远端数据库备份：${_fmtSize(info.length)}，上传时间 ${info.mtime ?? '未知'}',
+      );
+    } catch (e) {
+      return SyncResult(success: false, message: '查询异常: $e');
+    }
+  }
+
+  /// 校验远端备份：下载数据库做完整性校验 + 各表行数统计（不替换本地数据）
+  static Future<SyncResult> inspectRemoteBackup({
+    required String url,
+    required String username,
+    required String password,
+    required String prefix,
+    required bool allowSelfSigned,
+  }) async {
+    try {
+      final webdav = WebDavService(
+        baseUrl: url,
+        username: username,
+        password: password,
+        prefix: prefix,
+        allowSelfSigned: allowSelfSigned,
+      );
+      final tmpDir = await Directory.systemTemp.createTemp('steplife_inspect_');
+      final downloaded = p.join(tmpDir.path, 'steplife_v9.db');
+      final ok = await webdav.downloadFile('/db/steplife_v9.db', downloaded);
+      if (!ok) {
+        try {
+          await tmpDir.delete(recursive: true);
+        } catch (_) {}
+        return const SyncResult(
+          success: false,
+          message: '远端未找到数据库备份，请先执行一次「立即上传」',
+        );
+      }
+      final verify = await DatabaseService.instance.verifySnapshot(downloaded);
+      try {
+        await tmpDir.delete(recursive: true);
+      } catch (_) {}
+      final counts =
+          Map<String, int>.from((verify['counts'] as Map?) ?? const {});
+      if (verify['ok'] != true) {
+        return SyncResult(
+          success: false,
+          message: '校验未通过：云端数据库完整性异常，请重新执行一次「立即上传」',
+          counts: counts,
+        );
+      }
+      return SyncResult(
+        success: true,
+        message: '校验通过：数据库完整，${_countsSummary(counts)}',
+        counts: counts,
+      );
+    } catch (e) {
+      return SyncResult(success: false, message: '校验异常: $e');
+    }
+  }
+
+  static String _fmtSize(int bytes) {
+    if (bytes >= 1024 * 1024) {
+      return '${(bytes / 1024 / 1024).toStringAsFixed(1)} MB';
+    }
+    if (bytes >= 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    return '$bytes B';
   }
 
   static String _countsSummary(Map<String, int> c) {
