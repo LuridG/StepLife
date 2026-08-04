@@ -144,12 +144,12 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
               if (BillParser.isOcrSupported)
                 ListTile(
                   leading: const Icon(Icons.photo_library_outlined, color: Colors.white70),
-                  title: const Text('从相册选择账单图片', style: TextStyle(color: Colors.white)),
+                  title: const Text('从相册选择账单图片（内置 OCR）', style: TextStyle(color: Colors.white)),
                   onTap: () => Navigator.pop(ctx, 'image'),
                 ),
               ListTile(
                 leading: const Icon(Icons.keyboard_outlined, color: Colors.white70),
-                title: const Text('粘贴账单文字', style: TextStyle(color: Colors.white)),
+                title: const Text('粘贴 OCR 文字（AI 识别）', style: TextStyle(color: Colors.white)),
                 onTap: () => Navigator.pop(ctx, 'paste'),
               ),
             ],
@@ -230,14 +230,14 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('粘贴账单文字'),
+        title: const Text('粘贴 OCR 文字'),
         backgroundColor: const Color(0xFF111C38),
         content: TextField(
           controller: ctrl,
           maxLines: 8,
           style: const TextStyle(color: Colors.white),
           decoration: const InputDecoration(
-            hintText: '粘贴微信账单等文字内容',
+            hintText: '粘贴 OCR 识别出的账单文字（可含多笔消费）',
             hintStyle: TextStyle(color: Colors.white38),
           ),
         ),

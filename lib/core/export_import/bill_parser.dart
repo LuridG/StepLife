@@ -86,12 +86,13 @@ class BillParser {
   }) async {
     final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
     final instruction = '''
-你是生活记账整理助手。下面是用户某次消费的账单文字（OCR 或手动粘贴），请提取每一笔消费记录。
+你是生活记账整理助手。下面是用户某次消费的账单文字（OCR 或手动粘贴），请提取其中的每一笔消费记录。
+账单可能包含多笔消费（一张截图/一段文字可有多笔），必须逐笔拆分为独立记录、按出现顺序排列，严禁合并、遗漏或凭空捏造。
 只返回 JSON，不输出任何解释。
 字段规则：
-- records: 数组，每项含 amount(数字，单位元)、time(格式 yyyy-MM-dd HH:mm，账单未写日期时按今天 $today 推断)、memo(账单中的消费内容/菜名，没有则省略该字段)。
+- records: 数组。每项含 amount(数字，单位元，去掉 ¥ ￥ 等货币符号)、time(格式 yyyy-MM-dd HH:mm；账单未写日期按今天 $today 推断，未写具体时间默认 12:00)、memo(该笔消费内容/菜名，没有则省略该字段)。
 - storeGuess: 仅当账单中出现与当前店铺「$storeName」不同的店铺名时给出 {"name":"店铺名","category":"建议分类"}，否则省略。
-输出格式：{"records":[{"amount":12.5,"time":"$today 12:30","memo":"微信支付-餐饮"}],"storeGuess":{...}}''';
+输出格式：{"records":[{"amount":12.5,"time":"$today 12:30","memo":"微信支付-餐饮"},{"amount":8.0,"time":"$today 12:35","memo":"奶茶"}],"storeGuess":{...}}''';
     final content = await DeepSeekService.chat(
       apiKey: apiKey,
       messages: [
