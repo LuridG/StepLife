@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
@@ -17,6 +18,71 @@ import '../domain/life_templates.dart';
 import '../providers/store_provider.dart';
 import '../utils/basket_stats.dart';
 import 'store_checkin_dialog.dart';
+
+/// 打卡历史筛选条件：字段（时间/金额）+ 操作符 + 值，多个条件 AND 组合
+class LogFilterCondition {
+  LogFilterCondition({
+    required this.field,
+    required this.op,
+    this.time,
+    this.cost,
+  });
+
+  final String field; // 'time' | 'cost'
+  final String op; // = > >= < <=
+  final DateTime? time;
+  final double? cost;
+
+  String get label {
+    if (field == 'time') {
+      final t = time;
+      if (t == null) return '时间 $op ?';
+      return '时间 $op ${DateFormat('yyyy-MM-dd HH:mm').format(t)}';
+    }
+    final v = cost;
+    return '金额 $op ${v == null ? '?' : v.toStringAsFixed(2)}';
+  }
+
+  /// 该条件是否命中一条打卡（时间比较对齐到分钟，金额 = 用误差 0.005）
+  bool matches(StoreLog l) {
+    if (field == 'time') {
+      final t = time;
+      if (t == null) return true;
+      final lt = DateTime(l.timestamp.year, l.timestamp.month,
+          l.timestamp.day, l.timestamp.hour, l.timestamp.minute);
+      final cmp = lt.compareTo(t);
+      switch (op) {
+        case '=':
+          return cmp == 0;
+        case '>':
+          return cmp > 0;
+        case '>=':
+          return cmp >= 0;
+        case '<':
+          return cmp < 0;
+        case '<=':
+          return cmp <= 0;
+      }
+      return true;
+    }
+    final c = l.cost;
+    final v = cost;
+    if (c == null || v == null) return false;
+    switch (op) {
+      case '=':
+        return (c - v).abs() < 0.005;
+      case '>':
+        return c > v;
+      case '>=':
+        return c >= v;
+      case '<':
+        return c < v;
+      case '<=':
+        return c <= v;
+    }
+    return true;
+  }
+}
 
 /// 老数据/非模板字段的兜底中文标签（避免详情页直接显示英文 key）
 const kLogExtrasLabelFallback = <String, String>{
@@ -67,68 +133,24 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
   /// 打卡历史：紧凑视图开关
   bool _compactLogs = false;
 
-  /// 打卡历史筛选（'time' | 'cost'，null=无筛选）
-  String? _filterField;
-  String _filterOp = '>=';
-  DateTime? _filterTime;
-  double? _filterCost;
+  /// 打卡历史筛选条件（多个条件 AND 组合，空=无筛选）
+  final List<LogFilterCondition> _logFilters = [];
 
-  bool get _hasLogFilter =>
-      _filterField != null && (_filterTime != null || _filterCost != null);
+  bool get _hasLogFilter => _logFilters.isNotEmpty;
 
-  /// 按时间/金额条件过滤打卡记录（时间比较到秒，金额 null 视为不满足）
+  /// 按多个筛选条件（AND 组合）过滤打卡记录
   List<StoreLog> _applyLogFilters(List<StoreLog> logs) {
-    if (!_hasLogFilter) return logs;
-    return logs.where((l) {
-      if (_filterField == 'time') {
-        final t = _filterTime;
-        if (t == null) return true;
-        // 比较对齐到分钟（日期选择器只精确到分钟）
-        final lt = DateTime(l.timestamp.year, l.timestamp.month,
-            l.timestamp.day, l.timestamp.hour, l.timestamp.minute);
-        final cmp = lt.compareTo(t);
-        switch (_filterOp) {
-          case '=':
-            return cmp == 0;
-          case '>':
-            return cmp > 0;
-          case '>=':
-            return cmp >= 0;
-          case '<':
-            return cmp < 0;
-          case '<=':
-            return cmp <= 0;
-        }
-        return true;
-      }
-      if (_filterField == 'cost') {
-        final c = l.cost;
-        final v = _filterCost;
-        if (c == null || v == null) return false;
-        switch (_filterOp) {
-          case '=':
-            return (c - v).abs() < 0.005;
-          case '>':
-            return c > v;
-          case '>=':
-            return c >= v;
-          case '<':
-            return c < v;
-          case '<=':
-            return c <= v;
-        }
-        return true;
-      }
-      return true;
-    }).toList();
+    if (_logFilters.isEmpty) return logs;
+    return logs.where((l) => _logFilters.every((f) => f.matches(l))).toList();
   }
 
   Future<void> _showLogFilterSheet(BuildContext context) async {
-    var field = _filterField;
-    var op = _filterOp;
-    var time = _filterTime;
-    var cost = _filterCost;
-    final costCtrl = TextEditingController(text: cost?.toString() ?? '');
+    var newField = 'time';
+    var newOp = '>=';
+    var newTime = DateTime.now();
+    var newCost = 0.0;
+    final costCtrl = TextEditingController();
+    final draftFilters = List<LogFilterCondition>.of(_logFilters);
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: const Color(0xFF111C38),
@@ -146,105 +168,135 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('筛选打卡记录',
+                const Text('筛选打卡记录（可叠加多个条件）',
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
-                const SizedBox(height: 14),
-                const Text('字段', style: TextStyle(fontSize: 12, color: Colors.white54)),
-                const SizedBox(height: 6),
-                Wrap(
-                  spacing: 6,
-                  children: [
-                    for (final f in const <(String, String)>[('time', '时间'), ('cost', '金额')])
-                      ChoiceChip(
-                        label: Text(f.$2, style: const TextStyle(fontSize: 12)),
-                        selected: field == f.$1,
-                        selectedColor: const Color(0xFF10B981).withAlpha(70),
-                        backgroundColor: Colors.white10,
-                        labelStyle: TextStyle(color: field == f.$1 ? Colors.white : Colors.white70),
-                        onSelected: (_) => setSheet(() {
-                          field = f.$1;
-                          if (f.$1 == 'time' && time == null) time = DateTime.now();
-                        }),
-                      ),
-                  ],
-                ),
                 const SizedBox(height: 12),
-                const Text('条件', style: TextStyle(fontSize: 12, color: Colors.white54)),
-                const SizedBox(height: 6),
-                Wrap(
-                  spacing: 6,
-                  children: [
-                    for (final o in const ['=', '>', '>=', '<', '<='])
-                      ChoiceChip(
-                        label: Text(o, style: const TextStyle(fontSize: 12)),
-                        selected: op == o,
-                        selectedColor: const Color(0xFF10B981).withAlpha(70),
-                        backgroundColor: Colors.white10,
-                        labelStyle: TextStyle(color: op == o ? Colors.white : Colors.white70),
-                        onSelected: (_) => setSheet(() => op = o),
+                if (draftFilters.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8),
+                    child: Text('尚未添加条件，点击下方「添加条件」设置。',
+                        style: TextStyle(fontSize: 12, color: Colors.white38)),
+                  )
+                else
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      for (var i = 0; i < draftFilters.length; i++)
+                        InputChip(
+                          label: Text(draftFilters[i].label, style: const TextStyle(fontSize: 11.5, color: Colors.white)),
+                          deleteIcon: const Icon(Icons.close, size: 15, color: Colors.white54),
+                          backgroundColor: const Color(0xFF10B981).withAlpha(25),
+                          side: const BorderSide(color: Color(0xFF10B981)),
+                          onDeleted: () => setSheet(() => draftFilters.removeAt(i)),
+                        ),
+                    ],
+                  ),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0F172A),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.white12),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('添加条件', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white70)),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: [
+                          for (final f in const <(String, String)>[('time', '时间'), ('cost', '金额')])
+                            ChoiceChip(
+                              label: Text(f.$2, style: const TextStyle(fontSize: 12)),
+                              selected: newField == f.$1,
+                              selectedColor: const Color(0xFF10B981).withAlpha(70),
+                              backgroundColor: Colors.white10,
+                              labelStyle: TextStyle(color: newField == f.$1 ? Colors.white : Colors.white70),
+                              onSelected: (_) => setSheet(() => newField = f.$1),
+                            ),
+                          for (final o in const ['=', '>', '>=', '<', '<='])
+                            ChoiceChip(
+                              label: Text(o, style: const TextStyle(fontSize: 12)),
+                              selected: newOp == o,
+                              selectedColor: const Color(0xFF10B981).withAlpha(70),
+                              backgroundColor: Colors.white10,
+                              labelStyle: TextStyle(color: newOp == o ? Colors.white : Colors.white70),
+                              onSelected: (_) => setSheet(() => newOp = o),
+                            ),
+                        ],
                       ),
-                  ],
+                      const SizedBox(height: 10),
+                      if (newField == 'time')
+                        OutlinedButton.icon(
+                          icon: const Icon(Icons.event, size: 16),
+                          label: Text(DateFormat('yyyy-MM-dd HH:mm').format(newTime),
+                              style: const TextStyle(fontSize: 12.5, color: Colors.white70)),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.white70,
+                            side: const BorderSide(color: Colors.white24),
+                          ),
+                          onPressed: () async {
+                            final d = await showDatePicker(
+                              context: ctx,
+                              initialDate: newTime,
+                              firstDate: DateTime(2020),
+                              lastDate: DateTime.now().add(const Duration(days: 365)),
+                            );
+                            if (d == null || !ctx.mounted) return;
+                            final t = await showTimePicker(
+                              context: ctx,
+                              initialTime: TimeOfDay.fromDateTime(newTime),
+                            );
+                            if (t == null) return;
+                            setSheet(() => newTime =
+                                DateTime(d.year, d.month, d.day, t.hour, t.minute));
+                          },
+                        )
+                      else
+                        TextField(
+                          controller: costCtrl,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          style: const TextStyle(color: Colors.white),
+                          decoration: const InputDecoration(
+                            hintText: '输入金额，如 26.5',
+                            hintStyle: TextStyle(color: Colors.white38),
+                            isDense: true,
+                          ),
+                          onChanged: (v) => newCost = double.tryParse(v.trim()) ?? 0,
+                        ),
+                      const SizedBox(height: 10),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: FilledButton.tonal(
+                          style: FilledButton.styleFrom(backgroundColor: const Color(0xFF10B981).withAlpha(50)),
+                          onPressed: () => setSheet(() {
+                            draftFilters.add(LogFilterCondition(
+                              field: newField,
+                              op: newOp,
+                              time: newField == 'time' ? newTime : null,
+                              cost: newField == 'cost' ? newCost : null,
+                            ));
+                            costCtrl.clear();
+                          }),
+                          child: const Text('＋ 添加条件', style: TextStyle(fontSize: 12.5)),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 12),
-                if (field == 'time') ...[
-                  const Text('时间值', style: TextStyle(fontSize: 12, color: Colors.white54)),
-                  const SizedBox(height: 6),
-                  OutlinedButton.icon(
-                    icon: const Icon(Icons.event, size: 16),
-                    label: Text(time == null
-                        ? '选择日期时间'
-                        : DateFormat('yyyy-MM-dd HH:mm').format(time!)),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.white70,
-                      side: const BorderSide(color: Colors.white24),
-                    ),
-                    onPressed: () async {
-                      final now = time ?? DateTime.now();
-                      final d = await showDatePicker(
-                        context: ctx,
-                        initialDate: now,
-                        firstDate: DateTime(2020),
-                        lastDate: DateTime.now().add(const Duration(days: 365)),
-                      );
-                      if (d == null || !ctx.mounted) return;
-                      final t = await showTimePicker(
-                        context: ctx,
-                        initialTime: TimeOfDay.fromDateTime(now),
-                      );
-                      if (t == null) return;
-                      setSheet(() => time =
-                          DateTime(d.year, d.month, d.day, t.hour, t.minute));
-                    },
-                  ),
-                ] else ...[
-                  const Text('金额值（元）', style: TextStyle(fontSize: 12, color: Colors.white54)),
-                  const SizedBox(height: 6),
-                  TextField(
-                    controller: costCtrl,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    style: const TextStyle(color: Colors.white),
-                    decoration: const InputDecoration(
-                      hintText: '输入金额，如 26.5',
-                      hintStyle: TextStyle(color: Colors.white38),
-                      isDense: true,
-                    ),
-                    onChanged: (v) => cost = double.tryParse(v.trim()),
-                  ),
-                ],
-                const SizedBox(height: 18),
+                const SizedBox(height: 16),
                 Row(
                   children: [
                     TextButton(
                       onPressed: () {
                         Navigator.pop(ctx);
-                        setState(() {
-                          _filterField = null;
-                          _filterTime = null;
-                          _filterCost = null;
-                          _filterOp = '>=';
-                        });
+                        setState(() => _logFilters.clear());
                       },
-                      child: const Text('清除筛选', style: TextStyle(color: Colors.white54)),
+                      child: const Text('清除全部', style: TextStyle(color: Colors.white54)),
                     ),
                     const Spacer(),
                     FilledButton(
@@ -252,13 +304,11 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
                       onPressed: () {
                         Navigator.pop(ctx);
                         setState(() {
-                          _filterField = field;
-                          _filterOp = op;
-                          _filterTime = field == 'time' ? time : null;
-                          _filterCost = field == 'cost' ? cost : null;
+                          _logFilters.clear();
+                          _logFilters.addAll(draftFilters);
                         });
                       },
-                      child: const Text('应用筛选'),
+                      child: Text(draftFilters.isEmpty ? '关闭' : '应用筛选（${draftFilters.length} 个）'),
                     ),
                   ],
                 ),
@@ -270,9 +320,8 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
     );
     costCtrl.dispose();
   }
-
-  /// 打卡统计：汇总当前（筛选后）打卡列表的各类信息
-  void _showLogStatsSheet(BuildContext context, List<StoreLog> logs) {
+  /// 打卡统计：汇总当前（筛选后）打卡列表的各类信息，按模板类型差异化展示
+  void _showLogStatsSheet(BuildContext context, List<StoreLog> logs, String templateKey) {
     if (logs.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
         content: Text('当前没有可统计的打卡记录'),
@@ -310,6 +359,59 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
       ..sort((a, b) => b.value.compareTo(a.value));
     final menus = byMenu.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
+
+    // ---- 模板类型专属统计 ----
+    final typeBlocks = <Widget>[];
+    switch (templateKey) {
+      case 'dining':
+        // 人均消费（按同行人数平均）
+        var personCost = 0.0;
+        var personCount = 0;
+        for (final l in logs) {
+          final n = l.visitorNames.where((v) => v.trim().isNotEmpty).length;
+          final c = l.cost;
+          if (n > 0 && c != null) {
+            personCost += c;
+            personCount += n;
+          }
+        }
+        if (personCount > 0) {
+          typeBlocks.add(_statsSectionTitle('人均消费'));
+          typeBlocks.add(_statChip('¥${_fmtPrice(personCost / personCount)}', '按同行人数平均'));
+        }
+        typeBlocks.addAll(_distWidgets('结算平台', _collectMultiExtras(logs, 'platform')));
+      case 'movie':
+        typeBlocks.addAll(_distWidgets('观看平台', _collectMultiExtras(logs, 'platform')));
+        typeBlocks.addAll(_distWidgets('媒体类型', _collectSingles(logs, 'mediaType')));
+        var watched = 0;
+        var totalEps = 0;
+        for (final l in logs) {
+          watched += _numFrom(l.extras['watchedEpisodes']);
+          totalEps += _numFrom(l.extras['totalEpisodes']);
+        }
+        if (watched > 0 || totalEps > 0) {
+          typeBlocks.add(_statsSectionTitle('集数进度'));
+          typeBlocks.add(_statChip(totalEps > 0
+              ? '$watched / $totalEps 集'
+              : '$watched 集',
+              '累计已看 / 总集数'));
+        }
+      case 'snack':
+        typeBlocks.addAll(_distWidgets('品牌分布', _collectSingles(logs, 'brand')));
+        typeBlocks.addAll(_distWidgets('零食分类', _collectSingles(logs, 'snackTag')));
+      case 'book':
+        final progresses = logs.reversed
+            .map((l) => l.extras['progress']?.toString().trim() ?? '')
+            .where((s) => s.isNotEmpty)
+            .take(3)
+            .toList();
+        if (progresses.isNotEmpty) {
+          typeBlocks.add(_statsSectionTitle('最近阅读进度'));
+          typeBlocks.addAll(
+              progresses.map((p) => _statChip(p, '')));
+        }
+    }
+
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: const Color(0xFF111C38),
@@ -347,9 +449,9 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
                     _statsMetric('最低', minC == null ? '—' : '¥${_fmtPrice(minC)}'),
                   ],
                 ),
+                ...typeBlocks,
                 if (months.isNotEmpty) ...[
-                  const SizedBox(height: 16),
-                  const Text('按月分布', style: TextStyle(fontSize: 12.5, color: Colors.white70, fontWeight: FontWeight.w600)),
+                  _statsSectionTitle('按月分布'),
                   const SizedBox(height: 6),
                   Wrap(
                     spacing: 6,
@@ -370,8 +472,7 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
                   ),
                 ],
                 if (visitors.isNotEmpty) ...[
-                  const SizedBox(height: 14),
-                  const Text('成员分布', style: TextStyle(fontSize: 12.5, color: Colors.white70, fontWeight: FontWeight.w600)),
+                  _statsSectionTitle('成员分布'),
                   const SizedBox(height: 6),
                   Wrap(
                     spacing: 6,
@@ -391,8 +492,7 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
                   ),
                 ],
                 if (menus.isNotEmpty) ...[
-                  const SizedBox(height: 14),
-                  const Text('点菜频次', style: TextStyle(fontSize: 12.5, color: Colors.white70, fontWeight: FontWeight.w600)),
+                  _statsSectionTitle('点菜频次'),
                   const SizedBox(height: 6),
                   Wrap(
                     spacing: 6,
@@ -418,6 +518,105 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
         ),
       ),
     );
+  }
+
+  Widget _statsSectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 14, bottom: 6),
+      child: Text(title,
+          style: const TextStyle(fontSize: 12.5, color: Colors.white70, fontWeight: FontWeight.w600)),
+    );
+  }
+
+  Widget _statChip(String text, String sub) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 6, bottom: 6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0F172A),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.white12),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(text, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
+            if (sub.isNotEmpty)
+              Text(sub, style: const TextStyle(fontSize: 10.5, color: Colors.white38)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 统计分布：标题 + 名称×次数 标签
+  List<Widget> _distWidgets(String title, List<String> values) {
+    final counts = <String, int>{};
+    for (final v in values) {
+      if (v.trim().isEmpty) continue;
+      counts[v.trim()] = (counts[v.trim()] ?? 0) + 1;
+    }
+    final sorted = counts.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    if (sorted.isEmpty) return const [];
+    return [
+      _statsSectionTitle(title),
+      const SizedBox(height: 2),
+      Wrap(
+        spacing: 6,
+        runSpacing: 6,
+        children: [
+          for (final e in sorted)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.white.withAlpha(12),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text('${e.key} · ${e.value}次',
+                  style: const TextStyle(fontSize: 11, color: Colors.white70)),
+            ),
+        ],
+      ),
+    ];
+  }
+
+  List<String> _collectSingles(List<StoreLog> logs, String key) {
+    final out = <String>[];
+    for (final l in logs) {
+      final v = (l.extras[key]?.toString() ?? '').trim();
+      if (v.isNotEmpty) out.add(v);
+    }
+    return out;
+  }
+
+  /// 多选字段（platform 等）可能是 JSON 数组字符串，也可能是分隔文本
+  List<String> _collectMultiExtras(List<StoreLog> logs, String key) {
+    final out = <String>[];
+    for (final l in logs) {
+      final raw = l.extras[key];
+      if (raw == null) continue;
+      final s = raw.toString().trim();
+      if (s.isEmpty) continue;
+      if (s.startsWith('[')) {
+        try {
+          final d = jsonDecode(s);
+          if (d is List) {
+            out.addAll(d.map((e) => e.toString().trim()).where((e) => e.isNotEmpty));
+            continue;
+          }
+        } catch (_) {}
+      }
+      out.addAll(s.split(RegExp(r'[,，、]')).map((e) => e.trim()).where((e) => e.isNotEmpty));
+    }
+    return out;
+  }
+
+  int _numFrom(Object? raw) {
+    if (raw == null) return 0;
+    final m = RegExp(r'\d+').firstMatch(raw.toString());
+    return m == null ? 0 : int.tryParse(m.group(0)!) ?? 0;
   }
 
   Widget _statsMetric(String label, String value) {
@@ -1419,7 +1618,7 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
                       visualDensity: VisualDensity.compact,
                       tooltip: '打卡统计',
                       icon: const Icon(Icons.insights_outlined, size: 20, color: Colors.white54),
-                      onPressed: () => _showLogStatsSheet(context, filteredLogs),
+                      onPressed: () => _showLogStatsSheet(context, filteredLogs, tpl.key),
                     ),
                     IconButton(
                       visualDensity: VisualDensity.compact,
