@@ -84,4 +84,6 @@ flutter {
 dependencies {
     // 应用内更新：FileProvider 提供 APK 给系统安装器
     implementation("androidx.core:core-ktx:1.13.1")
+    // 离线 OCR（账单导入）：google_mlkit_text_recognition 仅内置拉丁文，中文识别模型随此依赖打包进 APK
+    implementation("com.google.mlkit:text-recognition-chinese:16.0.1")
 }
