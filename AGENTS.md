@@ -20,7 +20,7 @@
 - **图标**：保持 100% 透明 Alpha 通道（RGBA）DIB ICO，严禁白色/浅色背景余边。
 - **版本发布**：`pubspec.yaml` `version: 1.5.x+YYYYMMDD`，构建号用打包日期且必须递增；发布时同步更新 `assets/walkthrough.md` 更新日志、设置中心「更新记录与版本历史」与 README，保持多处一致。
 
-- **生活导入导出**：核心在 `lib/core/export_import/`（StoreExporter / StoreImporter / ImportDraft / ImportPreviewScreen / BillParser）；导出支持单分类与全量（JSON v1，图片字段位预留）；导入分 L1 详情页纯打卡（parseLogsOnly）→ L2 新店铺建项目 → L3 模板全量；导入前必须 `vacuumInto` 快照备份（保留 3 份）+ 单事务回滚；AI 账单导入（OCR+DeepSeek）产出仅作建议，须经模拟导入页用户确认后落库；依赖 share_plus / file_picker / google_mlkit_text_recognition。
+- **生活导入导出**：核心在 `lib/core/export_import/`（StoreExporter / StoreImporter / ImportDraft / ImportPreviewScreen / BillParser）；导出支持单分类与全量（JSON v1，图片字段位预留）；导入分 L1 详情页纯打卡（parseLogsOnly）→ L2 新店铺建项目 → L3 模板全量；导入前必须 `vacuumInto` 快照备份（保留 3 份）+ 单事务回滚；AI 账单导入（OCR+DeepSeek）产出仅作建议，须经模拟导入页用户确认后落库；OCR 仅安卓/苹果可用（`BillParser.isOcrSupported`），桌面端自动降级为粘贴账单文字；依赖 share_plus / file_picker / google_mlkit_text_recognition。
 
 ## 🧭 全局架构要点
 - 入口 `lib/main.dart`：底部 4 个 Tab（路线/家务/生活/成员），「关于」已合并进设置中心；桌面 FFI 初始化不可删。

@@ -141,14 +141,15 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              ListTile(
-                leading: const Icon(Icons.photo_library_outlined, color: Colors.white70),
-                title: const Text('从相册选择账单图片', style: TextStyle(color: Colors.white)),
-                onTap: () => Navigator.pop(ctx, 'image'),
-              ),
+              if (BillParser.isOcrSupported)
+                ListTile(
+                  leading: const Icon(Icons.photo_library_outlined, color: Colors.white70),
+                  title: const Text('从相册选择账单图片', style: TextStyle(color: Colors.white)),
+                  onTap: () => Navigator.pop(ctx, 'image'),
+                ),
               ListTile(
                 leading: const Icon(Icons.keyboard_outlined, color: Colors.white70),
-                title: const Text('粘贴账单文字（桌面端推荐）', style: TextStyle(color: Colors.white)),
+                title: const Text('粘贴账单文字', style: TextStyle(color: Colors.white)),
                 onTap: () => Navigator.pop(ctx, 'paste'),
               ),
             ],
@@ -164,6 +165,13 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
         messenger.showSnackBar(const SnackBar(content: Text('正在 OCR 识别账单…')));
         try {
           rawText = await BillParser.ocrImage(picked.path);
+        } on BillOcrUnavailableException {
+          messenger.showSnackBar(const SnackBar(
+            content: Text('当前设备不支持离线 OCR，已切换为粘贴账单文字'),
+          ));
+          if (!context.mounted) return;
+          rawText = await _askPasteText(context);
+          if (rawText.isEmpty) return;
         } catch (e) {
           messenger.showSnackBar(SnackBar(
             backgroundColor: const Color(0xFFEF4444),

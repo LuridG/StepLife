@@ -1,4 +1,7 @@
 import 'dart:convert';
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/services.dart' show MissingPluginException;
 import 'package:intl/intl.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import '../../features/assistant/services/deepseek_service.dart';
@@ -31,9 +34,23 @@ class BillParseResult {
 }
 
 /// 账单智能导入：离线 OCR + DeepSeek 结构化 → 打卡草稿。
+class BillOcrUnavailableException implements Exception {
+  const BillOcrUnavailableException();
+
+  @override
+  String toString() => '当前设备不支持离线 OCR（仅安卓/苹果可用）';
+}
+
 class BillParser {
+  /// 当前平台是否支持 ML Kit 离线 OCR（仅 Android/iOS）。
+  static bool get isOcrSupported =>
+      !kIsWeb && (Platform.isAndroid || Platform.isIOS);
+
   /// 用 ML Kit 离线识别图片中的文字（仅 Android/iOS；桌面端抛异常由调用方兜底）。
   static Future<String> ocrImage(String imagePath) async {
+    if (!isOcrSupported) {
+      throw const BillOcrUnavailableException();
+    }
     final recognizer = TextRecognizer(
       script: TextRecognitionScript.chinese,
     );
@@ -49,8 +66,14 @@ class BillParser {
         throw const FormatException('未能从图片中识别出文字，请换一张更清晰的图片');
       }
       return text;
+    } on MissingPluginException {
+      throw const BillOcrUnavailableException();
     } finally {
-      recognizer.close();
+      try {
+        recognizer.close();
+      } catch (_) {
+        // 平台不支持时忽略关闭异常
+      }
     }
   }
 
