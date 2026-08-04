@@ -123,6 +123,18 @@ void main() {
       expect(item.logs.single.memo, '早餐');
       expect(item.logs.single.timestamp, DateTime(2026, 8, 1, 9, 0));
     });
+
+    test('纯打卡 JSON 缺时间 → timestamp 为 null', () {
+      final draft = StoreImporter.parseLogsOnly(
+        '{"logs": [{"cost": 12.5, "memo": "早餐"}]}',
+        targetStoreId: 7,
+        targetStoreName: '早点铺',
+        targetCategory: '餐饮美食',
+      );
+      final log = draft.categories.single.items.single.logs.single;
+      expect(log.timestamp, isNull);
+      expect(log.cost, 12.5);
+    });
   });
 
   group('BillParser.parseBillJson', () {
@@ -174,6 +186,18 @@ void main() {
       final r = BillParser.redactSensitive('会员卡号：88888888 消费 20 元', ['会员卡号']);
       expect(r.removed, 1);
       expect(r.text.contains('88888888'), isFalse);
+    });
+
+    test('账单导入缺时间的记录 timestamp 为 null', () {
+      final result = BillParser.toDraft(
+        BillParseResult(records: [BillRecord(amount: 8.0)]),
+        storeId: 1,
+        storeName: '店铺',
+        category: '餐饮美食',
+      );
+      final log = result.categories.single.items.single.logs.single;
+      expect(log.timestamp, isNull);
+      expect(log.cost, 8.0);
     });
   });
 }

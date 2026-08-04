@@ -44,7 +44,9 @@ class _ImportPreviewScreenState extends State<ImportPreviewScreen> {
   Future<void> _editLog(ImportLogDraft log) async {
     final costCtrl = TextEditingController(text: log.cost?.toString() ?? '');
     final timeCtrl = TextEditingController(
-      text: DateFormat('yyyy-MM-dd HH:mm').format(log.timestamp),
+      text: log.timestamp == null
+          ? ''
+          : DateFormat('yyyy-MM-dd HH:mm').format(log.timestamp!),
     );
     final memoCtrl = TextEditingController(text: log.memo ?? '');
     final saved = await showDialog<bool>(
@@ -105,13 +107,30 @@ class _ImportPreviewScreenState extends State<ImportPreviewScreen> {
         var time = DateTime.tryParse(timeCtrl.text.trim());
         time ??= DateFormat('yyyy-MM-dd HH:mm').tryParse(timeCtrl.text.trim());
         log.cost = cost;
-        log.timestamp = time ?? log.timestamp;
+        log.timestamp = time;
         log.memo = memoCtrl.text.trim().isEmpty ? null : memoCtrl.text.trim();
       });
     }
   }
 
   Future<void> _confirm() async {
+    // 每张打卡必须有完整时间（分钟级），否则要求先在预览中补充
+    final missing = draft.categories
+        .where((c) => c.selected)
+        .expand((c) => c.items)
+        .where((i) => i.selected)
+        .expand((i) => i.logs)
+        .where((l) => l.selected && l.timestamp == null)
+        .length;
+    if (missing > 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: Color(0xFFEF4444),
+          content: Text('存在缺时间的打卡记录，请点开对应打卡补充时间（yyyy-MM-dd HH:mm）后再导入'),
+        ),
+      );
+      return;
+    }
     setState(() => _busy = true);
     try {
       final result = await StoreImporter.apply(draft);
@@ -298,7 +317,9 @@ class _ImportPreviewScreenState extends State<ImportPreviewScreen> {
   }
 
   Widget _logTile(ImportLogDraft log) {
-    final time = DateFormat('yyyy-MM-dd HH:mm').format(log.timestamp);
+    final time = log.timestamp == null
+        ? ''
+        : DateFormat('yyyy-MM-dd HH:mm').format(log.timestamp!);
     final cost = log.cost == null ? '' : '¥${log.cost}';
     final memo = log.memo == null ? '' : ' · ${log.memo}';
     return InkWell(
@@ -313,11 +334,20 @@ class _ImportPreviewScreenState extends State<ImportPreviewScreen> {
               onChanged: (v) => setState(() => log.selected = v ?? true),
             ),
             Expanded(
-              child: Text(
-                '$time $cost$memo',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: Colors.white70, fontSize: 12.5),
+              child: Row(
+                children: [
+                  if (log.timestamp == null) ...[
+                    const Text('缺时间 ', style: TextStyle(color: Colors.redAccent, fontSize: 12.5)),
+                  ],
+                  Expanded(
+                    child: Text(
+                      '$time $cost$memo',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: Colors.white70, fontSize: 12.5),
+                    ),
+                  ),
+                ],
               ),
             ),
             const Icon(Icons.edit_outlined, size: 14, color: Colors.white24),

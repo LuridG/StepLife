@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:intl/intl.dart';
 import 'package:path/path.dart' as p;
-import 'package:sqflite/sqflite.dart' show getDatabasesPath;
+import 'package:sqflite/sqflite.dart' show getDatabasesPath, DatabaseExecutor;
 import '../../features/store_journal/domain/store_models.dart' show MenuItemSpec;
 import '../db/database_service.dart';
 import 'import_draft.dart';
@@ -113,7 +113,7 @@ class StoreImporter {
         final names = _parseStringList(lm['visitorNamesJson'], 'logs[$li].visitorNamesJson');
         target.logs.add(ImportLogDraft(
           cost: _optNum(lm['cost'], 'logs[$li].cost'),
-          timestamp: _parseTime(lm['timestamp'], 'logs[$li]'),
+          timestamp: _optTime(lm['timestamp'], 'logs[$li]'),
           memo: lm['memo']?.toString(),
           visitorNames: names.isEmpty ? const ['自己'] : names,
           extras: _parseJsonMap(lm['extrasJson'], 'logs[$li].extrasJson'),
@@ -184,7 +184,7 @@ class StoreImporter {
       final names = _parseStringList(lm['visitorNamesJson'], 'logs[$li].visitorNamesJson');
       item.logs.add(ImportLogDraft(
         cost: _optNum(lm['cost'], 'logs[$li].cost'),
-        timestamp: _parseTime(lm['timestamp'], 'logs[$li]'),
+        timestamp: _optTime(lm['timestamp'], 'logs[$li]'),
         memo: lm['memo']?.toString(),
         visitorNames: names.isEmpty ? const ['自己'] : names,
         extras: _parseJsonMap(lm['extrasJson'], 'logs[$li].extrasJson'),
@@ -273,6 +273,17 @@ class StoreImporter {
     var skippedLogs = 0;
 
     await db.transaction((txn) async {
+      // 按 项目+分钟 索引已有打卡，用于「合并」时同一分钟增补而非新建
+      final existingLogsByMinute = <int, Map<String, Map<String, dynamic>>>{};
+      final allLogs = await txn.query('store_logs');
+      for (final row in allLogs) {
+        final sid = row['storeId'] as int?;
+        final tsRaw = row['timestamp'] as String?;
+        if (sid == null || tsRaw == null) continue;
+        final tsDt = _parseTsLoose(tsRaw);
+        if (tsDt == null) continue;
+        (existingLogsByMinute[sid] ??= <String, Map<String, dynamic>>{})[_minuteKey(tsDt)] = row;
+      }
       for (final c in draft.categories) {
         if (!c.selected) continue;
         var catId = c.targetCategoryId;
@@ -326,6 +337,19 @@ class StoreImporter {
               skippedLogs++;
               continue;
             }
+            final ts = l.timestamp;
+            if (ts == null) {
+              throw const FormatException('存在缺少时间的打卡记录，请在预览中补充时间后再导入');
+            }
+            if (!isCreated) {
+              // 合并：同一分钟已有打卡 → 在原记录上增补缺失字段；否则追加新打卡
+              final existing = existingLogsByMinute[itemId]?[_minuteKey(ts)];
+              if (existing != null) {
+                await _mergeIntoLog(txn, existing, l);
+                mergedLogs++;
+                continue;
+              }
+            }
             await txn.insert('store_logs', {
               'storeId': itemId,
               'storeName': it.resolvedName,
@@ -338,7 +362,7 @@ class StoreImporter {
               'menuItemIdsJson': '[]',
               'menuNamesJson': jsonEncode(l.menuNames),
               'menuSpecsJson': jsonEncode(l.menuSpecs),
-              'timestamp': l.timestamp.toIso8601String(),
+              'timestamp': ts.toIso8601String(),
             });
             if (isCreated) {
               createdLogs++;
@@ -393,6 +417,100 @@ class StoreImporter {
     final n = raw is num ? raw.toDouble() : double.tryParse(raw.toString());
     if (n == null) throw FormatException('$where 不是数字');
     return n;
+  }
+
+  static DateTime? _optTime(Object? raw, String where) {
+    if (raw == null || raw.toString().trim().isEmpty) return null;
+    final s = raw.toString().trim();
+    try {
+      return DateFormat('yyyy-MM-dd HH:mm').parse(s);
+    } catch (_) {}
+    final dt = DateTime.tryParse(s);
+    if (dt == null) {
+      throw FormatException('$where 时间格式非法：$s（需要 yyyy-MM-dd HH:mm）');
+    }
+    return dt;
+  }
+
+  static DateTime? _parseTsLoose(String s) {
+    final t = DateTime.tryParse(s.trim());
+    if (t != null) return t;
+    try {
+      return DateFormat('yyyy-MM-dd HH:mm:ss').parse(s.trim());
+    } catch (_) {}
+    try {
+      return DateFormat('yyyy-MM-dd HH:mm').parse(s.trim());
+    } catch (_) {}
+    return null;
+  }
+
+  static String _minuteKey(DateTime dt) =>
+      DateFormat("yyyy-MM-dd'T'HH:mm").format(dt);
+
+  static Future<void> _mergeIntoLog(
+    DatabaseExecutor txn,
+    Map<String, dynamic> row,
+    ImportLogDraft l,
+  ) async {
+    final cost = row['cost'] ?? l.cost;
+    var memo = row['memo'] as String?;
+    if ((memo == null || memo.isEmpty) && (l.memo?.trim().isNotEmpty ?? false)) {
+      memo = l.memo;
+    }
+    var visitorNames = _decodeStrListSafe(row['visitorNamesJson']);
+    if (visitorNames.isEmpty && l.visitorNames.isNotEmpty) {
+      visitorNames = l.visitorNames;
+    }
+    var menuNames = _decodeStrListSafe(row['menuNamesJson']);
+    if (menuNames.isEmpty && l.menuNames.isNotEmpty) {
+      menuNames = l.menuNames;
+    }
+    var menuSpecs = _decodeStrListSafe(row['menuSpecsJson']);
+    if (menuSpecs.isEmpty && l.menuSpecs.isNotEmpty) {
+      menuSpecs = l.menuSpecs;
+    }
+    final extras = _mergeExtras(_decodeJsonMapSafe(row['extrasJson']), l.extras);
+    await txn.update(
+      'store_logs',
+      {
+        'cost': cost,
+        'visitorNamesJson':
+            jsonEncode(visitorNames.isEmpty ? const ['自己'] : visitorNames),
+        'memo': memo,
+        'extrasJson': jsonEncode(extras),
+        'menuNamesJson': jsonEncode(menuNames),
+        'menuSpecsJson': jsonEncode(menuSpecs),
+      },
+      where: 'id = ?',
+      whereArgs: [row['id']],
+    );
+  }
+
+  static List<String> _decodeStrListSafe(Object? raw) {
+    if (raw == null) return const [];
+    try {
+      final d = jsonDecode(raw.toString());
+      if (d is List) return d.map((e) => e.toString()).toList();
+    } catch (_) {}
+    return const [];
+  }
+
+  static Map<String, dynamic> _decodeJsonMapSafe(Object? raw) {
+    if (raw == null) return {};
+    try {
+      final d = jsonDecode(raw.toString());
+      if (d is Map) return Map<String, dynamic>.from(d);
+    } catch (_) {}
+    return {};
+  }
+
+  static Map<String, dynamic> _mergeExtras(
+    Map<String, dynamic> base,
+    Map<String, dynamic> add,
+  ) {
+    final out = Map<String, dynamic>.from(base);
+    add.forEach((k, v) => out.putIfAbsent(k, () => v));
+    return out;
   }
 
   static DateTime _parseTime(Object? raw, String where) {

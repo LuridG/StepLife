@@ -7,7 +7,7 @@ enum ImportStrategy { create, merge }
 class ImportLogDraft {
   ImportLogDraft({
     this.cost,
-    required this.timestamp,
+    this.timestamp,
     this.memo,
     this.visitorNames = const ['自己'],
     this.extras = const {},
@@ -17,7 +17,7 @@ class ImportLogDraft {
   });
 
   double? cost;
-  DateTime timestamp;
+  DateTime? timestamp;
   String? memo;
   List<String> visitorNames;
   Map<String, dynamic> extras;

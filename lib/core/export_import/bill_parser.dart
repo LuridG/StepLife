@@ -190,7 +190,7 @@ class BillParser {
     for (final r in result.records) {
       item.logs.add(ImportLogDraft(
         cost: r.amount,
-        timestamp: r.time ?? DateTime.now(),
+        timestamp: r.time,
         memo: r.memo,
       ));
     }
