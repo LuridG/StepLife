@@ -468,8 +468,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildVersionItem(
-                  version: 'v1.6.1 (2026-08-21)',
+                  version: 'v1.6.2 (2026-08-22)',
                   isLatest: true,
+                  changes: [
+                    '🧹 家务界面优化：打卡时刻选择器改圆角卡片；5 天日期矩阵自适应缩放防溢出，日期圈 38→31dp；标题按长度自适应字号，量化数值与备注角标展示。',
+                    '📱 生活记录打卡时刻选择器同步圆角卡片；分类抽屉超长分类名省略号截断。',
+                    '👤 成员卡片重构：头像+姓名+编辑/删除按钮同行紧凑排布，信息区收进圆角描边容器。',
+                    '🎨 底部 Tab 栏字号与点击反馈优化（亮/暗主题一致）；助手确认卡片意图文本自动换行。',
+                  ],
+                ),
+                const Divider(color: Colors.white12, height: 24),
+                _buildVersionItem(
+                  version: 'v1.6.1 (2026-08-21)',
+                  isLatest: false,
                   changes: [
                     '📥 生活记录导入导出：单分类/全量 JSON 导出（图片字段预留、share 分享）；模板化导入与模拟导入（dry-run 预览可勾选/编辑/切换策略）；账单 OCR+AI 批量导入（一张图多笔消费）。',
                     '🔒 导入防误建与合并：详情页导入锁定当前餐厅/分类禁止误建；合并按同项目+同一秒匹配只增补不重复，逐条/批量切换新建或合并，缺时间禁止落库。',
@@ -478,7 +489,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ],
                 ),
                 const Divider(color: Colors.white12, height: 24),
-_buildVersionItem(
+                _buildVersionItem(
                   version: 'v1.6.0 (2026-08-20)',
                   isLatest: false,
                   changes: [
