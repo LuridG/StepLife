@@ -147,5 +147,16 @@ void main() {
       final result = BillParser.parseBillJson('{"records":[{"amount":3.5}]}');
       expect(result.records.single.time, isNull);
     });
+
+    test('识别带负号的金额字符串（如 -8.00）', () {
+      final result = BillParser.parseBillJson('{"records":[{"amount":"-8.00","time":"2026-08-03 16:16","memo":"糖灶"}]}');
+      expect(result.records.single.amount, -8.0);
+      expect(result.records.single.memo, '糖灶');
+    });
+
+    test('解析中文日期时间格式', () {
+      final result = BillParser.parseBillJson('{"records":[{"amount":8.0,"time":"2026年8月3日 16:16:12"}]}');
+      expect(result.records.single.time, DateTime(2026, 8, 3, 16, 16));
+    });
   });
 }

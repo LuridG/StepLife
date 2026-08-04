@@ -87,10 +87,10 @@ class BillParser {
     final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
     final instruction = '''
 你是生活记账整理助手。下面是用户某次消费的账单文字（OCR 或手动粘贴），请提取其中的每一笔消费记录。
-账单可能包含多笔消费（一张截图/一段文字可有多笔），必须逐笔拆分为独立记录、按出现顺序排列，严禁合并、遗漏或凭空捏造。
+账单可能包含多笔消费（一张截图/一段文字可有多笔），必须逐笔拆分为独立记录、按出现顺序排列，严禁合并、遗漏或凭空捏造。OCR 文字常为分行键值结构（标签与值各占一行，金额也可能在标签之前），请结合上下文把数值对号入座。
 只返回 JSON，不输出任何解释。
 字段规则：
-- records: 数组。每项含 amount(数字，单位元，去掉 ¥ ￥ 等货币符号)、time(格式 yyyy-MM-dd HH:mm；账单未写日期按今天 $today 推断，未写具体时间默认 12:00)、memo(该笔消费内容/菜名，没有则省略该字段)。
+- records: 数组。每项含 amount(数字，单位元，去掉 ¥ ￥ 等货币符号；金额可能带负号如 -8.00，表示扣款/支出，一律取绝对值)、time(格式 yyyy-MM-dd HH:mm；中文日期如「2026年8月3日 16:16:12」需转换为「2026-08-03 16:16」；账单未写日期按今天 $today 推断，未写具体时间默认 12:00)、memo(该笔消费内容/菜名，如「商品」标签后的名称，没有则省略该字段)。
 - storeGuess: 仅当账单中出现与当前店铺「$storeName」不同的店铺名时给出 {"name":"店铺名","category":"建议分类"}，否则省略。
 输出格式：{"records":[{"amount":12.5,"time":"$today 12:30","memo":"微信支付-餐饮"},{"amount":8.0,"time":"$today 12:35","memo":"奶茶"}],"storeGuess":{...}}''';
     final content = await DeepSeekService.chat(
@@ -173,9 +173,19 @@ class BillParser {
     if (raw == null) return null;
     final s = raw.toString().trim();
     if (s.isEmpty) return null;
-    try {
-      return DateFormat('yyyy-MM-dd HH:mm').parse(s);
-    } catch (_) {}
+    for (final fmt in [
+      'yyyy-MM-dd HH:mm',
+      'yyyy-MM-dd HH:mm:ss',
+      'yyyy年M月d日 HH:mm:ss',
+      'yyyy年M月d日 HH:mm',
+      'yyyy年M月d日',
+    ]) {
+      try {
+        final dt = DateFormat(fmt).parse(s);
+        // 打卡时间统一精确到分钟
+        return DateTime(dt.year, dt.month, dt.day, dt.hour, dt.minute);
+      } catch (_) {}
+    }
     return DateTime.tryParse(s);
   }
 }
