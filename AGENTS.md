@@ -7,7 +7,7 @@
 2. **新表/新列必须同步 WebDAV 备份**：凡新增数据库表，必须加入 `database_service._syncTables`（备份表清单）与 WebDAV 恢复逻辑，否则云端备份缺表。
 3. **用户数据零丢失**：禁止破坏性更新、禁止随意删除种子/默认数据（成员 A/B/C、默认分类依赖初始化逻辑）；升级必须可逆。
 4. **正式签名不可回退**：release 构建签名由 `android/app/build.gradle.kts` 的 key.properties 决定，禁止改为 debug 签名；CI 用 GitHub Secrets 签名并校验指纹。
-5. **打卡时间语义**：所有打卡时间精确到分钟（`yyyy-MM-dd HH:mm`），支持补卡/改时；展示一律按时间倒序（新→旧），与插入先后无关。
+5. **打卡时间语义**：打卡时间统一按秒归一化（`yyyy-MM-dd HH:mm:ss`，毫秒清零）；账单/AI 导入必须保留秒；同一项目下「同一秒」视为同一张卡（导入合并判定依据）；支持补卡/改时；展示一律按时间倒序（新→旧），与插入先后无关。
 
 ## 📐 核心规范（必须遵守，细则见 docs/architecture.md）
 - **数据库升级**：改表结构必须递增 version，`_onUpgrade` 写 `ALTER TABLE` / `CREATE TABLE IF NOT EXISTS` 兼容逻辑且与 `_onCreate` 新建逻辑一致；`onOpen` 幂等补齐 `members.birthDate`（报错忽略）；`preferredViewMode` 新读 `app_settings`、缺省回退旧 `user_profile` 字段、写入双写保持降级兼容。
@@ -20,7 +20,7 @@
 - **图标**：保持 100% 透明 Alpha 通道（RGBA）DIB ICO，严禁白色/浅色背景余边。
 - **版本发布**：`pubspec.yaml` `version: 1.5.x+YYYYMMDD`，构建号用打包日期且必须递增；发布时同步更新 `assets/walkthrough.md` 更新日志、设置中心「更新记录与版本历史」与 README，保持多处一致。
 
-- **生活导入导出**：核心在 `lib/core/export_import/`（StoreExporter / StoreImporter / ImportDraft / ImportPreviewScreen / BillParser）；导出支持单分类与全量（JSON v1，图片字段位预留）；导入分 L1 详情页纯打卡（parseLogsOnly）→ L2 新店铺建项目 → L3 模板全量；导入前必须 `vacuumInto` 快照备份（保留 3 份）+ 单事务回滚；AI 账单导入（OCR+DeepSeek）产出仅作建议，须经模拟导入页用户确认后落库；OCR 仅安卓/苹果可用（`BillParser.isOcrSupported`），桌面端自动降级为粘贴账单文字；OCR 文本送 AI 前按可自定义敏感词脱敏（默认交易单号/商户单号等）+ 人工复核；「合并」导入按 分钟级 timestamp 匹配已有打卡并在原记录上增补缺失字段（金额/备注/菜单等），除非用户手动切「新建」否则不新建；每条打卡必须有完整时间（`yyyy-MM-dd HH:mm`），缺时间禁止落库；依赖 share_plus / file_picker / google_mlkit_text_recognition。
+- **生活导入导出**：核心在 `lib/core/export_import/`（StoreExporter / StoreImporter / ImportDraft / ImportPreviewScreen / BillParser）；导出单分类/全量 JSON v1（秒级时间戳，图片字段位预留）；导入分 L1 详情页纯打卡/账单（parseLogsOnly / BillParser.toDraft）、L2 新店铺建项目、L3 模板全量（parseJson）；**详情页导入分类与餐厅必须锁定（`lockToTarget`），绝不新建分类/项目，定位失败直接报错**；新建重名自动追加 `(导入N)` 后缀防 UNIQUE 冲突；「新建/合并」分三套：分类、项目、打卡（`ImportLogDraft.strategy`：merge 默认 / create 强制新建），打卡合并按「同项目+同一秒」判定并在原记录上增补缺失字段（金额/备注/菜单等），预览标签显示实际行为（`willMerge`）；缺时间禁止落库；导入前 `vacuumInto` 快照备份（3 份）+ 单事务回滚；AI 账单导入：ML Kit 离线 OCR 仅安卓/iOS（`isOcrSupported`），桌面降级粘贴文字 → 敏感词脱敏（默认交易单号/商户单号等，设置可自定义）→ 人工复核 → DeepSeek（deepseek-v4-flash，提示词强制 `yyyy-MM-dd HH:mm:ss` 保留秒）→ 用户确认后落库；依赖 share_plus / file_picker / google_mlkit_text_recognition；现状见 [docs/store-import-export-implemented.md](docs/store-import-export-implemented.md)，剩余计划见 [docs/import-export-todo.md](docs/import-export-todo.md)。
 
 ## 🧭 全局架构要点
 - 入口 `lib/main.dart`：底部 4 个 Tab（路线/家务/生活/成员），「关于」已合并进设置中心；桌面 FFI 初始化不可删。
@@ -55,4 +55,5 @@
 - 中文沟通；大改动先出方案，用户确认后再实施。
 - 常规节奏：改代码 → 验证 → commit → push → 升版本 → 打包 → 发布（用户会明确下令，不要擅自发布）。
 - 本环境 `apply_patch` 不可用，文件读写用 Node REPL；Dart 模板字符串 `${...}` 在 JS 模板串中要写成 `\${...}`；JS 替换一律用 `split(old).join(new)`。
-- commit 通过临时文件 `git commit -F`；git 只读/写命令需按已批准前缀执行（组合命令会被沙箱拦截，需拆开单独跑）；大部分 Dart 文件 LF 行尾，git 的 CRLF 警告属正常，勿批量转换行尾。
+- commit 通过临时文件 `git commit -F`，**必须用已批准前缀固定文件名** `C:\Users\Lurid\AppData\Local\Temp\steplife_commit_msg6.txt`，并用 `[System.IO.File]::WriteAllText(path, msg, (New-Object System.Text.UTF8Encoding($false)))` 写入**无 BOM** UTF-8（PowerShell 默认 `Set-Content -Encoding UTF8` 会带 BOM，导致 commit 消息首字符 `\uFEFF` 乱码且 amend 会被审批拒绝）。
+- git 只读/写命令需按已批准前缀执行（组合命令会被沙箱拦截，需拆开单独跑）；大部分 Dart 文件 LF 行尾，git 的 CRLF 警告属正常，勿批量转换行尾。

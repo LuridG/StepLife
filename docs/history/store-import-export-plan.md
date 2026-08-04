@@ -1,3 +1,5 @@
+> 📌 历史方案文档（2026-08）：P0-P4 已完成代码实施并通过验证；P5/P6 及后续扩展需求见 [../import-export-todo.md](../import-export-todo.md)，当前导入/导出打卡逻辑的实现现状见 [../store-import-export-implemented.md](../store-import-export-implemented.md)。文中「分钟级时间戳」等描述仅代表当时规划，实际已按秒级时间落地。
+
 # StepLife 生活记录 导入/导出 + 账单智能导入 方案 v1.0
 
 > 版本：v1.0 讨论稿（2026-08-04）
