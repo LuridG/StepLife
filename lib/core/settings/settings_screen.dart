@@ -446,8 +446,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildVersionItem(
-                  version: 'v1.5.0 (2026-08-19)',
+                  version: 'v1.6.0 (2026-08-20)',
                   isLatest: true,
+                  changes: [
+                    '🧹 家务事项支持编辑与删除：卡片 ⋮ 菜单可改名称/分类/量化单位，删除时连同全部打卡记录一并清理。',
+                    '📦 生活记录顶栏收纳：设置/排序/视图切换收进「⋮ 更多」下拉，只留新建打卡，标题不再被按钮挤没。',
+                    '🔀 排序图标化：时间/星级/打卡次数改为图标菜单项，支持顺序/逆序切换（点当前项翻转方向，逐分类记住偏好）。',
+                    '🎤 修复安卓语音输入：补麦克风权限申请与引导、错误码中文提示、中文语音包缺失时回退系统默认语言。',
+                    '🧠 助手模板动态化：提示词随内置模板自动生成，新增模板无需手动同步。',
+                    '✂️ 文案精简：路线页、打卡详情、家务等界面短文案去冗余（路线库 / 打卡记录 / 步量方圆生活等）。',
+                  ],
+                ),
+                const Divider(color: Colors.white12, height: 24),
+                _buildVersionItem(
+                  version: 'v1.5.0 (2026-08-19)',
+                  isLatest: false,
                   changes: [
                     '🤖 智能助手（DeepSeek v4-flash）：家务/生活页左上角新增助手入口，一句话或语音即可解析为家务打卡、生活记录、菜篮子记价等结构化动作，全部经确认后才写入。',
                     '🎤 语音转文字：Android 系统语音识别（RECORD_AUDIO），Windows 自动降级为文字输入。',
