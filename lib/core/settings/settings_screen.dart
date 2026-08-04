@@ -468,8 +468,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildVersionItem(
-                  version: 'v1.6.2 (2026-08-22)',
+                  version: 'v1.6.3 (2026-08-23)',
                   isLatest: true,
+                  changes: [
+                    '🔧 修复账单 OCR 导入闪退：中文识别模型未打包（ML Kit 仅内置拉丁文），补充 text-recognition-chinese 依赖，离线模型随 APK 打包，OCR 全离线可用。',
+                  ],
+                ),
+                const Divider(color: Colors.white12, height: 24),
+                _buildVersionItem(
+                  version: 'v1.6.2 (2026-08-22)',
+                  isLatest: false,
                   changes: [
                     '🧹 家务界面优化：打卡时刻选择器改圆角卡片；5 天日期矩阵自适应缩放防溢出，日期圈 38→31dp；标题按长度自适应字号，量化数值与备注角标展示。',
                     '📱 生活记录打卡时刻选择器同步圆角卡片；分类抽屉超长分类名省略号截断。',
