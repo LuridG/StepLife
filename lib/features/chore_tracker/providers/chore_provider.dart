@@ -104,6 +104,24 @@ class ChoreProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 更新家务事项
+  Future<void> updateChoreItem(ChoreItem item) async {
+    final index = _choreItems.indexWhere((c) => c.id == item.id);
+    if (index != -1) {
+      await DatabaseService.instance.updateChoreItem(item);
+      _choreItems[index] = item;
+      notifyListeners();
+    }
+  }
+
+  /// 删除家务事项（连同其打卡记录）
+  Future<void> deleteChoreItem(int choreId) async {
+    await DatabaseService.instance.deleteChoreItem(choreId);
+    _choreItems.removeWhere((c) => c.id == choreId);
+    _choreLogs.removeWhere((l) => l.choreId == choreId);
+    notifyListeners();
+  }
+
   Future<void> logChore({
     required ChoreItem choreItem,
     required List<Member> selectedMembers,

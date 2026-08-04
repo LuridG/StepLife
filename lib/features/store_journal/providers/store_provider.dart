@@ -27,6 +27,7 @@ class StoreProvider extends ChangeNotifier {
   static const String kSortRating = 'rating';
   static const String kSortCheckin = 'checkin';
   Map<String, String> _sortPrefs = {};
+  Map<String, String> _sortDirs = {};
 
   List<StoreCategory> get categories => _categories;
   List<StoreItem> get storeItems => _storeItems;
@@ -45,6 +46,7 @@ class StoreProvider extends ChangeNotifier {
 
   /// 当前分类的排序模式（未设置过则默认按添加时间）
   String get activeSortMode => _sortPrefs[_selectedCategory] ?? kSortTime;
+  String get activeSortDir => _sortDirs[_selectedCategory] ?? 'desc';
 
   List<StoreItem> get filteredStoreItems {
     Iterable<StoreItem> result = _storeItems;
@@ -107,36 +109,45 @@ class StoreProvider extends ChangeNotifier {
     return list;
   }
 
-  /// 按当前分类的排序偏好对卡片列表排序
+  /// 按当前分类的排序偏好对卡片列表排序（支持顺序/逆序切换）
   void _applySort(List<StoreItem> list) {
-    switch (activeSortMode) {
-      case kSortRating:
-        list.sort((a, b) => b.rating.compareTo(a.rating));
-        break;
-      case kSortCheckin:
-        final counts = <int, int>{};
-        for (final it in list) {
-          counts[it.id ?? 0] = getCheckinCountForStore(it.id ?? 0);
-        }
-        list.sort((a, b) =>
-            (counts[b.id ?? 0] ?? 0).compareTo(counts[a.id ?? 0] ?? 0));
-        break;
-      case kSortTime:
-      default:
-        list.sort((a, b) {
+    final desc = activeSortDir != 'asc';
+    final counts = <int, int>{};
+    if (activeSortMode == kSortCheckin) {
+      for (final it in list) {
+        counts[it.id ?? 0] = getCheckinCountForStore(it.id ?? 0);
+      }
+    }
+    int compare(StoreItem a, StoreItem b) {
+      switch (activeSortMode) {
+        case kSortRating:
+          return b.rating.compareTo(a.rating);
+        case kSortCheckin:
+          return (counts[b.id ?? 0] ?? 0).compareTo(counts[a.id ?? 0] ?? 0);
+        case kSortTime:
+        default:
           final c = b.createdAt.compareTo(a.createdAt);
           if (c != 0) return c;
           return (b.id ?? 0).compareTo(a.id ?? 0);
-        });
+      }
     }
+    list.sort((a, b) => desc ? compare(a, b) : -compare(a, b));
   }
 
   /// 切换某分类的排序方式（持久化到 app_settings，重启后保留）
+  /// 再次点击当前排序项时切换方向：逆序 ↔ 顺序
   Future<void> setSortMode(String category, String mode) async {
-    _sortPrefs[category] = mode;
+    if (_sortPrefs[category] == mode) {
+      _sortDirs[category] = (_sortDirs[category] ?? 'desc') == 'desc' ? 'asc' : 'desc';
+    } else {
+      _sortPrefs[category] = mode;
+      _sortDirs[category] = 'desc';
+    }
     try {
       await DatabaseService.instance
           .setSetting('storeSortPrefs', jsonEncode(_sortPrefs));
+      await DatabaseService.instance
+          .setSetting('storeSortDirs', jsonEncode(_sortDirs));
     } catch (_) {}
     notifyListeners();
   }
@@ -161,6 +172,16 @@ class StoreProvider extends ChangeNotifier {
         final dec = jsonDecode(prefsJson);
         if (dec is Map) {
           _sortPrefs = dec.map((k, v) => MapEntry(k.toString(), v.toString()));
+        }
+      }
+    } catch (_) {}
+
+    try {
+      final dirsJson = await DatabaseService.instance.getSetting('storeSortDirs');
+      if (dirsJson != null && dirsJson.isNotEmpty) {
+        final dec = jsonDecode(dirsJson);
+        if (dec is Map) {
+          _sortDirs = dec.map((k, v) => MapEntry(k.toString(), v.toString()));
         }
       }
     } catch (_) {}

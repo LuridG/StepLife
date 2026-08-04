@@ -11,7 +11,7 @@ import '../utils/basket_stats.dart';
 import '../../../core/cache/cache_manager.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/network/tmdb_client.dart';
-import '../../../core/settings/settings_button.dart';
+import '../../../core/settings/settings_screen.dart';
 import '../../../core/settings/settings_provider.dart';
 import '../../../core/utils/map_launcher.dart';
 import '../../../core/utils/location_picker.dart';
@@ -1604,23 +1604,54 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
           ],
         ),
         actions: [
-          const SettingsButton(),
           PopupMenuButton<String>(
-            icon: _sortModeIcon(storeProvider.activeSortMode),
-            tooltip: '专项排序',
+            icon: const Icon(Icons.more_vert),
+            tooltip: '更多',
             color: const Color(0xFF0F172A),
-            onSelected: (mode) =>
-                storeProvider.setSortMode(storeProvider.selectedCategory, mode),
+            onSelected: (v) {
+              if (v == 'time' || v == 'rating' || v == 'checkin') {
+                storeProvider.setSortMode(storeProvider.selectedCategory, v);
+              } else if (v == 'toggle_view') {
+                storeProvider.toggleViewMode();
+              } else if (v == 'settings') {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                );
+              }
+            },
             itemBuilder: (ctx) => [
-              _buildSortMenuItem('time', '添加时间', Icons.schedule, storeProvider.activeSortMode),
-              _buildSortMenuItem('rating', '星级', Icons.star, storeProvider.activeSortMode),
-              _buildSortMenuItem('checkin', '打卡次数', Icons.flash_on, storeProvider.activeSortMode),
+              _buildSortIconItem('time', Icons.access_time, storeProvider.activeSortMode, storeProvider.activeSortDir),
+              _buildSortIconItem('rating', Icons.star_rounded, storeProvider.activeSortMode, storeProvider.activeSortDir),
+              _buildSortIconItem('checkin', Icons.flash_on_rounded, storeProvider.activeSortMode, storeProvider.activeSortDir),
+              const PopupMenuDivider(),
+              PopupMenuItem<String>(
+                value: 'toggle_view',
+                child: Row(
+                  children: [
+                    Icon(
+                      storeProvider.isCardView ? Icons.view_headline : Icons.grid_view,
+                      size: 16,
+                      color: Colors.white70,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      storeProvider.isCardView ? '切换紧凑列表' : '切换卡片视图',
+                      style: const TextStyle(fontSize: 13),
+                    ),
+                  ],
+                ),
+              ),
+              PopupMenuItem<String>(
+                value: 'settings',
+                child: const Row(
+                  children: [
+                    Icon(Icons.settings_outlined, size: 16, color: Colors.white70),
+                    SizedBox(width: 8),
+                    Text('设置中心', style: TextStyle(fontSize: 13)),
+                  ],
+                ),
+              ),
             ],
-          ),
-          IconButton(
-            icon: Icon(storeProvider.isCardView ? Icons.view_headline : Icons.grid_view),
-            tooltip: storeProvider.isCardView ? '切换为紧凑列表模式' : '切换为 Card 卡片模式',
-            onPressed: () => storeProvider.toggleViewMode(),
           ),
           IconButton(
             icon: const Icon(Icons.add_circle_outline),
@@ -2680,30 +2711,26 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
     return '🛒 最近价 ¥${_fmtPrice(latest)}/$unit · ${chg == null ? '暂无涨跌对比' : BasketStats.formatPct(chg)} · ${logs.length} 次${brand.isNotEmpty && brand != '通用' ? ' · 🏷️ $brand' : ''}';
   }
 
-  /// 排序按钮图标：按当前模式显示（时间/星级/次数）
-  Icon _sortModeIcon(String mode) {
-    switch (mode) {
-      case StoreProvider.kSortRating:
-        return const Icon(Icons.star_rounded, color: Colors.amber);
-      case StoreProvider.kSortCheckin:
-        return const Icon(Icons.flash_on_rounded, color: Color(0xFF10B981));
-      default:
-        return const Icon(Icons.schedule_rounded, color: Colors.lightBlueAccent);
-    }
-  }
-
-  /// 排序弹窗菜单项：图标 + 短标签（选中项打勾）
-  CheckedPopupMenuItem<String> _buildSortMenuItem(
-      String value, String label, IconData icon, String activeMode) {
-    return CheckedPopupMenuItem(
+  /// 排序菜单图标项：只显示图标，当前排序项高亮并附方向箭头（点一次顺序/再点逆序）
+  PopupMenuItem<String> _buildSortIconItem(
+      String value, IconData icon, String activeMode, String activeDir) {
+    final isActive = activeMode == value;
+    final color = isActive ? const Color(0xFF10B981) : Colors.white70;
+    return PopupMenuItem<String>(
       value: value,
-      checked: activeMode == value,
-      child: Row(
-        children: [
-          Icon(icon, size: 16, color: Colors.white70),
-          const SizedBox(width: 8),
-          Text(label, style: const TextStyle(fontSize: 13)),
-        ],
+      child: Center(
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 18, color: color),
+            if (isActive)
+              Icon(
+                activeDir == 'asc' ? Icons.arrow_upward : Icons.arrow_downward,
+                size: 12,
+                color: color,
+              ),
+          ],
+        ),
       ),
     );
   }

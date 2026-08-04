@@ -1141,6 +1141,25 @@ class DatabaseService {
     return await db.insert('chore_items', item.toMap());
   }
 
+  Future<void> updateChoreItem(ChoreItem item) async {
+    final db = await database;
+    await db.update(
+      'chore_items',
+      item.toMap(),
+      where: 'id = ?',
+      whereArgs: [item.id],
+    );
+  }
+
+  /// 删除家务事项（连同其全部打卡记录一并删除）
+  Future<void> deleteChoreItem(int id) async {
+    final db = await database;
+    await db.transaction((txn) async {
+      await txn.delete('chore_logs', where: 'choreId = ?', whereArgs: [id]);
+      await txn.delete('chore_items', where: 'id = ?', whereArgs: [id]);
+    });
+  }
+
   Future<List<ChoreLog>> getChoreLogs() async {
     final db = await database;
     final maps = await db.query('chore_logs', orderBy: 'timestamp DESC');

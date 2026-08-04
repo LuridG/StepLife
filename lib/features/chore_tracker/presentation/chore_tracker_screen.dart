@@ -21,11 +21,12 @@ class _ChoreTrackerScreenState extends State<ChoreTrackerScreen>
   @override
   bool get wantKeepAlive => true;
 
-  void _showAddChoreDialog() {
-    final titleController = TextEditingController();
-    final categoryController = TextEditingController(text: '日常家务');
-    final unitController = TextEditingController(text: '元');
-    bool isQuantifiable = false;
+  void _showChoreDialog({ChoreItem? existing}) {
+    final isEdit = existing != null;
+    final titleController = TextEditingController(text: existing?.title ?? '');
+    final categoryController = TextEditingController(text: existing?.category ?? '日常家务');
+    final unitController = TextEditingController(text: existing?.unit ?? '元');
+    bool isQuantifiable = existing?.isQuantifiable ?? false;
 
     showDialog(
       context: context,
@@ -33,7 +34,7 @@ class _ChoreTrackerScreenState extends State<ChoreTrackerScreen>
         builder: (context, setModalState) {
           return AlertDialog(
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            title: const Text('新建家务/习惯 Item'),
+            title: Text(isEdit ? '编辑家务/习惯' : '新建家务/习惯'),
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -94,12 +95,26 @@ class _ChoreTrackerScreenState extends State<ChoreTrackerScreen>
                 onPressed: () {
                   final title = titleController.text.trim();
                   if (title.isNotEmpty) {
-                    context.read<ChoreProvider>().addChoreItem(
-                          title,
-                          category: categoryController.text.trim(),
+                    final category = categoryController.text.trim();
+                    final unit = isQuantifiable ? unitController.text.trim() : '次';
+                    final chore = context.read<ChoreProvider>();
+                    if (isEdit) {
+                      chore.updateChoreItem(
+                        existing.copyWith(
+                          title: title,
+                          category: category,
                           isQuantifiable: isQuantifiable,
-                          unit: isQuantifiable ? unitController.text.trim() : '次',
-                        );
+                          unit: unit,
+                        ),
+                      );
+                    } else {
+                      chore.addChoreItem(
+                        title,
+                        category: category,
+                        isQuantifiable: isQuantifiable,
+                        unit: unit,
+                      );
+                    }
                   }
                   titleController.dispose();
                   categoryController.dispose();
@@ -110,11 +125,39 @@ class _ChoreTrackerScreenState extends State<ChoreTrackerScreen>
                   backgroundColor: const Color(0xFF6366F1),
                   foregroundColor: Colors.white,
                 ),
-                child: const Text('创建'),
+                child: Text(isEdit ? '保存' : '创建'),
               ),
             ],
           );
         },
+      ),
+    );
+  }
+
+  void _confirmDeleteChore(ChoreItem item) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('删除家务/习惯'),
+        content: Text('确定删除「${item.title}」吗？其全部打卡记录也会一并删除，且无法撤销。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('取消'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              context.read<ChoreProvider>().deleteChoreItem(item.id!);
+              Navigator.of(ctx).pop();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFEF4444),
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('删除'),
+          ),
+        ],
       ),
     );
   }
@@ -303,8 +346,8 @@ class _ChoreTrackerScreenState extends State<ChoreTrackerScreen>
           const SettingsButton(),
           IconButton(
             icon: const Icon(Icons.playlist_add_outlined),
-            tooltip: '新建家务Item',
-            onPressed: _showAddChoreDialog,
+            tooltip: '新建家务',
+            onPressed: () => _showChoreDialog(),
           ),
         ],
       ),
@@ -416,6 +459,38 @@ class _ChoreTrackerScreenState extends State<ChoreTrackerScreen>
                                                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white),
                                                       overflow: TextOverflow.ellipsis,
                                                     ),
+                                                  ),
+                                                  PopupMenuButton<String>(
+                                                    padding: EdgeInsets.zero,
+                                                    iconSize: 18,
+                                                    icon: const Icon(Icons.more_vert, color: Colors.white38),
+                                                    color: const Color(0xFF0F172A),
+                                                    onSelected: (v) {
+                                                      if (v == 'edit') _showChoreDialog(existing: item);
+                                                      if (v == 'delete') _confirmDeleteChore(item);
+                                                    },
+                                                    itemBuilder: (ctx) => const [
+                                                      PopupMenuItem(
+                                                        value: 'edit',
+                                                        child: Row(
+                                                          children: [
+                                                            Icon(Icons.edit_outlined, size: 16, color: Color(0xFF818CF8)),
+                                                            SizedBox(width: 8),
+                                                            Text('编辑'),
+                                                          ],
+                                                        ),
+                                                      ),
+                                                      PopupMenuItem(
+                                                        value: 'delete',
+                                                        child: Row(
+                                                          children: [
+                                                            Icon(Icons.delete_outline, size: 16, color: Color(0xFFEF4444)),
+                                                            SizedBox(width: 8),
+                                                            Text('删除'),
+                                                          ],
+                                                        ),
+                                                      ),
+                                                    ],
                                                   ),
                                                 ],
                                               ),

@@ -113,6 +113,24 @@ class ChoreItem {
     this.unit = '次',
   });
 
+  ChoreItem copyWith({
+    int? id,
+    String? title,
+    String? category,
+    String? iconName,
+    bool? isQuantifiable,
+    String? unit,
+  }) {
+    return ChoreItem(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      category: category ?? this.category,
+      iconName: iconName ?? this.iconName,
+      isQuantifiable: isQuantifiable ?? this.isQuantifiable,
+      unit: unit ?? this.unit,
+    );
+  }
+
   Map<String, dynamic> toMap() {
     return {
       'id': id,
