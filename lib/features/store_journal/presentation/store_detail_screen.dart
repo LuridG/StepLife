@@ -4,12 +4,47 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:provider/provider.dart';
+import '../../../core/export_import/store_exporter.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:image_picker/image_picker.dart';
+import '../../../core/export_import/bill_parser.dart';
+import '../../../core/settings/settings_provider.dart';
+import '../../../core/export_import/store_importer.dart';
+import '../../../core/export_import/import_preview_screen.dart';
 import '../../../core/utils/map_launcher.dart';
 import '../domain/store_models.dart';
 import '../domain/life_templates.dart';
 import '../providers/store_provider.dart';
 import '../utils/basket_stats.dart';
 import 'store_checkin_dialog.dart';
+
+/// 老数据/非模板字段的兜底中文标签（避免详情页直接显示英文 key）
+const kLogExtrasLabelFallback = <String, String>{
+  'qty': '数量',
+  'price': '单价',
+  'channel': '购买渠道',
+  'brand': '品牌',
+  'quality': '新鲜度/品质',
+  'note': '备注',
+  'unit': '单位',
+  'origin': '产地/品牌',
+  'basketTag': '果蔬分类',
+  'total': '总价',
+  'totalAmount': '总价',
+  'cost': '消费总额',
+  'sku': '规格型号',
+  'refPrice': '参考价（元）',
+  'buyReason': '购买理由',
+  'actualCost': '实付金额（元）',
+  'detail': '购买明细',
+  'experience': '使用体验',
+  'episodesWatched': '已看集数',
+  'platform': '观看平台',
+  'genre': '题材',
+  'year': '上映年份',
+  'director': '导演',
+  'duration': '片长',
+};
 
 class StoreDetailScreen extends StatefulWidget {
   final StoreItem storeItem;
@@ -24,8 +59,188 @@ class StoreDetailScreen extends StatefulWidget {
 }
 
 class _StoreDetailScreenState extends State<StoreDetailScreen> {
+  final ImagePicker _picker = ImagePicker();
+
   /// 菜篮子品牌筛选（'全部' 或具体品牌）
   String _basketBrand = '全部';
+
+  Future<void> _handleExportCategory(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final data = await StoreExporter.buildExportData(category: widget.storeItem.category);
+      final file = await StoreExporter.writeExportFile(data, category: widget.storeItem.category);
+      await StoreExporter.copyToDocuments(file);
+      await StoreExporter.shareFile(file);
+      if (!mounted) return;
+      messenger.showSnackBar(const SnackBar(
+        backgroundColor: Color(0xFF10B981),
+        content: Text('已导出该分类（JSON）'),
+      ));
+    } catch (e) {
+      if (!mounted) return;
+      messenger.showSnackBar(SnackBar(
+        backgroundColor: const Color(0xFFEF4444),
+        content: Text('导出失败：$e'),
+      ));
+    }
+  }
+
+  Future<void> _handleImportLogs(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final picked = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: const ['json'],
+        dialogTitle: '选择打卡记录文件',
+      );
+      if (picked == null || picked.files.isEmpty) return;
+      final path = picked.files.single.path;
+      if (path == null) return;
+      final content = await File(path).readAsString();
+      final draft = StoreImporter.parseLogsOnly(
+        content,
+        targetStoreId: widget.storeItem.id ?? 0,
+        targetStoreName: widget.storeItem.name,
+        targetCategory: widget.storeItem.category,
+      );
+      if (!context.mounted) return;
+      final result = await Navigator.of(context).push<ImportResult>(
+        MaterialPageRoute(builder: (_) => ImportPreviewScreen(draft: draft)),
+      );
+      if (result != null && context.mounted) {
+        await context.read<StoreProvider>().loadData();
+        messenger.showSnackBar(SnackBar(
+          backgroundColor: const Color(0xFF10B981),
+          content: Text('已导入 ${result.createdLogs + result.mergedLogs} 条打卡记录'),
+        ));
+      }
+    } catch (e) {
+      if (!context.mounted) return;
+      messenger.showSnackBar(SnackBar(
+        backgroundColor: const Color(0xFFEF4444),
+        content: Text('导入失败：$e'),
+      ));
+    }
+  }
+
+  Future<void> _handleImportBill(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final settings = context.read<SettingsProvider>();
+      if (settings.deepseekApiKey.trim().isEmpty) {
+        messenger.showSnackBar(const SnackBar(
+          backgroundColor: Color(0xFFEF4444),
+          content: Text('请先在设置中心配置 DeepSeek API Key 后使用账单导入'),
+        ));
+        return;
+      }
+      final source = await showModalBottomSheet<String>(
+        context: context,
+        backgroundColor: const Color(0xFF111C38),
+        builder: (ctx) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.photo_library_outlined, color: Colors.white70),
+                title: const Text('从相册选择账单图片', style: TextStyle(color: Colors.white)),
+                onTap: () => Navigator.pop(ctx, 'image'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.keyboard_outlined, color: Colors.white70),
+                title: const Text('粘贴账单文字（桌面端推荐）', style: TextStyle(color: Colors.white)),
+                onTap: () => Navigator.pop(ctx, 'paste'),
+              ),
+            ],
+          ),
+        ),
+      );
+      if (source == null || !context.mounted) return;
+
+      String rawText;
+      if (source == 'image') {
+        final picked = await _picker.pickImage(source: ImageSource.gallery, maxWidth: 2400);
+        if (picked == null) return;
+        messenger.showSnackBar(const SnackBar(content: Text('正在 OCR 识别账单…')));
+        try {
+          rawText = await BillParser.ocrImage(picked.path);
+        } catch (e) {
+          messenger.showSnackBar(SnackBar(
+            backgroundColor: const Color(0xFFEF4444),
+            content: Text('OCR 识别失败：$e'),
+          ));
+          return;
+        }
+      } else {
+        rawText = await _askPasteText(context);
+        if (rawText.isEmpty) return;
+      }
+      if (!context.mounted) return;
+
+      messenger.showSnackBar(const SnackBar(content: Text('正在整理账单内容…')));
+      final result = await BillParser.structure(
+        rawText: rawText,
+        storeName: widget.storeItem.name,
+        category: widget.storeItem.category,
+        apiKey: settings.deepseekApiKey,
+      );
+      if (result.records.isEmpty) {
+        messenger.showSnackBar(const SnackBar(
+          backgroundColor: Color(0xFFEF4444),
+          content: Text('未能从账单中识别出任何消费记录'),
+        ));
+        return;
+      }
+      final draft = BillParser.toDraft(
+        result,
+        storeId: widget.storeItem.id ?? 0,
+        storeName: widget.storeItem.name,
+        category: widget.storeItem.category,
+      );
+      if (!context.mounted) return;
+      final importResult = await Navigator.of(context).push<ImportResult>(
+        MaterialPageRoute(builder: (_) => ImportPreviewScreen(draft: draft)),
+      );
+      if (importResult != null && context.mounted) {
+        await context.read<StoreProvider>().loadData();
+        messenger.showSnackBar(SnackBar(
+          backgroundColor: const Color(0xFF10B981),
+          content: Text('已导入 ${importResult.createdLogs + importResult.mergedLogs} 条消费记录'),
+        ));
+      }
+    } catch (e) {
+      if (!context.mounted) return;
+      messenger.showSnackBar(SnackBar(
+        backgroundColor: const Color(0xFFEF4444),
+        content: Text('账单导入失败：$e'),
+      ));
+    }
+  }
+
+  Future<String> _askPasteText(BuildContext context) async {
+    final ctrl = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('粘贴账单文字'),
+        backgroundColor: const Color(0xFF111C38),
+        content: TextField(
+          controller: ctrl,
+          maxLines: 8,
+          style: const TextStyle(color: Colors.white),
+          decoration: const InputDecoration(
+            hintText: '粘贴微信账单等文字内容',
+            hintStyle: TextStyle(color: Colors.white38),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('继续')),
+        ],
+      ),
+    );
+    return ok == true ? ctrl.text.trim() : '';
+  }
 
   void _confirmDeleteLog(BuildContext context, StoreLog log) {
     showDialog(
@@ -125,9 +340,14 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
         ? BasketStats.pricePoints(visibleBasketLogs)
         : const <({StoreLog log, double price})>[];
     final basketLatest = isBasket ? BasketStats.latestPrice(visibleBasketLogs) : null;
-    final basketUnit = (widget.storeItem.extras['unit']?.toString() ?? '').isEmpty
+    final basketUnitRaw = widget.storeItem.extras['unit'];
+    final basketUnit = (basketUnitRaw == null || basketUnitRaw.toString().trim().isEmpty)
         ? '斤'
-        : widget.storeItem.extras['unit'].toString();
+        : (basketUnitRaw is num
+            ? (basketUnitRaw == basketUnitRaw.roundToDouble()
+                ? basketUnitRaw.toInt().toString()
+                : basketUnitRaw.toString())
+            : basketUnitRaw.toString());
     final basketChangePrev = isBasket ? BasketStats.changeVsPrevious(visibleBasketLogs) : null;
     final basketChange7 = isBasket ? BasketStats.changeVsDaysAgo(visibleBasketLogs, 7) : null;
     final basketAvg30 = isBasket ? BasketStats.avgPriceSince(visibleBasketLogs, 30) : null;
@@ -143,8 +363,17 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
     ];
 
     final logFieldLabels = {
-      for (final f in [...tpl.checkinFields, ...(cat?.extraFields ?? const []).map((m) => TemplateField.fromJson(m))])
+      for (final f in [
+        ...tpl.checkinFields,
+        ...(cat?.extraFields ?? const []).map((m) => TemplateField.fromJson(m)),
+        ...itemFields,
+      ])
         f.key: f.label,
+      ...kLogExtrasLabelFallback,
+    };
+    final logFieldTypes = {
+      for (final f in [...tpl.checkinFields, ...(cat?.extraFields ?? const []).map((m) => TemplateField.fromJson(m))])
+        f.key: f.type,
     };
 
     // 计算同行成员频率
@@ -159,6 +388,52 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
       appBar: AppBar(
         title: Text(widget.storeItem.name),
         actions: [
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert, color: Colors.white70),
+            tooltip: '更多',
+            color: const Color(0xFF0F172A),
+            onSelected: (v) {
+              if (v == 'export_category') {
+                _handleExportCategory(context);
+              } else if (v == 'import_logs') {
+                _handleImportLogs(context);
+              } else if (v == 'import_bill') {
+                _handleImportBill(context);
+              }
+            },
+            itemBuilder: (ctx) => [
+              PopupMenuItem<String>(
+                value: 'export_category',
+                child: const Row(
+                  children: [
+                    Icon(Icons.folder_shared_outlined, size: 16, color: Colors.white70),
+                    SizedBox(width: 8),
+                    Text('导出该分类', style: TextStyle(fontSize: 13)),
+                  ],
+                ),
+              ),
+              PopupMenuItem<String>(
+                value: 'import_logs',
+                child: const Row(
+                  children: [
+                    Icon(Icons.file_upload_outlined, size: 16, color: Colors.white70),
+                    SizedBox(width: 8),
+                    Text('导入打卡记录（JSON）', style: TextStyle(fontSize: 13)),
+                  ],
+                ),
+              ),
+              PopupMenuItem<String>(
+                value: 'import_bill',
+                child: const Row(
+                  children: [
+                    Icon(Icons.receipt_long_outlined, size: 16, color: Colors.white70),
+                    SizedBox(width: 8),
+                    Text('导入账单（OCR+AI）', style: TextStyle(fontSize: 13)),
+                  ],
+                ),
+              ),
+            ],
+          ),
           IconButton(
             icon: const Icon(Icons.edit_outlined, color: Colors.lightBlueAccent),
             tooltip: '编辑该项目',
@@ -446,7 +721,7 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
                                 child: Row(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    SizedBox(width: 92, child: Text(en.key, style: const TextStyle(fontSize: 12, color: Colors.white54))),
+                                    SizedBox(width: 92, child: Text(kLogExtrasLabelFallback[en.key] ?? en.key, style: const TextStyle(fontSize: 12, color: Colors.white54))),
                                     Expanded(child: Text(en.value, style: const TextStyle(fontSize: 12, color: Colors.white))),
                                   ],
                                 ),
@@ -720,24 +995,6 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
                                         ),
                                         Row(
                                           children: [
-                                            if (log.cost != null && log.cost! > 0)
-                                              Text('¥${log.cost!.toStringAsFixed(1)}', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF10B981), fontSize: 14)),
-                                            if (isBasket && log.extras['price'] is num)
-                                              Container(
-                                                margin: const EdgeInsets.only(right: 6),
-                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                                                decoration: BoxDecoration(
-                                                  color: const Color(0xFF10B981).withAlpha(30),
-                                                  borderRadius: BorderRadius.circular(6),
-                                                ),
-                                                child: Text(
-                                                  '单价 ¥${(log.extras['price'] as num).toString()}/$basketUnit',
-                                                  style: const TextStyle(
-                                                      fontSize: 11,
-                                                      color: Color(0xFF10B981),
-                                                      fontWeight: FontWeight.bold),
-                                                ),
-                                              ),
                                             if ((log.extras['brand']?.toString() ?? '').trim().isNotEmpty)
                                               Padding(
                                                 padding: const EdgeInsets.only(left: 6),
@@ -779,7 +1036,12 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
                                     ),
                                     if (log.extras.isNotEmpty) ...[
                                       const SizedBox(height: 6),
-                                      ..._formatLogExtras(log, logFieldLabels),
+                                      ..._formatLogExtras(log, logFieldLabels, logFieldTypes, isBasket),
+                                    ],
+                                    if (log.cost != null && log.cost! > 0) ...[
+                                      const SizedBox(height: 2),
+                                      Text('🧾 消费总额: ¥${_fmtPrice(log.cost!)}',
+                                          style: const TextStyle(fontSize: 12, color: Color(0xFF10B981), fontWeight: FontWeight.bold)),
                                     ],
                                     if (log.menuNames.isNotEmpty) ...[
                                       const SizedBox(height: 6),
@@ -894,14 +1156,33 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
   }
 
   /// 打卡记录中的模板字段摘要
-  List<Widget> _formatLogExtras(StoreLog log, Map<String, String> labels) {
+  List<Widget> _formatLogExtras(
+      StoreLog log, Map<String, String> labels, Map<String, TemplateFieldType> types, bool isBasketLog) {
     final widgets = <Widget>[];
+    final unitRaw = widget.storeItem.extras['unit'];
+    final unit = (unitRaw == null || unitRaw.toString().trim().isEmpty)
+        ? '斤'
+        : (unitRaw is num
+            ? (unitRaw == unitRaw.roundToDouble()
+                ? unitRaw.toInt().toString()
+                : unitRaw.toString())
+            : unitRaw.toString());
     log.extras.forEach((key, value) {
       if (value == null) return;
       final str = value.toString();
       if (str.isEmpty || str == 'false') return;
-      final display = value == true ? '是' : str;
-      final label = labels[key] ?? key;
+      var display = value == true ? '是' : str;
+      var label = labels[key] ?? key;
+      final type = types[key];
+      if (type == TemplateFieldType.rating && value is num) {
+        display = '⭐ ${value.toStringAsFixed(1)}';
+      } else if (value is List) {
+        display = value.map((e) => e.toString()).where((e) => e.isNotEmpty).join(' / ');
+      }
+      if (isBasketLog && key == 'price' && value is num) {
+        label = '单价';
+        display = '${_fmtPrice(value.toDouble())}元/$unit';
+      }
       widgets.add(Padding(
         padding: const EdgeInsets.only(bottom: 4),
         child: Row(

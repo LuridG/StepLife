@@ -162,6 +162,19 @@ class StoreProvider extends ChangeNotifier {
 
     _categories = await DatabaseService.instance.getStoreCategories();
     _storeItems = await DatabaseService.instance.getStoreItems();
+
+    // 应用设置中的默认筛选分类（仅首次加载时生效，用户手动选择后不受影响）
+    try {
+      final defCat =
+          await DatabaseService.instance.getSetting('store_default_filter_category');
+      if (defCat != null &&
+          defCat.isNotEmpty &&
+          defCat != '全部分类' &&
+          _selectedCategory == '全部分类') {
+        final exists = _categories.any((c) => c.name == defCat);
+        if (exists) _selectedCategory = defCat;
+      }
+    } catch (_) {}
     _storeLogs = await DatabaseService.instance.getStoreLogs();
     _menuItems = await DatabaseService.instance.getStoreMenuItems();
 
@@ -203,6 +216,19 @@ class StoreProvider extends ChangeNotifier {
     _isCardView = !_isCardView;
     notifyListeners();
     await DatabaseService.instance.savePreferredViewMode(_isCardView ? 'card' : 'list');
+  }
+
+  /// 一键重置全部筛选（分类 + 各模板二级筛选）
+  void resetAllFilters() {
+    _selectedCategory = '全部分类';
+    _selectedStatus = '全部状态';
+    _selectedMediaType = '全部媒体类型';
+    _selectedGenre = '全部题材';
+    _selectedYear = '全部年份';
+    _selectedSnackTag = '全部零食分类';
+    _selectedBasketTag = '全部果蔬分类';
+    _selectedBasketTrend = '全部涨跌';
+    notifyListeners();
   }
 
   void selectCategory(String categoryName) {

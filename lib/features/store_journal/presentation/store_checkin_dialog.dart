@@ -26,10 +26,18 @@ class StoreCheckinDialog extends StatelessWidget {
     return v.toStringAsFixed(1);
   }
 
+  /// 从模板字段值解析数字（兼容 num 与字符串）
+  double? _numOf(dynamic v) {
+    if (v is num) return v.toDouble();
+    return double.tryParse(v?.toString() ?? '');
+  }
+
   @override
   Widget build(BuildContext context) {
     final isEdit = existingLog != null;
     final costController = TextEditingController();
+    // 总价是否被用户手动编辑（手动编辑后不再被 单价 × 数量 自动覆盖）
+    var costEditedByUser = false;
     final memoController = TextEditingController();
     final members = context.read<ChoreProvider>().members;
     final Map<String, dynamic> extrasValues = <String, dynamic>{};
@@ -46,6 +54,7 @@ class StoreCheckinDialog extends StatelessWidget {
     final tpl = LifeTemplates.byKey(
       cat?.templateKey ?? LifeTemplates.matchTemplateKey(store.category),
     );
+    final isBasket = tpl.key == 'basket';
     final customFields = (cat?.extraFields ?? const [])
         .map((m) => TemplateField.fromJson(m))
         .toList();
@@ -252,12 +261,13 @@ class StoreCheckinDialog extends StatelessWidget {
                 TextField(
                   controller: costController,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(
-                    labelText: '本次打卡消费金额',
-                    hintText: '例: 45 元 (不涉及消费可留空或填 0)',
+                  onChanged: (_) => setModalState(() => costEditedByUser = true),
+                  decoration: InputDecoration(
+                    labelText: isBasket ? '总价（可自动计算）' : '本次打卡消费金额',
+                    hintText: isBasket ? '留空自动按 单价 × 数量 计算，也可手动填写' : '例: 45 元 (不涉及消费可留空或填 0)',
                     hintStyle: AppTheme.hintStyle,
-                    prefixIcon: Icon(Icons.attach_money),
-                    border: OutlineInputBorder(),
+                    prefixIcon: const Icon(Icons.attach_money),
+                    border: const OutlineInputBorder(),
                   ),
                 ),
                 const SizedBox(height: 14),
@@ -295,7 +305,17 @@ class StoreCheckinDialog extends StatelessWidget {
                       child: TemplateFieldWidget(
                         field: f,
                         value: extrasValues[f.key],
-                        onChanged: (v) => setModalState(() => extrasValues[f.key] = v),
+                        onChanged: (v) => setModalState(() {
+                          extrasValues[f.key] = v;
+                          // 菜篮子：单价/数量变化且总价未被手动编辑时，自动计算总价
+                          if (isBasket && !costEditedByUser && (f.key == 'price' || f.key == 'qty')) {
+                            final pd = _numOf(extrasValues['price']);
+                            final qd = _numOf(extrasValues['qty']);
+                            costController.text = (pd != null && qd != null && pd * qd > 0)
+                                ? _fmtPrice(pd * qd)
+                                : '';
+                          }
+                        }),
                       ),
                     )),
 
@@ -364,7 +384,15 @@ class StoreCheckinDialog extends StatelessWidget {
             ),
             ElevatedButton(
               onPressed: () {
-                final cost = double.tryParse(costController.text);
+                var cost = double.tryParse(costController.text);
+                // 菜篮子：总价留空时按 单价 × 数量 自动计算
+                if (isBasket && (cost == null || cost <= 0)) {
+                  final pd = _numOf(extrasValues['price']);
+                  final qd = _numOf(extrasValues['qty']);
+                  if (pd != null && qd != null && pd * qd > 0) {
+                    cost = pd * qd;
+                  }
+                }
                 final vIds = selectedMembers.map((m) => m.id ?? 0).toList();
                 final vNames = selectedMembers.map((m) => m.name).toList();
 

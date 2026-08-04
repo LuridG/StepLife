@@ -30,6 +30,12 @@ class SettingsProvider extends ChangeNotifier {
   String _backupWarning = '';
   // 启动时自动检查更新（仅 Android）
   bool _autoCheckUpdate = true;
+  // 生活记录分类筛选栏模式: expanded 展开显示 / collapsed 隐藏为悬浮按钮
+  String _storeFilterBarMode = 'expanded';
+  // 生活记录默认筛选分类（'全部分类' 或某一分类名，下次启动生效）
+  String _storeDefaultFilterCategory = '全部分类';
+  // 悬浮筛选按钮常态透明度（0.2 ~ 1.0，用户可调）
+  double _storeFilterFabOpacity = 0.5;
   bool _loaded = false;
 
   String get themeMode => _themeMode;
@@ -52,6 +58,9 @@ class SettingsProvider extends ChangeNotifier {
   bool get webdavConfigured =>
       _webdavUrl.trim().isNotEmpty && _webdavUsername.trim().isNotEmpty;
   bool get autoCheckUpdate => _autoCheckUpdate;
+  String get storeFilterBarMode => _storeFilterBarMode;
+  String get storeDefaultFilterCategory => _storeDefaultFilterCategory;
+  double get storeFilterFabOpacity => _storeFilterFabOpacity;
 
   static const String kThemeMode = 'theme_mode';
   static const String kPreferredViewMode = 'preferredViewMode';
@@ -69,6 +78,9 @@ class SettingsProvider extends ChangeNotifier {
   static const String kLastCheckinMemberIds = 'last_checkin_member_ids';
   static const String kBackupWarning = 'backup_warning';
   static const String kAutoCheckUpdate = 'auto_check_update';
+  static const String kStoreFilterBarMode = 'store_filter_bar_mode';
+  static const String kStoreDefaultFilterCategory = 'store_default_filter_category';
+  static const String kStoreFilterFabOpacity = 'store_filter_fab_opacity';
   static const String kRouteSort = 'route_sort';
 
   /// 从 app_settings 加载全部设置
@@ -91,6 +103,9 @@ class SettingsProvider extends ChangeNotifier {
       _lastCheckinMemberIds = all[kLastCheckinMemberIds] ?? '';
       _backupWarning = all[kBackupWarning] ?? '';
       _autoCheckUpdate = all[kAutoCheckUpdate] != 'false';
+      _storeFilterBarMode = all[kStoreFilterBarMode] ?? 'expanded';
+      _storeDefaultFilterCategory = all[kStoreDefaultFilterCategory] ?? '全部分类';
+      _storeFilterFabOpacity = double.tryParse(all[kStoreFilterFabOpacity] ?? '') ?? 0.5;
       _loaded = true;
       notifyListeners();
     } catch (_) {
@@ -187,5 +202,27 @@ class SettingsProvider extends ChangeNotifier {
     _autoCheckUpdate = value;
     notifyListeners();
     await _save(kAutoCheckUpdate, value.toString());
+  }
+
+  Future<void> setStoreFilterBarMode(String mode) async {
+    if (_storeFilterBarMode == mode) return;
+    _storeFilterBarMode = mode;
+    notifyListeners();
+    await _save(kStoreFilterBarMode, mode);
+  }
+
+  Future<void> setStoreDefaultFilterCategory(String name) async {
+    if (_storeDefaultFilterCategory == name) return;
+    _storeDefaultFilterCategory = name;
+    notifyListeners();
+    await _save(kStoreDefaultFilterCategory, name);
+  }
+
+  Future<void> setStoreFilterFabOpacity(double opacity) async {
+    final v = opacity.clamp(0.2, 1.0);
+    if (_storeFilterFabOpacity == v) return;
+    _storeFilterFabOpacity = v;
+    notifyListeners();
+    await _save(kStoreFilterFabOpacity, v.toString());
   }
 }

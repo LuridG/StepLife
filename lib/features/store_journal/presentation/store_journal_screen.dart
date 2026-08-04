@@ -9,6 +9,10 @@ import '../domain/life_templates.dart';
 import '../providers/store_provider.dart';
 import '../utils/basket_stats.dart';
 import '../../../core/cache/cache_manager.dart';
+import '../../../core/export_import/store_exporter.dart';
+import 'package:file_picker/file_picker.dart';
+import '../../../core/export_import/store_importer.dart';
+import '../../../core/export_import/import_preview_screen.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/network/tmdb_client.dart';
 import '../../../core/settings/settings_screen.dart';
@@ -1520,10 +1524,8 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    super.build(context);
-    final storeProvider = context.watch<StoreProvider>();
+  /// 分类筛选栏：按当前分类与数据动态计算模板二级筛选选项（展开内联 / 弹层共用，实时刷新）
+  Widget _buildFilterBar(StoreProvider storeProvider) {
     // 当前分类对应的模板 key（用于影视状态筛选显示）
     String? currentTplKey;
     if (storeProvider.selectedCategory != '全部分类') {
@@ -1579,180 +1581,9 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
       storeProvider.setEarliestShownYear(int.parse(shownYears.last));
     }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('生活记录'),
-        leadingWidth: 112,
-        leading: Row(
-          children: [
-            IconButton(
-              icon: const Icon(Icons.auto_awesome),
-              tooltip: '智能助手',
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const AssistantScreen()),
-                );
-              },
-            ),
-            Builder(
-              builder: (ctx) => IconButton(
-                icon: const Icon(Icons.menu),
-                tooltip: '生活分类管理',
-                onPressed: () => Scaffold.of(ctx).openDrawer(),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert),
-            tooltip: '更多',
-            color: const Color(0xFF0F172A),
-            onSelected: (v) {
-              if (v == 'time' || v == 'rating' || v == 'checkin') {
-                storeProvider.setSortMode(storeProvider.selectedCategory, v);
-              } else if (v == 'toggle_view') {
-                storeProvider.toggleViewMode();
-              } else if (v == 'settings') {
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const SettingsScreen()),
-                );
-              }
-            },
-            itemBuilder: (ctx) => [
-              _buildSortIconItem('time', Icons.access_time, storeProvider.activeSortMode, storeProvider.activeSortDir),
-              _buildSortIconItem('rating', Icons.star_rounded, storeProvider.activeSortMode, storeProvider.activeSortDir),
-              _buildSortIconItem('checkin', Icons.flash_on_rounded, storeProvider.activeSortMode, storeProvider.activeSortDir),
-              const PopupMenuDivider(),
-              PopupMenuItem<String>(
-                value: 'toggle_view',
-                child: Row(
-                  children: [
-                    Icon(
-                      storeProvider.isCardView ? Icons.view_headline : Icons.grid_view,
-                      size: 16,
-                      color: Colors.white70,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      storeProvider.isCardView ? '切换紧凑列表' : '切换卡片视图',
-                      style: const TextStyle(fontSize: 13),
-                    ),
-                  ],
-                ),
-              ),
-              PopupMenuItem<String>(
-                value: 'settings',
-                child: const Row(
-                  children: [
-                    Icon(Icons.settings_outlined, size: 16, color: Colors.white70),
-                    SizedBox(width: 8),
-                    Text('设置中心', style: TextStyle(fontSize: 13)),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          IconButton(
-            icon: const Icon(Icons.add_circle_outline),
-            tooltip: '新建打卡记录',
-            onPressed: () async {
-              final key = await TemplateGallerySheet.show(context);
-              if (key != null) _showStoreFormDialog(initialTemplateKey: key);
-            },
-          ),
-        ],
-      ),
-      drawer: Drawer(
-        backgroundColor: const Color(0xFF0F172A),
-        child: SafeArea(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white.withAlpha(10),
-                  border: const Border(bottom: BorderSide(color: Colors.white12)),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.category, color: Color(0xFF10B981), size: 24),
-                    const SizedBox(width: 10),
-                    const Text('生活分类管理', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
-                    const Spacer(),
-                    IconButton(
-                      icon: const Icon(Icons.add, color: Color(0xFF10B981)),
-                      tooltip: '添加分类',
-                      onPressed: _showAddCategoryDialog,
-                    ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  children: [
-                    ListTile(
-                      leading: const Icon(Icons.grid_view, color: Colors.white70),
-                      title: const Text('全部分类', style: TextStyle(color: Colors.white)),
-                      selected: storeProvider.selectedCategory == '全部分类',
-                      selectedTileColor: const Color(0xFF10B981).withAlpha(40),
-                      onTap: () {
-                        storeProvider.selectCategory('全部分类');
-                        Navigator.of(context).pop();
-                      },
-                    ),
-                    ...storeProvider.categories.map((c) {
-                      final isSelected = storeProvider.selectedCategory == c.name;
-                      return ListTile(
-                        leading: const Icon(Icons.label_outline, color: Color(0xFF10B981)),
-                        title: Text(c.name, style: const TextStyle(color: Colors.white)),
-                        selected: isSelected,
-                        selectedTileColor: const Color(0xFF10B981).withAlpha(40),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.edit_outlined, color: Colors.white54, size: 18),
-                              onPressed: () => _showEditCategoryDialog(c),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 18),
-                              onPressed: () => _confirmDeleteCategory(c),
-                            ),
-                          ],
-                        ),
-                        onTap: () {
-                          storeProvider.selectCategory(c.name);
-                          Navigator.of(context).pop();
-                        },
-                      );
-                    }),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-      body: SafeArea(
-        child: Stack(
-          children: [
-            Container(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Color(0xFF090D16), Color(0xFF111C38), Color(0xFF0F172A)],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                ),
-              ),
-            ),
-            SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
                   SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: Row(
@@ -2003,7 +1834,314 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                       ),
                     ),
                   ],
-                  const SizedBox(height: 16),
+      ],
+    );
+  }
+
+  Future<void> _handleExport(BuildContext context, {String? category}) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final data = await StoreExporter.buildExportData(category: category);
+      final file = await StoreExporter.writeExportFile(data, category: category);
+      await StoreExporter.copyToDocuments(file);
+      await StoreExporter.shareFile(file);
+      if (!mounted) return;
+      final count = (data['items'] as List).length;
+      messenger.showSnackBar(SnackBar(
+        backgroundColor: const Color(0xFF10B981),
+        content: Text(
+          category == null
+              ? '已导出全部生活记录：$count 个项目（JSON）'
+              : '已导出分类「$category」：$count 个项目（JSON）',
+        ),
+      ));
+    } catch (e) {
+      if (!mounted) return;
+      messenger.showSnackBar(SnackBar(
+        backgroundColor: const Color(0xFFEF4444),
+        content: Text('导出失败：$e'),
+      ));
+    }
+  }
+
+  Future<void> _handleImport(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final picked = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: const ['json'],
+        dialogTitle: '选择生活记录导入文件',
+      );
+      if (picked == null || picked.files.isEmpty) return;
+      final path = picked.files.single.path;
+      if (path == null) return;
+      final content = await File(path).readAsString();
+      final draft = StoreImporter.parseJson(content);
+      if (!context.mounted) return;
+      final result = await Navigator.of(context).push<ImportResult>(
+        MaterialPageRoute(builder: (_) => ImportPreviewScreen(draft: draft)),
+      );
+      if (result != null && context.mounted) {
+        await context.read<StoreProvider>().loadData();
+        messenger.showSnackBar(SnackBar(
+          backgroundColor: const Color(0xFF10B981),
+          content: Text(_importSummary(result)),
+        ));
+      }
+    } catch (e) {
+      if (!mounted) return;
+      messenger.showSnackBar(SnackBar(
+        backgroundColor: const Color(0xFFEF4444),
+        content: Text('导入失败：$e'),
+      ));
+    }
+  }
+
+  String _importSummary(ImportResult r) {
+    final parts = <String>[
+      if (r.createdCategories > 0) '新建分类 ${r.createdCategories}',
+      if (r.createdItems > 0) '新建项目 ${r.createdItems}',
+      if (r.createdLogs > 0) '新增打卡 ${r.createdLogs}',
+      if (r.mergedLogs > 0) '合并打卡 ${r.mergedLogs}',
+      if (r.createdMenus > 0) '菜单 ${r.createdMenus}',
+    ];
+    if (parts.isEmpty) return '没有可导入的内容（已全部取消选择）';
+    return '导入完成：${parts.join('、')}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    final storeProvider = context.watch<StoreProvider>();
+    final settings = context.watch<SettingsProvider>();
+    final filterBarCollapsed = settings.storeFilterBarMode == 'collapsed';
+    final fabOpacity = settings.storeFilterFabOpacity.clamp(0.2, 1.0);
+    final hasActiveFilter = storeProvider.selectedCategory != '全部分类' ||
+        storeProvider.selectedStatus != '全部状态' ||
+        storeProvider.selectedMediaType != '全部媒体类型' ||
+        storeProvider.selectedGenre != '全部题材' ||
+        storeProvider.selectedYear != '全部年份' ||
+        storeProvider.selectedSnackTag != '全部零食分类' ||
+        storeProvider.selectedBasketTag != '全部果蔬分类' ||
+        storeProvider.selectedBasketTrend != '全部涨跌';
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('生活记录'),
+        leadingWidth: 112,
+        leading: Row(
+          children: [
+            IconButton(
+              icon: const Icon(Icons.auto_awesome),
+              tooltip: '智能助手',
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const AssistantScreen()),
+                );
+              },
+            ),
+            Builder(
+              builder: (ctx) => IconButton(
+                icon: const Icon(Icons.menu),
+                tooltip: '生活分类管理',
+                onPressed: () => Scaffold.of(ctx).openDrawer(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert),
+            tooltip: '更多',
+            color: const Color(0xFF0F172A),
+            onSelected: (v) {
+              if (v == 'time' || v == 'rating' || v == 'checkin') {
+                storeProvider.setSortMode(storeProvider.selectedCategory, v);
+              } else if (v == 'toggle_view') {
+                storeProvider.toggleViewMode();
+              } else if (v == 'settings') {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                );
+              } else if (v == 'export_category') {
+                final cat = storeProvider.selectedCategory;
+                _handleExport(context, category: cat == '全部分类' ? null : cat);
+              } else if (v == 'export_all') {
+                _handleExport(context);
+              } else if (v == 'import_data') {
+                _handleImport(context);
+              }
+            },
+            itemBuilder: (ctx) => [
+              _buildSortIconItem('time', Icons.access_time, '时间', storeProvider.activeSortMode, storeProvider.activeSortDir),
+              _buildSortIconItem('rating', Icons.star_rounded, '评分', storeProvider.activeSortMode, storeProvider.activeSortDir),
+              _buildSortIconItem('checkin', Icons.flash_on_rounded, '次数', storeProvider.activeSortMode, storeProvider.activeSortDir),
+              const PopupMenuDivider(),
+              PopupMenuItem<String>(
+                value: 'toggle_view',
+                child: Row(
+                  children: [
+                    Icon(
+                      storeProvider.isCardView ? Icons.view_headline : Icons.grid_view,
+                      size: 16,
+                      color: Colors.white70,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      storeProvider.isCardView ? '切换紧凑列表' : '切换卡片视图',
+                      style: const TextStyle(fontSize: 13),
+                    ),
+                  ],
+                ),
+              ),
+              PopupMenuItem<String>(
+                value: 'settings',
+                child: const Row(
+                  children: [
+                    Icon(Icons.settings_outlined, size: 16, color: Colors.white70),
+                    SizedBox(width: 8),
+                    Text('设置中心', style: TextStyle(fontSize: 13)),
+                  ],
+                ),
+              ),
+              const PopupMenuDivider(),
+              PopupMenuItem<String>(
+                value: 'export_category',
+                child: const Row(
+                  children: [
+                    Icon(Icons.folder_shared_outlined, size: 16, color: Colors.white70),
+                    SizedBox(width: 8),
+                    Text('导出当前分类', style: TextStyle(fontSize: 13)),
+                  ],
+                ),
+              ),
+              PopupMenuItem<String>(
+                value: 'export_all',
+                child: const Row(
+                  children: [
+                    Icon(Icons.file_download_outlined, size: 16, color: Colors.white70),
+                    SizedBox(width: 8),
+                    Text('导出全部数据', style: TextStyle(fontSize: 13)),
+                  ],
+                ),
+              ),
+              const PopupMenuDivider(),
+              PopupMenuItem<String>(
+                value: 'import_data',
+                child: const Row(
+                  children: [
+                    Icon(Icons.file_upload_outlined, size: 16, color: Colors.white70),
+                    SizedBox(width: 8),
+                    Text('导入数据（JSON）', style: TextStyle(fontSize: 13)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          IconButton(
+            icon: const Icon(Icons.add_circle_outline),
+            tooltip: '新建打卡记录',
+            onPressed: () async {
+              final key = await TemplateGallerySheet.show(context);
+              if (key != null) _showStoreFormDialog(initialTemplateKey: key);
+            },
+          ),
+        ],
+      ),
+      drawer: Drawer(
+        backgroundColor: const Color(0xFF0F172A),
+        child: SafeArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white.withAlpha(10),
+                  border: const Border(bottom: BorderSide(color: Colors.white12)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.category, color: Color(0xFF10B981), size: 24),
+                    const SizedBox(width: 10),
+                    const Text('生活分类管理', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.add, color: Color(0xFF10B981)),
+                      tooltip: '添加分类',
+                      onPressed: _showAddCategoryDialog,
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  children: [
+                    ListTile(
+                      leading: const Icon(Icons.grid_view, color: Colors.white70),
+                      title: const Text('全部分类', style: TextStyle(color: Colors.white)),
+                      selected: storeProvider.selectedCategory == '全部分类',
+                      selectedTileColor: const Color(0xFF10B981).withAlpha(40),
+                      onTap: () {
+                        storeProvider.selectCategory('全部分类');
+                        Navigator.of(context).pop();
+                      },
+                    ),
+                    ...storeProvider.categories.map((c) {
+                      final isSelected = storeProvider.selectedCategory == c.name;
+                      return ListTile(
+                        leading: const Icon(Icons.label_outline, color: Color(0xFF10B981)),
+                        title: Text(c.name, style: const TextStyle(color: Colors.white)),
+                        selected: isSelected,
+                        selectedTileColor: const Color(0xFF10B981).withAlpha(40),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.edit_outlined, color: Colors.white54, size: 18),
+                              onPressed: () => _showEditCategoryDialog(c),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 18),
+                              onPressed: () => _confirmDeleteCategory(c),
+                            ),
+                          ],
+                        ),
+                        onTap: () {
+                          storeProvider.selectCategory(c.name);
+                          Navigator.of(context).pop();
+                        },
+                      );
+                    }),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      body: SafeArea(
+        child: Stack(
+          children: [
+            Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFF090D16), Color(0xFF111C38), Color(0xFF0F172A)],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
+              ),
+            ),
+            SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (!filterBarCollapsed) ...[
+                    _buildFilterBar(storeProvider),
+                    const SizedBox(height: 16),
+                  ],
 
                   storeProvider.filteredStoreItems.isEmpty
                       ? _buildEmptyStoreCard()
@@ -2024,6 +2162,66 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                 ],
               ),
             ),
+            if (filterBarCollapsed)
+              Positioned(
+                right: 14,
+                bottom: 14,
+                child: Opacity(
+                  opacity: fabOpacity,
+                  child: _FilterFab(
+                    active: hasActiveFilter,
+                    onPressed: () {
+                        showModalBottomSheet<void>(
+                          context: context,
+                          backgroundColor: const Color(0xFF111C38),
+                          shape: const RoundedRectangleBorder(
+                            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                          ),
+                          isScrollControlled: true,
+                          builder: (sheetCtx) => Consumer<StoreProvider>(
+                            builder: (ctx, provider, _) => SafeArea(
+                              child: ConstrainedBox(
+                              constraints: BoxConstraints(
+                                maxHeight: MediaQuery.of(sheetCtx).size.height * 0.8,
+                              ),
+                              child: SingleChildScrollView(
+                                padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        const Text('分类筛选',
+                                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                                        const Spacer(),
+                                        TextButton.icon(
+                                          onPressed: () {
+                                            storeProvider.resetAllFilters();
+                                            Navigator.of(sheetCtx).pop();
+                                          },
+                                          icon: const Icon(Icons.restart_alt, size: 18),
+                                          label: const Text('重置'),
+                                        ),
+                                        IconButton(
+                                          onPressed: () => Navigator.of(sheetCtx).pop(),
+                                          icon: const Icon(Icons.close, color: Colors.white54),
+                                        ),
+                                      ],
+                                    ),
+                                    const Divider(color: Colors.white12),
+                                    const SizedBox(height: 6),
+                                    _buildFilterBar(provider),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
           ],
         ),
       ),
@@ -2711,26 +2909,40 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
     return '🛒 最近价 ¥${_fmtPrice(latest)}/$unit · ${chg == null ? '暂无涨跌对比' : BasketStats.formatPct(chg)} · ${logs.length} 次${brand.isNotEmpty && brand != '通用' ? ' · 🏷️ $brand' : ''}';
   }
 
-  /// 排序菜单图标项：只显示图标，当前排序项高亮并附方向箭头（点一次顺序/再点逆序）
+  /// 排序菜单项：图标 + 短标签，与菜单内其它功能项风格统一；
+  /// 当前排序项高亮并附方向箭头与正序/倒序提示（点一次切换方式，再点当前项切换方向）
   PopupMenuItem<String> _buildSortIconItem(
-      String value, IconData icon, String activeMode, String activeDir) {
+      String value, IconData icon, String label, String activeMode, String activeDir) {
     final isActive = activeMode == value;
     final color = isActive ? const Color(0xFF10B981) : Colors.white70;
     return PopupMenuItem<String>(
       value: value,
-      child: Center(
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 18, color: color),
-            if (isActive)
-              Icon(
-                activeDir == 'asc' ? Icons.arrow_upward : Icons.arrow_downward,
-                size: 12,
-                color: color,
-              ),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: color),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              color: color,
+              fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+          if (isActive) ...[
+            const SizedBox(width: 10),
+            Icon(
+              activeDir == 'asc' ? Icons.arrow_upward : Icons.arrow_downward,
+              size: 14,
+              color: color,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              activeDir == 'asc' ? '正序' : '倒序',
+              style: TextStyle(fontSize: 11, color: color),
+            ),
           ],
-        ),
+        ],
       ),
     );
   }
@@ -2884,6 +3096,52 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
             border: Border.all(color: Colors.white.withAlpha(35), width: 1.2),
           ),
           child: child,
+        ),
+      ),
+    );
+  }
+}
+/// 悬浮筛选按钮：扁平青蓝圆钮，与整体深蓝调性协调并区别于绿色主色
+class _FilterFab extends StatefulWidget {
+  final bool active;
+  final VoidCallback onPressed;
+
+  const _FilterFab({required this.active, required this.onPressed});
+
+  @override
+  State<_FilterFab> createState() => _FilterFabState();
+}
+
+class _FilterFabState extends State<_FilterFab> {
+  @override
+  Widget build(BuildContext context) {
+    final active = widget.active;
+    final bg = active ? const Color(0xFF38BDF8) : const Color(0xFF0EA5E9);
+    return Material(
+      color: bg.withAlpha(active ? 235 : 210),
+      shape: const CircleBorder(),
+      elevation: 3,
+      shadowColor: const Color(0xFF38BDF8).withAlpha(120),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: widget.onPressed,
+        child: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: const Color(0xFF7DD3FC).withAlpha(active ? 160 : 110),
+              width: 1,
+            ),
+          ),
+          child: Center(
+            child: Icon(
+              active ? Icons.filter_alt : Icons.filter_alt_outlined,
+              color: Colors.white,
+              size: 20,
+            ),
+          ),
         ),
       ),
     );

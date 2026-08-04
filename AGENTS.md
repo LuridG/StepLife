@@ -20,6 +20,8 @@
 - **图标**：保持 100% 透明 Alpha 通道（RGBA）DIB ICO，严禁白色/浅色背景余边。
 - **版本发布**：`pubspec.yaml` `version: 1.5.x+YYYYMMDD`，构建号用打包日期且必须递增；发布时同步更新 `assets/walkthrough.md` 更新日志、设置中心「更新记录与版本历史」与 README，保持多处一致。
 
+- **生活导入导出**：核心在 `lib/core/export_import/`（StoreExporter / StoreImporter / ImportDraft / ImportPreviewScreen / BillParser）；导出支持单分类与全量（JSON v1，图片字段位预留）；导入分 L1 详情页纯打卡（parseLogsOnly）→ L2 新店铺建项目 → L3 模板全量；导入前必须 `vacuumInto` 快照备份（保留 3 份）+ 单事务回滚；AI 账单导入（OCR+DeepSeek）产出仅作建议，须经模拟导入页用户确认后落库；依赖 share_plus / file_picker / google_mlkit_text_recognition。
+
 ## 🧭 全局架构要点
 - 入口 `lib/main.dart`：底部 4 个 Tab（路线/家务/生活/成员），「关于」已合并进设置中心；桌面 FFI 初始化不可删。
 - 分层：presentation（页面，只渲染不碰库）→ providers（`ChangeNotifier`，先落库再更新内存并 `notifyListeners()`）→ domain（纯模型）→ core/db（`DatabaseService` 单例集中 SQL）；核心算法放 core/utils 可单测。
@@ -42,6 +44,12 @@
 
 ## 🧪 交付前验证
 依次运行且 0 错误：`flutter analyze` → `flutter test`（如涉及）→ release 构建。
+
+## 🧰 Flutter 工具链卡死排查（僵尸进程防护）
+- 现象：`flutter run/analyze` 长时间无响应、CPU 持续烧高，通常是 flutter.bat 包装进程在 `bin\cache\flutter.bat.lock` 的 `:acquire_lock` 循环空转（沙箱写权限不足或残留 wrapper 进程导致），会阻塞后续所有 flutter 命令。
+- 先查：`Get-Process | Where-Object { $_.Name -in 'cmd','dart' -and $_.CPU -gt 30 }`，发现高 CPU 的 cmd/dart 即 `Stop-Process -Id <PID>` 清理；勿放任不管（单个进程一天可烧数万 CPU 秒）。
+- 一键修复：运行 `scripts/cleanup_flutter_zombies.ps1`（先 `-ListOnly` 预览；结束僵尸进程后会自动清理过期锁文件）。
+- 预防：所有 flutter 命令必须用已批准前缀在沙箱外执行（如 `-Last 30` 等已批准后缀），禁止用未批准后缀在沙箱内跑 flutter，避免写锁文件被拒后触发 `:acquire_lock` 死循环。
 
 ## 🛠 环境与协作约定（用户偏好）
 - 中文沟通；大改动先出方案，用户确认后再实施。

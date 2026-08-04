@@ -728,37 +728,62 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Widget _section(String title, Widget child) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white.withAlpha(16),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.white.withAlpha(35), width: 1.2),
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: const Color(0xFF7DD3FC).withAlpha(55), width: 1.2),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withAlpha(45),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF10B981),
-                    letterSpacing: 0.5,
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white.withAlpha(16),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF10B981),
+                      letterSpacing: 0.5,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                child,
-              ],
+                  const SizedBox(height: 12),
+                  child,
+                ],
+              ),
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  /// 按钮标签：窄屏下自动缩小字号保持单行，避免文字换行变形
+  Widget _btnLabel(String text, {double fontSize = 14}) {
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Text(
+        text,
+        maxLines: 1,
+        softWrap: false,
+        style: TextStyle(fontSize: fontSize),
       ),
     );
   }
@@ -781,6 +806,41 @@ class _SettingsScreenState extends State<SettingsScreen> {
             states.contains(WidgetState.selected)
                 ? const Color(0xFF10B981).withAlpha(200)
                 : Colors.white.withAlpha(10)),
+      ),
+    );
+  }
+
+  /// 默认筛选分类下拉：全部分类 + 当前生活分类（不存在的旧值回退为全部分类）
+  Widget _buildDefaultCategoryDropdown(SettingsProvider settings) {
+    final storeProvider = context.watch<StoreProvider>();
+    final options = <String>['全部分类', ...storeProvider.categories.map((c) => c.name)];
+    final value = options.contains(settings.storeDefaultFilterCategory)
+        ? settings.storeDefaultFilterCategory
+        : '全部分类';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: Colors.white.withAlpha(10),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.white24),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: value,
+          isExpanded: true,
+          dropdownColor: const Color(0xFF0F172A),
+          iconEnabledColor: const Color(0xFF10B981),
+          style: const TextStyle(fontSize: 13, color: Colors.white),
+          items: options
+              .map((name) => DropdownMenuItem(
+                    value: name,
+                    child: Text(name, style: const TextStyle(color: Colors.white)),
+                  ))
+              .toList(),
+          onChanged: (v) {
+            if (v != null) settings.setStoreDefaultFilterCategory(v);
+          },
+        ),
       ),
     );
   }
@@ -843,7 +903,47 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ],
                       onChanged: (v) => settings.setDefaultMember(v.first),
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 16),
+                    const Text('生活分类筛选栏', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
+                    const SizedBox(height: 8),
+                    _segmented<String>(
+                      selected: {settings.storeFilterBarMode},
+                      segments: const [
+                        ButtonSegment(value: 'expanded', label: Text('展开显示'), icon: Icon(Icons.view_agenda_outlined, size: 16)),
+                        ButtonSegment(value: 'collapsed', label: Text('悬浮按钮'), icon: Icon(Icons.filter_alt_outlined, size: 16)),
+                      ],
+                      onChanged: (v) => settings.setStoreFilterBarMode(v.first),
+                    ),
+                    if (settings.storeFilterBarMode == 'collapsed') ...[
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          const Text('悬浮按钮透明度', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
+                          const Spacer(),
+                          Text(
+                            '${(settings.storeFilterFabOpacity * 100).round()}%',
+                            style: const TextStyle(fontSize: 13, color: Color(0xFF10B981), fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                      Slider(
+                        value: settings.storeFilterFabOpacity,
+                        min: 0.2,
+                        max: 1.0,
+                        divisions: 8,
+                        activeColor: const Color(0xFF10B981),
+                        inactiveColor: Colors.white24,
+                        label: '${(settings.storeFilterFabOpacity * 100).round()}%',
+                        onChanged: (v) => settings.setStoreFilterFabOpacity(v),
+                      ),
+                    ],
+                    const SizedBox(height: 16),
+                    const Text('默认筛选分类', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
+                    const SizedBox(height: 8),
+                    _buildDefaultCategoryDropdown(settings),
+                    const SizedBox(height: 8),
+                    const Text('收起筛选栏后，通过右下角半透明悬浮按钮展开筛选；默认筛选分类下次启动生活记录时生效', style: TextStyle(fontSize: 11, color: Colors.white38)),
+                    const SizedBox(height: 8),
                     const Text('页面背景保留品牌深色渐变，主题切换影响对话框与系统控件', style: TextStyle(fontSize: 11, color: Colors.white38)),
                   ],
                 )),
@@ -870,6 +970,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         border: const OutlineInputBorder(),
                       ),
                     ),
+                    const SizedBox(height: 8),
                     const Text('数据来源 TMDB（themoviedb.org）。可填 v3 API Key（32 位）或 v4 Read Access Token（eyJ 开头），两者都支持', style: TextStyle(fontSize: 11, color: Colors.white38)),
                     const SizedBox(height: 10),
                     Row(
@@ -878,12 +979,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           child: OutlinedButton.icon(
                             onPressed: _resetTemplateBindings,
                             icon: const Icon(Icons.restore, size: 18),
-                            label: const Text('恢复内置模板绑定'),
+                            label: _btnLabel('恢复内置模板绑定'),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
                     const SizedBox(height: 16),
                     const Text('智能助手（DeepSeek）', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
                     const SizedBox(height: 8),
@@ -936,7 +1036,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             icon: _syncing
                                 ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
                                 : const Icon(Icons.upload_outlined, size: 18),
-                            label: const Text('立即上传'),
+                            label: _btnLabel('立即上传'),
                           ),
                         ),
                         const SizedBox(width: 10),
@@ -946,52 +1046,47 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             icon: _restoring
                                 ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
                                 : const Icon(Icons.download_outlined, size: 18),
-                            label: const Text('立即恢复'),
+                            label: _btnLabel('立即恢复'),
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 10),
-                    Row(
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
                       children: [
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: _inspecting ? null : _verifyRemote,
-                            icon: _inspecting
-                                ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
-                                : const Icon(Icons.fact_check_outlined, size: 17),
-                            label: const Text('校验远端'),
-                          ),
+                        OutlinedButton.icon(
+                          onPressed: _inspecting ? null : _verifyRemote,
+                          icon: _inspecting
+                              ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                              : const Icon(Icons.fact_check_outlined, size: 17),
+                          label: _btnLabel('校验远端'),
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: _inspecting ? null : _analyzeRemote,
-                            icon: _inspecting
-                                ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
-                                : const Icon(Icons.analytics_outlined, size: 17),
-                            label: const Text('数据概览'),
-                          ),
+                        OutlinedButton.icon(
+                          onPressed: _inspecting ? null : _analyzeRemote,
+                          icon: _inspecting
+                              ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                              : const Icon(Icons.analytics_outlined, size: 17),
+                          label: _btnLabel('数据概览'),
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: _inspecting ? null : _remoteInfo,
-                            icon: _inspecting
-                                ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
-                                : const Icon(Icons.schedule_outlined, size: 17),
-                            label: const Text('上传时间'),
-                          ),
+                        OutlinedButton.icon(
+                          onPressed: _inspecting ? null : _remoteInfo,
+                          icon: _inspecting
+                              ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                              : const Icon(Icons.schedule_outlined, size: 17),
+                          label: _btnLabel('上传时间'),
                         ),
                       ],
-                    ),                    const SizedBox(height: 10),
+                    ),
+                    const SizedBox(height: 8),
                     Text(
                       settings.webdavLastSync.isEmpty
                           ? '尚未同步过'
                           : '上次同步: ${settings.webdavLastSync}',
                       style: const TextStyle(fontSize: 12, color: Colors.white54),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 8),
                     const Text('账号密码 v1 明文存本地 SQLite，请谨慎保管；恢复操作会先自动备份本地库', style: TextStyle(fontSize: 11, color: Colors.white38)),
                   ],
                 )),
@@ -1021,16 +1116,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     const SizedBox(height: 14),
                     const Text('缓存上限', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
                     const SizedBox(height: 8),
-                    _segmented<int>(
-                      selected: {settings.cacheLimitMB},
-                      segments: const [
-                        ButtonSegment(value: 0, label: Text('不限')),
-                        ButtonSegment(value: 50, label: Text('50MB')),
-                        ButtonSegment(value: 100, label: Text('100MB')),
-                        ButtonSegment(value: 200, label: Text('200MB')),
-                        ButtonSegment(value: 500, label: Text('500MB')),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final v in const [0, 50, 100, 200, 500])
+                          ChoiceChip(
+                            label: Text(v == 0 ? '不限' : '${v}MB'),
+                            selected: settings.cacheLimitMB == v,
+                            selectedColor: const Color(0xFF10B981).withAlpha(80),
+                            backgroundColor: Colors.white.withAlpha(8),
+                            side: BorderSide(
+                              color: settings.cacheLimitMB == v
+                                  ? const Color(0xFF10B981)
+                                  : Colors.white24,
+                            ),
+                            onSelected: (_) => settings.setCacheLimitMB(v),
+                          ),
                       ],
-                      onChanged: (v) => settings.setCacheLimitMB(v.first),
                     ),
                     const SizedBox(height: 16),
                     const Text('新图片压缩质量', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
@@ -1051,7 +1154,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           child: OutlinedButton.icon(
                             onPressed: _cleanCacheNow,
                             icon: const Icon(Icons.cleaning_services_outlined, size: 18),
-                            label: const Text('按上限清理'),
+                            label: _btnLabel('按上限清理'),
                           ),
                         ),
                         const SizedBox(width: 10),
@@ -1063,13 +1166,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               _toast('缓存图片已清空');
                             },
                             icon: const Icon(Icons.delete_sweep_outlined, size: 18),
-                            label: const Text('一键清空'),
+                            label: _btnLabel('一键清空'),
                             style: OutlinedButton.styleFrom(foregroundColor: Colors.redAccent),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 8),
                     const Text('旧图不受质量设置影响，仅影响新选图压缩', style: TextStyle(fontSize: 11, color: Colors.white38)),
                   ],
                 )),
@@ -1095,7 +1198,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             icon: _checkingUpdate
                                 ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
                                 : const Icon(Icons.system_update_alt, size: 18),
-                            label: Text(_checkingUpdate ? '检查中…' : '检查更新'),
+                            label: _btnLabel(_checkingUpdate ? '检查中…' : '检查更新'),
                             style: FilledButton.styleFrom(backgroundColor: const Color(0xFF10B981)),
                           ),
                         ),
