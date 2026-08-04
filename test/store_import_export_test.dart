@@ -135,6 +135,19 @@ void main() {
       expect(log.timestamp, isNull);
       expect(log.cost, 12.5);
     });
+
+    test('纯打卡导入分类默认合并（L1 不新建分类/项目）', () {
+      final draft = StoreImporter.parseLogsOnly(
+        '{"logs": [{"cost": 12.5, "timestamp": "2026-08-01 09:00"}]}',
+        targetStoreId: 7,
+        targetStoreName: '早点铺',
+        targetCategory: '餐饮美食',
+      );
+      final cat = draft.categories.single;
+      expect(cat.strategy, ImportStrategy.merge);
+      expect(cat.items.single.strategy, ImportStrategy.merge);
+      expect(cat.items.single.targetItemId, 7);
+    });
   });
 
   group('BillParser.parseBillJson', () {

@@ -184,6 +184,7 @@ class BillParser {
     required String category,
   }) {
     final cat = ImportCategoryDraft(name: category);
+    cat.strategy = ImportStrategy.merge;
     final item = ImportItemDraft(name: storeName, category: category);
     item.strategy = ImportStrategy.merge;
     item.targetItemId = storeId == 0 ? null : storeId;

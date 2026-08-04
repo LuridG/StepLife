@@ -174,6 +174,7 @@ class StoreImporter {
       throw const FormatException('缺少 logs 数组');
     }
     final cat = ImportCategoryDraft(name: targetCategory);
+    cat.strategy = ImportStrategy.merge;
     final item = ImportItemDraft(name: targetStoreName, category: targetCategory);
     item.strategy = ImportStrategy.merge;
     item.targetItemId = targetStoreId == 0 ? null : targetStoreId;
@@ -288,6 +289,22 @@ class StoreImporter {
         if (!c.selected) continue;
         var catId = c.targetCategoryId;
         if (c.strategy == ImportStrategy.create || catId == null) {
+          // 新建分类防撞名：同名已存在时追加 (导入N) 后缀，避免 UNIQUE 冲突
+          var catName = c.resolvedName;
+          var suffix = 2;
+          while (true) {
+            final dup = await txn.query('store_categories',
+                where: 'name = ?', whereArgs: [catName]);
+            if (dup.isEmpty) break;
+            catName = '${c.resolvedName} (导入$suffix)';
+            suffix++;
+          }
+          if (catName != c.resolvedName) {
+            c.resolvedName = catName;
+            for (final it in c.items) {
+              it.resolvedCategory = catName;
+            }
+          }
           catId = await txn.insert('store_categories', {
             'name': c.resolvedName,
             'iconName': c.iconName,
@@ -302,6 +319,18 @@ class StoreImporter {
           var itemId = it.targetItemId;
           final isCreated = it.strategy == ImportStrategy.create || itemId == null;
           if (isCreated) {
+            // 新建项目防撞名：同分类下同名已存在时追加 (导入N) 后缀
+            var itemName = it.resolvedName;
+            var suffix = 2;
+            while (true) {
+              final dup = await txn.query('store_items',
+                  where: 'category = ? AND name = ?',
+                  whereArgs: [c.resolvedName, itemName]);
+              if (dup.isEmpty) break;
+              itemName = '${it.resolvedName} (导入$suffix)';
+              suffix++;
+            }
+            it.resolvedName = itemName;
             itemId = await txn.insert('store_items', {
               'name': it.resolvedName,
               'category': c.resolvedName,
