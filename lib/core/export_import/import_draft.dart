@@ -23,6 +23,9 @@ class ImportLogDraft {
   Map<String, dynamic> extras;
   List<String> menuNames;
   List<String> menuSpecs;
+
+  /// 打卡策略：merge=同一秒已有打卡则合并增补；create=强制新建一条
+  ImportStrategy strategy = ImportStrategy.merge;
   bool selected;
 }
 

@@ -417,7 +417,7 @@ class StoreImporter {
             if (ts == null) {
               throw const FormatException('存在缺少时间的打卡记录，请在预览中补充时间后再导入');
             }
-            if (!isCreated) {
+            if (!isCreated && l.strategy == ImportStrategy.merge) {
               // 合并：同一秒已有打卡 → 在原记录上增补缺失字段；否则追加新打卡
               final existing = existingLogsBySecond[safeItemId]?[_secondKey(ts)];
               if (existing != null) {

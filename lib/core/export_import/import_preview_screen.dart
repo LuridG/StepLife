@@ -212,9 +212,35 @@ class _ImportPreviewScreenState extends State<ImportPreviewScreen> {
             '以下为预览，可勾选、编辑并确认，确认后才会写入数据；导入前会自动备份当前数据库。',
             style: TextStyle(color: Colors.white54, fontSize: 12),
           ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              const Text('打卡策略',
+                  style: TextStyle(color: Colors.white70, fontSize: 12)),
+              const SizedBox(width: 8),
+              _actionTag('全部合并', () => _setAllLogStrategy(ImportStrategy.merge)),
+              const SizedBox(width: 6),
+              _actionTag('全部新建', () => _setAllLogStrategy(ImportStrategy.create)),
+              const Spacer(),
+              const Text('可逐条点击标签切换',
+                  style: TextStyle(color: Colors.white38, fontSize: 10.5)),
+            ],
+          ),
         ],
       ),
     );
+  }
+
+  void _setAllLogStrategy(ImportStrategy s) {
+    setState(() {
+      for (final c in draft.categories) {
+        for (final it in c.items) {
+          for (final l in it.logs) {
+            l.strategy = s;
+          }
+        }
+      }
+    });
   }
 
   Widget _categoryCard(ImportCategoryDraft c) {
@@ -360,8 +386,70 @@ class _ImportPreviewScreenState extends State<ImportPreviewScreen> {
                 ],
               ),
             ),
+            _strategyTag(
+              log.strategy,
+              (s) => setState(() => log.strategy = s),
+              small: true,
+            ),
+            const SizedBox(width: 4),
             const Icon(Icons.edit_outlined, size: 14, color: Colors.white24),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _actionTag(String label, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E293B),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.white24),
+        ),
+        child: Text(label,
+            style: const TextStyle(fontSize: 11, color: Colors.white70)),
+      ),
+    );
+  }
+
+  /// 打卡策略标签：点击在「合并/新建」间切换
+  Widget _strategyTag(
+    ImportStrategy value,
+    ValueChanged<ImportStrategy> onChanged, {
+    bool small = false,
+  }) {
+    final isMerge = value == ImportStrategy.merge;
+    return InkWell(
+      onTap: () =>
+          onChanged(isMerge ? ImportStrategy.create : ImportStrategy.merge),
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: EdgeInsets.symmetric(
+          horizontal: small ? 8 : 10,
+          vertical: small ? 3 : 5,
+        ),
+        decoration: BoxDecoration(
+          color: isMerge
+              ? const Color(0xFF0E7490).withAlpha(70)
+              : const Color(0xFFB45309).withAlpha(70),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isMerge
+                ? Colors.cyan.shade400.withAlpha(140)
+                : Colors.amber.shade400.withAlpha(140),
+          ),
+        ),
+        child: Text(
+          isMerge ? '合并' : '新建',
+          style: TextStyle(
+            fontSize: small ? 10.5 : 12,
+            fontWeight: FontWeight.w600,
+            color: isMerge ? Colors.cyan.shade100 : Colors.amber.shade100,
+          ),
         ),
       ),
     );

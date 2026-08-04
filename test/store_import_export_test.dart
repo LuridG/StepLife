@@ -122,6 +122,7 @@ void main() {
       expect(item.targetItemId, 7);
       expect(item.logs.single.memo, '早餐');
       expect(item.logs.single.timestamp, DateTime(2026, 8, 1, 9, 0));
+      expect(item.logs.single.strategy, ImportStrategy.merge);
     });
 
     test('纯打卡 JSON 缺时间 → timestamp 为 null', () {
@@ -249,6 +250,7 @@ void main() {
       final log = result.categories.single.items.single.logs.single;
       expect(log.timestamp, isNull);
       expect(log.cost, 8.0);
+      expect(log.strategy, ImportStrategy.merge);
     });
   });
 }
