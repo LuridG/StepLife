@@ -64,6 +64,384 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
   /// 菜篮子品牌筛选（'全部' 或具体品牌）
   String _basketBrand = '全部';
 
+  /// 打卡历史：紧凑视图开关
+  bool _compactLogs = false;
+
+  /// 打卡历史筛选（'time' | 'cost'，null=无筛选）
+  String? _filterField;
+  String _filterOp = '>=';
+  DateTime? _filterTime;
+  double? _filterCost;
+
+  bool get _hasLogFilter =>
+      _filterField != null && (_filterTime != null || _filterCost != null);
+
+  /// 按时间/金额条件过滤打卡记录（时间比较到秒，金额 null 视为不满足）
+  List<StoreLog> _applyLogFilters(List<StoreLog> logs) {
+    if (!_hasLogFilter) return logs;
+    return logs.where((l) {
+      if (_filterField == 'time') {
+        final t = _filterTime;
+        if (t == null) return true;
+        // 比较对齐到分钟（日期选择器只精确到分钟）
+        final lt = DateTime(l.timestamp.year, l.timestamp.month,
+            l.timestamp.day, l.timestamp.hour, l.timestamp.minute);
+        final cmp = lt.compareTo(t);
+        switch (_filterOp) {
+          case '=':
+            return cmp == 0;
+          case '>':
+            return cmp > 0;
+          case '>=':
+            return cmp >= 0;
+          case '<':
+            return cmp < 0;
+          case '<=':
+            return cmp <= 0;
+        }
+        return true;
+      }
+      if (_filterField == 'cost') {
+        final c = l.cost;
+        final v = _filterCost;
+        if (c == null || v == null) return false;
+        switch (_filterOp) {
+          case '=':
+            return (c - v).abs() < 0.005;
+          case '>':
+            return c > v;
+          case '>=':
+            return c >= v;
+          case '<':
+            return c < v;
+          case '<=':
+            return c <= v;
+        }
+        return true;
+      }
+      return true;
+    }).toList();
+  }
+
+  Future<void> _showLogFilterSheet(BuildContext context) async {
+    var field = _filterField;
+    var op = _filterOp;
+    var time = _filterTime;
+    var cost = _filterCost;
+    final costCtrl = TextEditingController(text: cost?.toString() ?? '');
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xFF111C38),
+      isScrollControlled: true,
+      builder: (sheetCtx) => StatefulBuilder(
+        builder: (ctx, setSheet) => Padding(
+          padding: EdgeInsets.only(
+            left: 16,
+            right: 16,
+            top: 16,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('筛选打卡记录',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                const SizedBox(height: 14),
+                const Text('字段', style: TextStyle(fontSize: 12, color: Colors.white54)),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 6,
+                  children: [
+                    for (final f in const <(String, String)>[('time', '时间'), ('cost', '金额')])
+                      ChoiceChip(
+                        label: Text(f.$2, style: const TextStyle(fontSize: 12)),
+                        selected: field == f.$1,
+                        selectedColor: const Color(0xFF10B981).withAlpha(70),
+                        backgroundColor: Colors.white10,
+                        labelStyle: TextStyle(color: field == f.$1 ? Colors.white : Colors.white70),
+                        onSelected: (_) => setSheet(() {
+                          field = f.$1;
+                          if (f.$1 == 'time' && time == null) time = DateTime.now();
+                        }),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                const Text('条件', style: TextStyle(fontSize: 12, color: Colors.white54)),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 6,
+                  children: [
+                    for (final o in const ['=', '>', '>=', '<', '<='])
+                      ChoiceChip(
+                        label: Text(o, style: const TextStyle(fontSize: 12)),
+                        selected: op == o,
+                        selectedColor: const Color(0xFF10B981).withAlpha(70),
+                        backgroundColor: Colors.white10,
+                        labelStyle: TextStyle(color: op == o ? Colors.white : Colors.white70),
+                        onSelected: (_) => setSheet(() => op = o),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                if (field == 'time') ...[
+                  const Text('时间值', style: TextStyle(fontSize: 12, color: Colors.white54)),
+                  const SizedBox(height: 6),
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.event, size: 16),
+                    label: Text(time == null
+                        ? '选择日期时间'
+                        : DateFormat('yyyy-MM-dd HH:mm').format(time!)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.white70,
+                      side: const BorderSide(color: Colors.white24),
+                    ),
+                    onPressed: () async {
+                      final now = time ?? DateTime.now();
+                      final d = await showDatePicker(
+                        context: ctx,
+                        initialDate: now,
+                        firstDate: DateTime(2020),
+                        lastDate: DateTime.now().add(const Duration(days: 365)),
+                      );
+                      if (d == null || !ctx.mounted) return;
+                      final t = await showTimePicker(
+                        context: ctx,
+                        initialTime: TimeOfDay.fromDateTime(now),
+                      );
+                      if (t == null) return;
+                      setSheet(() => time =
+                          DateTime(d.year, d.month, d.day, t.hour, t.minute));
+                    },
+                  ),
+                ] else ...[
+                  const Text('金额值（元）', style: TextStyle(fontSize: 12, color: Colors.white54)),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: costCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    style: const TextStyle(color: Colors.white),
+                    decoration: const InputDecoration(
+                      hintText: '输入金额，如 26.5',
+                      hintStyle: TextStyle(color: Colors.white38),
+                      isDense: true,
+                    ),
+                    onChanged: (v) => cost = double.tryParse(v.trim()),
+                  ),
+                ],
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        setState(() {
+                          _filterField = null;
+                          _filterTime = null;
+                          _filterCost = null;
+                          _filterOp = '>=';
+                        });
+                      },
+                      child: const Text('清除筛选', style: TextStyle(color: Colors.white54)),
+                    ),
+                    const Spacer(),
+                    FilledButton(
+                      style: FilledButton.styleFrom(backgroundColor: const Color(0xFF10B981)),
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        setState(() {
+                          _filterField = field;
+                          _filterOp = op;
+                          _filterTime = field == 'time' ? time : null;
+                          _filterCost = field == 'cost' ? cost : null;
+                        });
+                      },
+                      child: const Text('应用筛选'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    costCtrl.dispose();
+  }
+
+  /// 打卡统计：汇总当前（筛选后）打卡列表的各类信息
+  void _showLogStatsSheet(BuildContext context, List<StoreLog> logs) {
+    if (logs.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('当前没有可统计的打卡记录'),
+      ));
+      return;
+    }
+    final costs = logs.map((l) => l.cost).whereType<double>().toList();
+    final total = costs.fold<double>(0, (s, c) => s + c);
+    final avg = costs.isEmpty ? null : total / costs.length;
+    double? maxC;
+    double? minC;
+    for (final c in costs) {
+      maxC = maxC == null || c > maxC ? c : maxC;
+      minC = minC == null || c < minC ? c : minC;
+    }
+    final sorted = [...logs]..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+    final byMonth = <String, int>{};
+    final byVisitor = <String, int>{};
+    final byMenu = <String, int>{};
+    for (final l in logs) {
+      final mk = DateFormat('yyyy-MM').format(l.timestamp);
+      byMonth[mk] = (byMonth[mk] ?? 0) + 1;
+      for (final v in l.visitorNames) {
+        if (v.trim().isEmpty) continue;
+        byVisitor[v.trim()] = (byVisitor[v.trim()] ?? 0) + 1;
+      }
+      for (final m in l.menuNames) {
+        if (m.trim().isEmpty) continue;
+        byMenu[m.trim()] = (byMenu[m.trim()] ?? 0) + 1;
+      }
+    }
+    final months = byMonth.entries.toList()
+      ..sort((a, b) => a.key.compareTo(b.key));
+    final visitors = byVisitor.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    final menus = byMenu.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xFF111C38),
+      isScrollControlled: true,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.insights, color: Color(0xFF10B981), size: 20),
+                    const SizedBox(width: 8),
+                    const Text('打卡统计',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                    const Spacer(),
+                    const Text('基于当前筛选结果', style: TextStyle(fontSize: 10.5, color: Colors.white38)),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                    '共 ${logs.length} 次 · ${DateFormat('yyyy-MM-dd').format(sorted.first.timestamp)} 至 ${DateFormat('yyyy-MM-dd').format(sorted.last.timestamp)}',
+                    style: const TextStyle(fontSize: 12, color: Colors.white54)),
+                const SizedBox(height: 14),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _statsMetric('总金额', '¥${_fmtPrice(total)}'),
+                    _statsMetric('平均', avg == null ? '—' : '¥${_fmtPrice(avg)}'),
+                    _statsMetric('最高', maxC == null ? '—' : '¥${_fmtPrice(maxC)}'),
+                    _statsMetric('最低', minC == null ? '—' : '¥${_fmtPrice(minC)}'),
+                  ],
+                ),
+                if (months.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  const Text('按月分布', style: TextStyle(fontSize: 12.5, color: Colors.white70, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      for (final m in months)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF10B981).withAlpha(25),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFF10B981).withAlpha(60)),
+                          ),
+                          child: Text('${m.key} · ${m.value}次',
+                              style: const TextStyle(fontSize: 11, color: Color(0xFF86EFAC))),
+                        ),
+                    ],
+                  ),
+                ],
+                if (visitors.isNotEmpty) ...[
+                  const SizedBox(height: 14),
+                  const Text('成员分布', style: TextStyle(fontSize: 12.5, color: Colors.white70, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      for (final v in visitors)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withAlpha(12),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text('${v.key} · ${v.value}次',
+                              style: const TextStyle(fontSize: 11, color: Colors.white70)),
+                        ),
+                    ],
+                  ),
+                ],
+                if (menus.isNotEmpty) ...[
+                  const SizedBox(height: 14),
+                  const Text('点菜频次', style: TextStyle(fontSize: 12.5, color: Colors.white70, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      for (final m in menus.take(12))
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF59E0B).withAlpha(20),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFFF59E0B).withAlpha(50)),
+                          ),
+                          child: Text('${m.key} ×${m.value}',
+                              style: const TextStyle(fontSize: 11, color: Color(0xFFFCD34D))),
+                        ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _statsMetric(String label, String value) {
+    return Container(
+      width: (MediaQuery.of(context).size.width - 56) / 4,
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.white12),
+      ),
+      child: Column(
+        children: [
+          Text(value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
+          const SizedBox(height: 3),
+          Text(label, style: const TextStyle(fontSize: 10.5, color: Colors.white54)),
+        ],
+      ),
+    );
+  }
+
   Future<void> _handleExportCategory(BuildContext context) async {
     final messenger = ScaffoldMessenger.of(context);
     try {
@@ -362,6 +740,7 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
   Widget build(BuildContext context) {
     final storeProvider = context.watch<StoreProvider>();
     final logs = storeProvider.getLogsForStore(widget.storeItem.id!);
+    final filteredLogs = _applyLogFilters(logs);
     final totalCost = storeProvider.getTotalCostForStore(widget.storeItem.id!);
 
     // 模板专属字段（概览展示）
@@ -402,8 +781,8 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
     final basketBrands = isBasket ? BasketStats.brandsOf(logs) : const <String>[];
     final visibleBasketLogs = isBasket
         ? (_basketBrand == '全部'
-            ? logs
-            : logs.where((l) => BasketStats.brandLabel(l) == _basketBrand).toList())
+            ? filteredLogs
+            : filteredLogs.where((l) => BasketStats.brandLabel(l) == _basketBrand).toList())
         : const <StoreLog>[];
     final basketPoints = isBasket
         ? BasketStats.pricePoints(visibleBasketLogs)
@@ -1017,32 +1396,65 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
                 ],
                 const SizedBox(height: 20),
 
-                // 分钟级打卡履约历史时间线 (Timeline)
-                const Row(
+                // 打卡履约历史时间线 (Timeline)
+                Row(
                   children: [
-                    Icon(Icons.history, color: Color(0xFF10B981), size: 20),
-                    SizedBox(width: 8),
-                    Text('打卡历史', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                    const Icon(Icons.history, color: Color(0xFF10B981), size: 20),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text('打卡历史',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                    ),
+                    IconButton(
+                      visualDensity: VisualDensity.compact,
+                      tooltip: '筛选打卡',
+                      icon: Icon(Icons.filter_list,
+                          size: 20,
+                          color: _hasLogFilter ? const Color(0xFF10B981) : Colors.white54),
+                      onPressed: () => _showLogFilterSheet(context),
+                    ),
+                    IconButton(
+                      visualDensity: VisualDensity.compact,
+                      tooltip: '打卡统计',
+                      icon: const Icon(Icons.insights_outlined, size: 20, color: Colors.white54),
+                      onPressed: () => _showLogStatsSheet(context, filteredLogs),
+                    ),
+                    IconButton(
+                      visualDensity: VisualDensity.compact,
+                      tooltip: _compactLogs ? '切换为卡片视图' : '切换为紧凑视图',
+                      icon: Icon(_compactLogs ? Icons.view_agenda_outlined : Icons.view_list_outlined,
+                          size: 20,
+                          color: Colors.white54),
+                      onPressed: () => setState(() => _compactLogs = !_compactLogs),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 12),
 
-                logs.isEmpty
+                filteredLogs.isEmpty
                     ? _buildGlassCard(
-                        child: const Padding(
-                          padding: EdgeInsets.all(24.0),
+                        child: Padding(
+                          padding: const EdgeInsets.all(24.0),
                           child: Center(
-                            child: Text('暂无打卡记录，点击主页【⚡ 记一次打卡】添加。', style: TextStyle(color: Colors.white54, fontSize: 13)),
+                            child: Text(
+                              _hasLogFilter
+                                  ? '没有符合筛选条件的打卡记录，可点右上角筛选按钮调整。'
+                                  : '暂无打卡记录，点击主页【⚡ 记一次打卡】添加。',
+                              style: const TextStyle(color: Colors.white54, fontSize: 13),
+                            ),
                           ),
                         ),
                       )
                     : ListView.builder(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
-                        itemCount: logs.length,
+                        itemCount: filteredLogs.length,
                         itemBuilder: (ctx, idx) {
-                          final log = logs[idx];
+                          final log = filteredLogs[idx];
                           final timeStr = DateFormat('yyyy-MM-dd HH:mm:ss').format(log.timestamp);
+                          if (_compactLogs) return _buildCompactLogTile(log, timeStr);
 
                           return Padding(
                             padding: const EdgeInsets.only(bottom: 12.0),
@@ -1287,6 +1699,74 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
                   fontWeight: FontWeight.bold,
                   color: color)),
         ],
+      ),
+    );
+  }
+
+  /// 紧凑打卡条目：单行时间+金额+摘要，编辑/删除用小图标，适合窄屏
+  Widget _buildCompactLogTile(StoreLog log, String timeStr) {
+    final brand = (log.extras['brand']?.toString() ?? '').trim();
+    final parts = <String>[
+      if (log.memo != null && log.memo!.isNotEmpty) log.memo!,
+      if (log.menuNames.isNotEmpty) log.menuNames.join('、'),
+    ];
+    final summary = parts.join(' · ');
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: _buildGlassCard(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(timeStr,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Colors.white)),
+                        ),
+                        if (log.cost != null) ...[
+                          const SizedBox(width: 8),
+                          Text('¥${_fmtPrice(log.cost!)}',
+                              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF10B981))),
+                        ],
+                      ],
+                    ),
+                    if (summary.isNotEmpty || brand.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text(
+                          brand.isEmpty ? summary : '$brand · $summary',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 11, color: Colors.white54),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.edit_outlined, color: Colors.lightBlueAccent, size: 15),
+                visualDensity: VisualDensity.compact,
+                tooltip: '修改打卡',
+                onPressed: () => showDialog(
+                  context: context,
+                  builder: (ctx) => StoreCheckinDialog(store: widget.storeItem, existingLog: log),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 15),
+                visualDensity: VisualDensity.compact,
+                onPressed: () => _confirmDeleteLog(context, log),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
