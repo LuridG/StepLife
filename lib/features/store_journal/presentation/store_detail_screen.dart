@@ -678,7 +678,7 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
                   children: [
                     Icon(Icons.history, color: Color(0xFF10B981), size: 20),
                     SizedBox(width: 8),
-                    Text('打卡履约历史时间线', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                    Text('打卡历史', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
                   ],
                 ),
                 const SizedBox(height: 12),
@@ -688,7 +688,7 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
                         child: const Padding(
                           padding: EdgeInsets.all(24.0),
                           child: Center(
-                            child: Text('暂无打卡履约历史记录，点击主页【⚡ 记一次打卡】添加。', style: TextStyle(color: Colors.white54, fontSize: 13)),
+                            child: Text('暂无打卡记录，点击主页【⚡ 记一次打卡】添加。', style: TextStyle(color: Colors.white54, fontSize: 13)),
                           ),
                         ),
                       )

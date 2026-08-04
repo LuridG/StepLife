@@ -134,7 +134,7 @@ class _StepTrackerScreenState extends State<StepTrackerScreen>
             navigator.pop();
             messenger.showSnackBar(
               SnackBar(
-                content: Text('已成功建立路线资产: $name'),
+                content: Text('已成功建立路线: $name'),
                 backgroundColor: const Color(0xFF10B981),
               ),
             );
@@ -148,7 +148,7 @@ class _StepTrackerScreenState extends State<StepTrackerScreen>
               children: [
                 Icon(Icons.map, color: Color(0xFF10B981)),
                 SizedBox(width: 8),
-                Text('新建客观路线资产'),
+                Text('新建路线'),
               ],
             ),
             content: SingleChildScrollView(
@@ -301,7 +301,7 @@ class _StepTrackerScreenState extends State<StepTrackerScreen>
                   backgroundColor: const Color(0xFF10B981),
                   foregroundColor: Colors.white,
                 ),
-                child: const Text('保存路线资产'),
+                child: const Text('保存路线'),
               ),
             ],
           );
@@ -346,7 +346,7 @@ class _StepTrackerScreenState extends State<StepTrackerScreen>
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
             ),
-            title: Text('编辑路线资产: ${route.name}'),
+            title: Text('编辑路线: ${route.name}'),
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -490,7 +490,7 @@ class _StepTrackerScreenState extends State<StepTrackerScreen>
     if (routes.isEmpty) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('请先新建一条客观路线资产')));
+      ).showSnackBar(const SnackBar(content: Text('请先新建一条路线')));
       _showAddRouteAssetDialog();
       return;
     }
@@ -585,7 +585,7 @@ class _StepTrackerScreenState extends State<StepTrackerScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    '选择客观路线:',
+                    '选择路线:',
                     style: TextStyle(fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 4),
@@ -920,7 +920,7 @@ class _StepTrackerScreenState extends State<StepTrackerScreen>
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text('确认删除路线: ${route.name}?'),
-        content: const Text('删除后该路线资产将从列表中移除。'),
+        content: const Text('删除后该路线将从列表中移除。'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
@@ -1248,12 +1248,12 @@ class _StepTrackerScreenState extends State<StepTrackerScreen>
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('路线资产与步量打卡'),
+        title: const Text('步量方圆生活'),
         actions: [
           const SettingsButton(),
           IconButton(
             icon: const Icon(Icons.add_location_alt_outlined),
-            tooltip: '新建客观路线资产',
+            tooltip: '新建路线',
             onPressed: _showAddRouteAssetDialog,
           ),
         ],
@@ -1288,7 +1288,7 @@ class _StepTrackerScreenState extends State<StepTrackerScreen>
                     children: [
                       const Expanded(
                         child: Text(
-                          '客观路线资产库 (列表)',
+                          '路线库',
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
@@ -1694,7 +1694,7 @@ class _StepTrackerScreenState extends State<StepTrackerScreen>
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       const Text(
-                        '路线打卡履约日志',
+                        '打卡记录',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -1870,7 +1870,7 @@ class _StepTrackerScreenState extends State<StepTrackerScreen>
             const SizedBox(width: 12),
             const Expanded(
               child: Text(
-                '还没有客观路线资产，点击新建第一个路线吧！',
+                '还没有路线，点击新建第一条吧！',
                 style: TextStyle(color: Colors.white70, fontSize: 12),
               ),
             ),
