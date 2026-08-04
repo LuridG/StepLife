@@ -316,7 +316,7 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('删除此次打卡记录?'),
-        content: Text('打卡时间: ${DateFormat('yyyy-MM-dd HH:mm').format(log.timestamp)}\n消费: ¥${log.cost?.toStringAsFixed(1) ?? "0"}'),
+        content: Text('打卡时间: ${DateFormat('yyyy-MM-dd HH:mm:ss').format(log.timestamp)}\n消费: ¥${log.cost?.toStringAsFixed(1) ?? "0"}'),
         actions: [
           TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('取消')),
           ElevatedButton(
@@ -1042,7 +1042,7 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
                         itemCount: logs.length,
                         itemBuilder: (ctx, idx) {
                           final log = logs[idx];
-                          final timeStr = DateFormat('yyyy-MM-dd HH:mm').format(log.timestamp);
+                          final timeStr = DateFormat('yyyy-MM-dd HH:mm:ss').format(log.timestamp);
 
                           return Padding(
                             padding: const EdgeInsets.only(bottom: 12.0),

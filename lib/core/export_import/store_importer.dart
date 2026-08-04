@@ -212,6 +212,14 @@ class StoreImporter {
     final itemByKey = {
       for (final i in items) '${i.category.trim()}\u0000${i.name.trim()}': i,
     };
+    // 索引已有打卡（项目 → 秒级时间集合），用于预览标记每条打卡实际会合并还是新建
+    final allLogs = await svc.getStoreLogs();
+    final logsBySecond = <int, Set<String>>{};
+    for (final row in allLogs) {
+      final ts = _parseTsLoose(row.timestamp.toIso8601String());
+      if (ts == null) continue;
+      (logsBySecond[row.storeId] ??= <String>{}).add(_secondKey(ts));
+    }
 
     for (final c in draft.categories) {
       final existingCat = catByName[c.name.trim()];
@@ -277,6 +285,23 @@ class StoreImporter {
           it.strategy = ImportStrategy.create;
         }
       }
+      // 全部项目归属解析完后，标记每条打卡实际行为（合并/新建）
+      for (final it in c.items) {
+        _markLogMergeFlags(it, logsBySecond);
+      }
+    }
+  }
+
+  static void _markLogMergeFlags(
+    ImportItemDraft it,
+    Map<int, Set<String>> logsBySecond,
+  ) {
+    for (final l in it.logs) {
+      final ts = l.timestamp;
+      l.willMerge = ts != null &&
+          it.targetItemId != null &&
+          l.strategy == ImportStrategy.merge &&
+          (logsBySecond[it.targetItemId]?.contains(_secondKey(ts)) ?? false);
     }
   }
 
@@ -594,12 +619,14 @@ class StoreImporter {
   static DateTime _parseTime(Object? raw, String where) {
     if (raw == null || raw.toString().trim().isEmpty) return DateTime.now();
     final s = raw.toString().trim();
-    try {
-      return DateFormat('yyyy-MM-dd HH:mm').parse(s);
-    } catch (_) {}
+    for (final fmt in ['yyyy-MM-dd HH:mm:ss', 'yyyy-MM-dd HH:mm']) {
+      try {
+        return DateFormat(fmt).parse(s);
+      } catch (_) {}
+    }
     final dt = DateTime.tryParse(s);
     if (dt == null) {
-      throw FormatException('$where 时间格式非法：$s（需要 yyyy-MM-dd HH:mm）');
+      throw FormatException('$where 时间格式非法：$s（需要 yyyy-MM-dd HH:mm:ss）');
     }
     return dt;
   }

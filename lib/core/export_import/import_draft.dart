@@ -26,6 +26,9 @@ class ImportLogDraft {
 
   /// 打卡策略：merge=同一秒已有打卡则合并增补；create=强制新建一条
   ImportStrategy strategy = ImportStrategy.merge;
+
+  /// 预览标记：当前策略下实际会合并（同秒已有打卡）还是新建，仅用于界面展示
+  bool willMerge = false;
   bool selected;
 }
 

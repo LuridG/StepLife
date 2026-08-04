@@ -22,7 +22,7 @@ class StoreExporter {
     final logs = await db.getStoreLogs();
     final menuItems = await db.getStoreMenuItems();
 
-    final fmt = DateFormat('yyyy-MM-dd HH:mm');
+    final fmt = DateFormat('yyyy-MM-dd HH:mm:ss');
 
     final scopedCategories = <String>{};
     final categoryList = <Map<String, dynamic>>[];

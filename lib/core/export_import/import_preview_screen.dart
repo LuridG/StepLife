@@ -231,7 +231,7 @@ class _ImportPreviewScreenState extends State<ImportPreviewScreen> {
     );
   }
 
-  void _setAllLogStrategy(ImportStrategy s) {
+  Future<void> _setAllLogStrategy(ImportStrategy s) async {
     setState(() {
       for (final c in draft.categories) {
         for (final it in c.items) {
@@ -241,6 +241,7 @@ class _ImportPreviewScreenState extends State<ImportPreviewScreen> {
         }
       }
     });
+    await _reresolve();
   }
 
   Widget _categoryCard(ImportCategoryDraft c) {
@@ -387,8 +388,13 @@ class _ImportPreviewScreenState extends State<ImportPreviewScreen> {
               ),
             ),
             _strategyTag(
-              log.strategy,
-              (s) => setState(() => log.strategy = s),
+              log.willMerge ? ImportStrategy.merge : ImportStrategy.create,
+              (_) async {
+                log.strategy = log.strategy == ImportStrategy.merge
+                    ? ImportStrategy.create
+                    : ImportStrategy.merge;
+                await _reresolve();
+              },
               small: true,
             ),
             const SizedBox(width: 4),

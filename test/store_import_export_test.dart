@@ -166,6 +166,13 @@ void main() {
       expect(item.logs.single.timestamp!.second, 12);
     });
 
+    test('打卡草稿默认合并策略且 willMerge 默认为 false', () {
+      final log =
+          ImportLogDraft(cost: 8.0, timestamp: DateTime(2026, 8, 4, 16, 16, 12));
+      expect(log.strategy, ImportStrategy.merge);
+      expect(log.willMerge, isFalse);
+    });
+
     test('未指定目标（storeId=0）不锁定，保持可新建', () {
       final draft = StoreImporter.parseLogsOnly(
         '{"logs": [{"cost": 12.5, "timestamp": "2026-08-01 09:00"}]}',
