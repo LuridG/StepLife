@@ -185,9 +185,11 @@ class BillParser {
   }) {
     final cat = ImportCategoryDraft(name: category);
     cat.strategy = ImportStrategy.merge;
+    cat.lockToTarget = storeId != 0;
     final item = ImportItemDraft(name: storeName, category: category);
     item.strategy = ImportStrategy.merge;
     item.targetItemId = storeId == 0 ? null : storeId;
+    item.lockToTarget = storeId != 0;
     for (final r in result.records) {
       item.logs.add(ImportLogDraft(
         cost: r.amount,
@@ -204,18 +206,22 @@ class BillParser {
     final s = raw.toString().trim();
     if (s.isEmpty) return null;
     for (final fmt in [
-      'yyyy-MM-dd HH:mm',
       'yyyy-MM-dd HH:mm:ss',
+      'yyyy-MM-dd HH:mm',
       'yyyy年M月d日 HH:mm:ss',
       'yyyy年M月d日 HH:mm',
       'yyyy年M月d日',
     ]) {
       try {
         final dt = DateFormat(fmt).parse(s);
-        // 打卡时间统一精确到分钟
-        return DateTime(dt.year, dt.month, dt.day, dt.hour, dt.minute);
+        // 打卡时间统一精确到秒，用于与已有打卡按秒判定同一张卡
+        return DateTime(dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second);
       } catch (_) {}
     }
-    return DateTime.tryParse(s);
+    final dt = DateTime.tryParse(s);
+    if (dt != null) {
+      return DateTime(dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second);
+    }
+    return null;
   }
 }

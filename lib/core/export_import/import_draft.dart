@@ -75,6 +75,9 @@ class ImportItemDraft {
 
   ImportStrategy strategy = ImportStrategy.create;
   int? targetItemId;
+
+  /// 锁定到调用方指定的目标项目（详情页导入），禁止新建项目
+  bool lockToTarget = false;
   bool selected = true;
 
   final List<ImportLogDraft> logs = [];
@@ -98,6 +101,9 @@ class ImportCategoryDraft {
   String resolvedName = '';
   ImportStrategy strategy = ImportStrategy.create;
   int? targetCategoryId;
+
+  /// 锁定到调用方指定的目标分类（详情页导入），禁止新建分类
+  bool lockToTarget = false;
   bool selected = true;
 
   final List<ImportItemDraft> items = [];

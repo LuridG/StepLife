@@ -175,9 +175,11 @@ class StoreImporter {
     }
     final cat = ImportCategoryDraft(name: targetCategory);
     cat.strategy = ImportStrategy.merge;
+    cat.lockToTarget = targetStoreId != 0;
     final item = ImportItemDraft(name: targetStoreName, category: targetCategory);
     item.strategy = ImportStrategy.merge;
     item.targetItemId = targetStoreId == 0 ? null : targetStoreId;
+    item.lockToTarget = targetStoreId != 0;
     for (var li = 0; li < logsRaw.length; li++) {
       final lr = logsRaw[li];
       if (lr is! Map) throw FormatException('logs[$li] 必须是对象');
@@ -213,7 +215,15 @@ class StoreImporter {
 
     for (final c in draft.categories) {
       final existingCat = catByName[c.name.trim()];
-      if (existingCat != null) {
+      if (c.lockToTarget) {
+        // 详情页导入：分类锁定为已有分类，绝不新建
+        if (existingCat == null) {
+          throw FormatException('目标分类「${c.name}」已不存在，无法导入');
+        }
+        c.targetCategoryId = existingCat.id;
+        c.resolvedName = existingCat.name;
+        c.strategy = ImportStrategy.merge;
+      } else if (existingCat != null) {
         c.targetCategoryId = existingCat.id;
         if (c.strategy == ImportStrategy.create) {
           c.resolvedName = '${c.name} (导入)';
@@ -227,6 +237,20 @@ class StoreImporter {
       }
       for (final it in c.items) {
         it.resolvedCategory = c.resolvedName;
+        // 详情页导入：项目锁定为当前餐厅，按 id 定位，定位失败直接报错而不是降级新建
+        if (it.lockToTarget) {
+          if (it.targetItemId == null) {
+            throw FormatException('缺少目标餐厅 ID，无法导入打卡');
+          }
+          final byId = items.where((i) => i.id == it.targetItemId).toList();
+          if (byId.isEmpty) {
+            throw FormatException('目标餐厅「${it.name}」已不存在，无法导入');
+          }
+          it.resolvedName = byId.first.name;
+          it.resolvedCategory = byId.first.category;
+          it.strategy = ImportStrategy.merge;
+          continue;
+        }
         // 调用方已显式指定合并目标（账单/纯打卡导入）时按 id 定位，避免名称/分类微差异被误判为新建
         if (it.strategy == ImportStrategy.merge && it.targetItemId != null) {
           final byId = items.where((i) => i.id == it.targetItemId).toList();
@@ -274,8 +298,8 @@ class StoreImporter {
     var skippedLogs = 0;
 
     await db.transaction((txn) async {
-      // 按 项目+分钟 索引已有打卡，用于「合并」时同一分钟增补而非新建
-      final existingLogsByMinute = <int, Map<String, Map<String, dynamic>>>{};
+      // 按 项目+秒 索引已有打卡，用于「合并」时同一秒增补而非新建
+      final existingLogsBySecond = <int, Map<String, Map<String, dynamic>>>{};
       final allLogs = await txn.query('store_logs');
       for (final row in allLogs) {
         final sid = row['storeId'] as int?;
@@ -283,12 +307,22 @@ class StoreImporter {
         if (sid == null || tsRaw == null) continue;
         final tsDt = _parseTsLoose(tsRaw);
         if (tsDt == null) continue;
-        (existingLogsByMinute[sid] ??= <String, Map<String, dynamic>>{})[_minuteKey(tsDt)] = row;
+        (existingLogsBySecond[sid] ??= <String, Map<String, dynamic>>{})[_secondKey(tsDt)] = row;
       }
       for (final c in draft.categories) {
         if (!c.selected) continue;
         var catId = c.targetCategoryId;
-        if (c.strategy == ImportStrategy.create || catId == null) {
+        if (c.lockToTarget) {
+          // 详情页导入：分类必须已存在，禁止新建
+          if (catId == null) {
+            throw const FormatException('目标分类已不存在，无法导入');
+          }
+          final catRow = await txn.query('store_categories',
+              where: 'id = ?', whereArgs: [catId]);
+          if (catRow.isEmpty) {
+            throw const FormatException('目标分类已不存在，无法导入');
+          }
+        } else if (c.strategy == ImportStrategy.create || catId == null) {
           // 新建分类防撞名：同名已存在时追加 (导入N) 后缀，避免 UNIQUE 冲突
           var catName = c.resolvedName;
           var suffix = 2;
@@ -317,8 +351,20 @@ class StoreImporter {
         for (final it in c.items) {
           if (!it.selected) continue;
           var itemId = it.targetItemId;
-          final isCreated = it.strategy == ImportStrategy.create || itemId == null;
-          if (isCreated) {
+          final itemLocked = it.lockToTarget;
+          final isCreated =
+              !itemLocked && (it.strategy == ImportStrategy.create || itemId == null);
+          if (itemLocked) {
+            // 详情页导入：餐厅必须已存在，禁止新建
+            if (itemId == null) {
+              throw const FormatException('缺少目标餐厅 ID，无法导入打卡');
+            }
+            final itemRow = await txn.query('store_items',
+                where: 'id = ?', whereArgs: [itemId]);
+            if (itemRow.isEmpty) {
+              throw const FormatException('目标餐厅已不存在，无法导入打卡');
+            }
+          } else if (isCreated) {
             // 新建项目防撞名：同分类下同名已存在时追加 (导入N) 后缀
             var itemName = it.resolvedName;
             var suffix = 2;
@@ -343,14 +389,15 @@ class StoreImporter {
             });
             createdItems++;
           }
-          final keys = menuKeys.putIfAbsent(itemId, () => <String>{});
+          final safeItemId = itemId!;
+          final keys = menuKeys.putIfAbsent(safeItemId, () => <String>{});
           for (final m in it.menuItems) {
             if (!m.selected) continue;
             final specJson = jsonEncode(m.specs.map((s) => s.toJson()).toList());
             final key = jsonEncode([m.name, specJson]);
             if (!keys.add(key)) continue;
             await txn.insert('store_menu_items', {
-              'storeId': itemId,
+              'storeId': safeItemId,
               'name': m.name,
               'price': m.price,
               'imagePath': null,
@@ -371,8 +418,8 @@ class StoreImporter {
               throw const FormatException('存在缺少时间的打卡记录，请在预览中补充时间后再导入');
             }
             if (!isCreated) {
-              // 合并：同一分钟已有打卡 → 在原记录上增补缺失字段；否则追加新打卡
-              final existing = existingLogsByMinute[itemId]?[_minuteKey(ts)];
+              // 合并：同一秒已有打卡 → 在原记录上增补缺失字段；否则追加新打卡
+              final existing = existingLogsBySecond[safeItemId]?[_secondKey(ts)];
               if (existing != null) {
                 await _mergeIntoLog(txn, existing, l);
                 mergedLogs++;
@@ -380,7 +427,7 @@ class StoreImporter {
               }
             }
             await txn.insert('store_logs', {
-              'storeId': itemId,
+              'storeId': safeItemId,
               'storeName': it.resolvedName,
               'cost': l.cost,
               'visitorIdsJson': '[]',
@@ -391,13 +438,9 @@ class StoreImporter {
               'menuItemIdsJson': '[]',
               'menuNamesJson': jsonEncode(l.menuNames),
               'menuSpecsJson': jsonEncode(l.menuSpecs),
-              'timestamp': ts.toIso8601String(),
+              'timestamp': _secondPrecision(ts).toIso8601String(),
             });
-            if (isCreated) {
-              createdLogs++;
-            } else {
-              mergedLogs++;
-            }
+            createdLogs++;
           }
         }
       }
@@ -451,30 +494,36 @@ class StoreImporter {
   static DateTime? _optTime(Object? raw, String where) {
     if (raw == null || raw.toString().trim().isEmpty) return null;
     final s = raw.toString().trim();
-    try {
-      return DateFormat('yyyy-MM-dd HH:mm').parse(s);
-    } catch (_) {}
-    final dt = DateTime.tryParse(s);
-    if (dt == null) {
-      throw FormatException('$where 时间格式非法：$s（需要 yyyy-MM-dd HH:mm）');
+    DateTime? dt;
+    for (final fmt in ['yyyy-MM-dd HH:mm:ss', 'yyyy-MM-dd HH:mm']) {
+      try {
+        dt = DateFormat(fmt).parse(s);
+        break;
+      } catch (_) {}
     }
-    return dt;
+    dt ??= DateTime.tryParse(s);
+    if (dt == null) {
+      throw FormatException('$where 时间格式非法：$s（需要 yyyy-MM-dd HH:mm:ss）');
+    }
+    return _secondPrecision(dt);
   }
 
   static DateTime? _parseTsLoose(String s) {
     final t = DateTime.tryParse(s.trim());
-    if (t != null) return t;
-    try {
-      return DateFormat('yyyy-MM-dd HH:mm:ss').parse(s.trim());
-    } catch (_) {}
-    try {
-      return DateFormat('yyyy-MM-dd HH:mm').parse(s.trim());
-    } catch (_) {}
+    if (t != null) return _secondPrecision(t);
+    for (final fmt in ['yyyy-MM-dd HH:mm:ss', 'yyyy-MM-dd HH:mm']) {
+      try {
+        return _secondPrecision(DateFormat(fmt).parse(s.trim()));
+      } catch (_) {}
+    }
     return null;
   }
 
-  static String _minuteKey(DateTime dt) =>
-      DateFormat("yyyy-MM-dd'T'HH:mm").format(dt);
+  static DateTime _secondPrecision(DateTime dt) =>
+      DateTime(dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second);
+
+  static String _secondKey(DateTime dt) =>
+      DateFormat("yyyy-MM-dd'T'HH:mm:ss").format(dt);
 
   static Future<void> _mergeIntoLog(
     DatabaseExecutor txn,

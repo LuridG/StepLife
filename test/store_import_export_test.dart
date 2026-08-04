@@ -145,8 +145,37 @@ void main() {
       );
       final cat = draft.categories.single;
       expect(cat.strategy, ImportStrategy.merge);
+      expect(cat.lockToTarget, isTrue);
       expect(cat.items.single.strategy, ImportStrategy.merge);
       expect(cat.items.single.targetItemId, 7);
+      expect(cat.items.single.lockToTarget, isTrue);
+    });
+
+    test('纯打卡导入时间保留到秒并锁定目标（详情页上下文）', () {
+      final draft = StoreImporter.parseLogsOnly(
+        '{"logs": [{"cost": 12.5, "timestamp": "2026-08-03 16:16:12"}]}',
+        targetStoreId: 9,
+        targetStoreName: '测试2店',
+        targetCategory: '餐饮美食',
+      );
+      final item = draft.categories.single.items.single;
+      expect(item.lockToTarget, isTrue);
+      expect(item.targetItemId, 9);
+      expect(item.logs.single.timestamp, DateTime(2026, 8, 3, 16, 16, 12));
+      expect(item.logs.single.timestamp!.second, 12);
+    });
+
+    test('未指定目标（storeId=0）不锁定，保持可新建', () {
+      final draft = StoreImporter.parseLogsOnly(
+        '{"logs": [{"cost": 12.5, "timestamp": "2026-08-01 09:00"}]}',
+        targetStoreId: 0,
+        targetStoreName: '早点铺',
+        targetCategory: '餐饮美食',
+      );
+      final cat = draft.categories.single;
+      expect(cat.lockToTarget, isFalse);
+      expect(cat.items.single.lockToTarget, isFalse);
+      expect(cat.items.single.targetItemId, isNull);
     });
   });
 
@@ -179,9 +208,18 @@ void main() {
       expect(result.records.single.memo, '糖灶');
     });
 
+    test('解析精确到秒的时间并保留秒', () {
+      final result = BillParser.parseBillJson(
+        '{"records": [{"amount": 26, "time": "2026-08-03 16:16:12", "memo": "糖灶"}]}',
+      );
+      final t = result.records.single.time;
+      expect(t, DateTime(2026, 8, 3, 16, 16, 12));
+      expect(t!.second, 12);
+    });
+
     test('解析中文日期时间格式', () {
       final result = BillParser.parseBillJson('{"records":[{"amount":8.0,"time":"2026年8月3日 16:16:12"}]}');
-      expect(result.records.single.time, DateTime(2026, 8, 3, 16, 16));
+      expect(result.records.single.time, DateTime(2026, 8, 3, 16, 16, 12));
     });
 
     test('redactSensitive 删除默认敏感词及其后数字串', () {

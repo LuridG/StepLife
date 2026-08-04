@@ -46,7 +46,7 @@ class _ImportPreviewScreenState extends State<ImportPreviewScreen> {
     final timeCtrl = TextEditingController(
       text: log.timestamp == null
           ? ''
-          : DateFormat('yyyy-MM-dd HH:mm').format(log.timestamp!),
+          : DateFormat('yyyy-MM-dd HH:mm:ss').format(log.timestamp!),
     );
     final memoCtrl = TextEditingController(text: log.memo ?? '');
     final saved = await showDialog<bool>(
@@ -73,7 +73,7 @@ class _ImportPreviewScreenState extends State<ImportPreviewScreen> {
                 controller: timeCtrl,
                 style: const TextStyle(color: Colors.white),
                 decoration: const InputDecoration(
-                  labelText: '时间（yyyy-MM-dd HH:mm）',
+                  labelText: '时间（yyyy-MM-dd HH:mm:ss）',
                   labelStyle: TextStyle(color: Colors.white54),
                 ),
               ),
@@ -105,7 +105,11 @@ class _ImportPreviewScreenState extends State<ImportPreviewScreen> {
       setState(() {
         final cost = double.tryParse(costCtrl.text.trim());
         var time = DateTime.tryParse(timeCtrl.text.trim());
+        time ??= DateFormat('yyyy-MM-dd HH:mm:ss').tryParse(timeCtrl.text.trim());
         time ??= DateFormat('yyyy-MM-dd HH:mm').tryParse(timeCtrl.text.trim());
+        if (time != null) {
+          time = DateTime(time.year, time.month, time.day, time.hour, time.minute, time.second);
+        }
         log.cost = cost;
         log.timestamp = time;
         log.memo = memoCtrl.text.trim().isEmpty ? null : memoCtrl.text.trim();
@@ -126,7 +130,7 @@ class _ImportPreviewScreenState extends State<ImportPreviewScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           backgroundColor: Color(0xFFEF4444),
-          content: Text('存在缺时间的打卡记录，请点开对应打卡补充时间（yyyy-MM-dd HH:mm）后再导入'),
+          content: Text('存在缺时间的打卡记录，请点开对应打卡补充时间（yyyy-MM-dd HH:mm:ss）后再导入'),
         ),
       );
       return;
@@ -205,7 +209,7 @@ class _ImportPreviewScreenState extends State<ImportPreviewScreen> {
           ),
           const SizedBox(height: 6),
           const Text(
-            '以下为预览，可勾选、编辑或切换「新建/合并」，确认后才会写入数据；导入前会自动备份当前数据库。',
+            '以下为预览，可勾选、编辑并确认，确认后才会写入数据；导入前会自动备份当前数据库。',
             style: TextStyle(color: Colors.white54, fontSize: 12),
           ),
         ],
@@ -240,7 +244,11 @@ class _ImportPreviewScreenState extends State<ImportPreviewScreen> {
                   ),
                 ),
               ),
-              if (c.targetCategoryId != null) ...[
+              if (c.lockToTarget) ...[
+                const Icon(Icons.lock_outline, size: 14, color: Colors.white38),
+                const SizedBox(width: 4),
+                const Text('导入到已有分类', style: TextStyle(color: Colors.white38, fontSize: 12)),
+              ] else if (c.targetCategoryId != null) ...[
                 const Text('策略', style: TextStyle(color: Colors.white38, fontSize: 12)),
                 _strategyDropdown(c.strategy, (s) => _changeCategoryStrategy(c, s)),
               ] else
@@ -285,7 +293,9 @@ class _ImportPreviewScreenState extends State<ImportPreviewScreen> {
                   style: const TextStyle(color: Colors.white, fontSize: 14),
                 ),
               ),
-              if (it.targetItemId != null)
+              if (it.lockToTarget)
+                const Text('导入到当前餐厅', style: TextStyle(color: Colors.white38, fontSize: 12))
+              else if (it.targetItemId != null)
                 _strategyDropdown(it.strategy, (s) async {
                   it.strategy = s;
                   await _reresolve();
@@ -319,7 +329,7 @@ class _ImportPreviewScreenState extends State<ImportPreviewScreen> {
   Widget _logTile(ImportLogDraft log) {
     final time = log.timestamp == null
         ? ''
-        : DateFormat('yyyy-MM-dd HH:mm').format(log.timestamp!);
+        : DateFormat('yyyy-MM-dd HH:mm:ss').format(log.timestamp!);
     final cost = log.cost == null ? '' : '¥${log.cost}';
     final memo = log.memo == null ? '' : ' · ${log.memo}';
     return InkWell(
