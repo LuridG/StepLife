@@ -168,7 +168,7 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('筛选打卡记录（可叠加多个条件）',
+                const Text('筛选',
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
                 const SizedBox(height: 12),
                 if (draftFilters.isEmpty)
@@ -271,8 +271,11 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
                       const SizedBox(height: 10),
                       Align(
                         alignment: Alignment.centerRight,
-                        child: FilledButton.tonal(
-                          style: FilledButton.styleFrom(backgroundColor: const Color(0xFF10B981).withAlpha(50)),
+                        child: FilledButton(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: const Color(0xFF34D399),
+                            foregroundColor: const Color(0xFF06281C),
+                          ),
                           onPressed: () => setSheet(() {
                             draftFilters.add(LogFilterCondition(
                               field: newField,
@@ -282,7 +285,7 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
                             ));
                             costCtrl.clear();
                           }),
-                          child: const Text('＋ 添加条件', style: TextStyle(fontSize: 12.5)),
+                          child: const Text('＋ 添加条件', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
                         ),
                       ),
                     ],
