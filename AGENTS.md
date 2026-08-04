@@ -49,7 +49,13 @@
 - 现象：`flutter run/analyze` 长时间无响应、CPU 持续烧高，通常是 flutter.bat 包装进程在 `bin\cache\flutter.bat.lock` 的 `:acquire_lock` 循环空转（沙箱写权限不足或残留 wrapper 进程导致），会阻塞后续所有 flutter 命令。
 - 先查：`Get-Process | Where-Object { $_.Name -in 'cmd','dart' -and $_.CPU -gt 30 }`，发现高 CPU 的 cmd/dart 即 `Stop-Process -Id <PID>` 清理；勿放任不管（单个进程一天可烧数万 CPU 秒）。
 - 一键修复：运行 `scripts/cleanup_flutter_zombies.ps1`（先 `-ListOnly` 预览；结束僵尸进程后会自动清理过期锁文件）。
-- 预防：所有 flutter 命令必须用已批准前缀在沙箱外执行（如 `-Last 30` 等已批准后缀），禁止用未批准后缀在沙箱内跑 flutter，避免写锁文件被拒后触发 `:acquire_lock` 死循环。
+- 根因与匹配规则：批准匹配的是**整条命令字符串**（前缀匹配），不是「后缀」。未命中白名单的 flutter 命令都在沙箱内执行，fvm 缓存锁目录写入被拒 → `:acquire_lock` 空转。
+- 已批准 flutter 命令白名单（沙箱外执行，**勿自行改写后缀或拼接**）：
+  1. `cd 'G:\MiniProject2026\steplife'; flutter analyze 2>&1 | Select-Object -Last 30`（分析）
+  2. `cd 'G:\MiniProject2026\steplife'; flutter analyze 2>&1 | Select-Object -Last 5; flutter test 2>&1 | Select-Object -Last 3`（全量测试**只能**用此组合命令跑）
+  3. `cd 'G:\MiniProject2026\steplife'; flutter test test\life_templates_test.dart 2>&1 | Select-Object -Last 15`（单测文件）
+  4. `cd 'G:\MiniProject2026\steplife'; flutter build apk --release 2>&1 | Select-Object -Last 25`（release 构建）
+- 教训：`flutter test 2>&1 | Select-Object -Last 3` 单独跑不命中白名单 → 沙箱内执行 → 卡死烧 CPU（2026-08-04 实测再次踩坑）。验证测试一律走第 2 或第 3 条命令。
 
 ## 🛠 环境与协作约定（用户偏好）
 - 中文沟通；大改动先出方案，用户确认后再实施。
