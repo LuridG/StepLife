@@ -685,6 +685,7 @@ class _AssistantScreenState extends State<AssistantScreen> {
           Text(
             _describeIntent(intent),
             style: const TextStyle(fontSize: 13.5, height: 1.5, color: Colors.white70),
+            softWrap: true,
           ),
           if (question != null) ...[
             const SizedBox(height: 10),

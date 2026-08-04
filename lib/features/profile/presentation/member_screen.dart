@@ -113,47 +113,76 @@ class _MemberScreenState extends State<MemberScreen> with AutomaticKeepAliveClie
                         itemBuilder: (ctx, index) {
                           final m = members[index];
                           return _buildGlassCard(
-                            child: ListTile(
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                              leading: CircleAvatar(
-                                radius: 22,
-                                backgroundColor: Color(m.colorValue),
-                                child: Text(
-                                  m.name.isNotEmpty ? m.name[0] : '?',
-                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
-                                ),
-                              ),
-                              title: Text(
-                                m.name,
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white),
-                              ),
-                              subtitle: Padding(
-                                padding: const EdgeInsets.only(top: 4),
-                                child: Text(
-                                  '性别: ${m.gender}  ·  身高: ${m.heightCm.toInt()}cm  ·  体重: ${m.weightKg.toInt()}kg\n出生日期: ${DateFormat('yyyy-MM-dd').format(m.birthDate)} (动态算得 ${m.age} 岁)'
-                                  '${m.customStrideCm != null ? '\n自定义步长: ${m.customStrideCm!.toInt()}cm' : ''}',
-                                  style: const TextStyle(fontSize: 12, color: Colors.white60, height: 1.4),
-                                ),
-                              ),
-                              trailing: Row(
-                                mainAxisSize: MainAxisSize.min,
+                            child: Padding(
+                              padding: const EdgeInsets.all(16.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  IconButton(
-                                    icon: const Icon(Icons.edit_outlined, color: Color(0xFF38BDF8), size: 20),
-                                    tooltip: '编辑成员',
-                                    onPressed: () {
-                                      showDialog(
-                                        context: context,
-                                        builder: (_) => MemberDialog(memberToEdit: m),
-                                      );
-                                    },
+                                  Row(
+                                    children: [
+                                      CircleAvatar(
+                                        radius: 20,
+                                        backgroundColor: Color(m.colorValue),
+                                        child: Text(
+                                          m.name.isNotEmpty ? m.name[0] : '?',
+                                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Text(
+                                          m.name,
+                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(Icons.edit_outlined, color: Color(0xFF38BDF8), size: 18),
+                                        tooltip: '编辑成员',
+                                        constraints: const BoxConstraints(),
+                                        padding: const EdgeInsets.all(6),
+                                        onPressed: () {
+                                          showDialog(
+                                            context: context,
+                                            builder: (_) => MemberDialog(memberToEdit: m),
+                                          );
+                                        },
+                                      ),
+                                      const SizedBox(width: 4),
+                                      IconButton(
+                                        icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 18),
+                                        tooltip: '删除成员',
+                                        constraints: const BoxConstraints(),
+                                        padding: const EdgeInsets.all(6),
+                                        onPressed: () {
+                                          _confirmDelete(context, provider, m);
+                                        },
+                                      ),
+                                    ],
                                   ),
-                                  IconButton(
-                                    icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
-                                    tooltip: '删除成员',
-                                    onPressed: () {
-                                      _confirmDelete(context, provider, m);
-                                    },
+                                  const SizedBox(height: 10),
+                                  Container(
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withAlpha(8),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(color: Colors.white12),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          '性别: ${m.gender}   ·   身高: ${m.heightCm.toInt()} cm   ·   体重: ${m.weightKg.toInt()} kg',
+                                          style: const TextStyle(fontSize: 12, color: Colors.white70, height: 1.4),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          '出生日期: ${DateFormat('yyyy-MM-dd').format(m.birthDate)}  (动态计算 ${m.age} 岁)'
+                                          '${m.customStrideCm != null ? '\n自定义步长: ${m.customStrideCm!.toInt()} cm' : ''}',
+                                          style: const TextStyle(fontSize: 11.5, color: Colors.white60, height: 1.4),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ],
                               ),

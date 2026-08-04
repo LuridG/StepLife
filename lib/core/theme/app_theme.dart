@@ -84,8 +84,11 @@ class AppTheme {
         backgroundColor: Color(0xFFFFFFFF),
         selectedItemColor: primaryColor,
         unselectedItemColor: Color(0xFF94A3B8),
+        selectedLabelStyle: TextStyle(fontSize: 12),
+        unselectedLabelStyle: TextStyle(fontSize: 11),
         elevation: 10,
         type: BottomNavigationBarType.fixed,
+        enableFeedback: true,
       ),
       inputDecorationTheme: const InputDecorationTheme(
         hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 10.5, fontWeight: FontWeight.w400),
@@ -137,8 +140,11 @@ class AppTheme {
         backgroundColor: Color(0xFF090D16),
         selectedItemColor: primaryColor,
         unselectedItemColor: Colors.white38,
+        selectedLabelStyle: TextStyle(fontSize: 12),
+        unselectedLabelStyle: TextStyle(fontSize: 11),
         elevation: 10,
         type: BottomNavigationBarType.fixed,
+        enableFeedback: true,
       ),
       inputDecorationTheme: const InputDecorationTheme(
         hintStyle: hintStyle,

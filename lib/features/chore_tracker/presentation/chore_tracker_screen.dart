@@ -231,43 +231,65 @@ class _ChoreTrackerScreenState extends State<ChoreTrackerScreen>
                     ),
                     maxLines: 2,
                   ),
-                  const SizedBox(height: 14),
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.access_time_filled, color: Color(0xFF10B981)),
-                    title: Text(
-                      '打卡时刻: ${DateFormat('yyyy-MM-dd HH:mm').format(selectedDateTime)}',
-                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withAlpha(10),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.white12),
                     ),
-                    subtitle: const Text('支持精确到分钟的时间登记', style: TextStyle(fontSize: 11, color: Colors.white54)),
-                    trailing: TextButton(
-                      child: const Text('更改时刻'),
-                      onPressed: () async {
-                        final pickedDate = await showDatePicker(
-                          context: ctx,
-                          initialDate: selectedDateTime,
-                          firstDate: DateTime(2020),
-                          lastDate: DateTime(2030),
-                        );
-                        if (pickedDate != null) {
-                          if (!ctx.mounted) return;
-                          final pickedTime = await showTimePicker(
-                            context: ctx,
-                            initialTime: TimeOfDay.fromDateTime(selectedDateTime),
-                          );
-                          if (pickedTime != null) {
-                            setModalState(() {
-                              selectedDateTime = DateTime(
-                                pickedDate.year,
-                                pickedDate.month,
-                                pickedDate.day,
-                                pickedTime.hour,
-                                pickedTime.minute,
+                    child: Row(
+                      children: [
+                        const Icon(Icons.access_time_filled, color: Color(0xFF10B981), size: 20),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '打卡时刻: ${DateFormat('yyyy-MM-dd HH:mm').format(selectedDateTime)}',
+                                style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Colors.white),
+                              ),
+                              const SizedBox(height: 2),
+                              const Text('精确到分钟的时间登记', style: TextStyle(fontSize: 10.5, color: Colors.white54)),
+                            ],
+                          ),
+                        ),
+                        TextButton(
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          child: const Text('更改时刻', style: TextStyle(fontSize: 12, color: Color(0xFF818CF8))),
+                          onPressed: () async {
+                            final pickedDate = await showDatePicker(
+                              context: ctx,
+                              initialDate: selectedDateTime,
+                              firstDate: DateTime(2020),
+                              lastDate: DateTime(2030),
+                            );
+                            if (pickedDate != null) {
+                              if (!ctx.mounted) return;
+                              final pickedTime = await showTimePicker(
+                                context: ctx,
+                                initialTime: TimeOfDay.fromDateTime(selectedDateTime),
                               );
-                            });
-                          }
-                        }
-                      },
+                              if (pickedTime != null) {
+                                setModalState(() {
+                                  selectedDateTime = DateTime(
+                                    pickedDate.year,
+                                    pickedDate.month,
+                                    pickedDate.day,
+                                    pickedTime.hour,
+                                    pickedTime.minute,
+                                  );
+                                });
+                              }
+                            }
+                          },
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -368,233 +390,264 @@ class _ChoreTrackerScreenState extends State<ChoreTrackerScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-
-                  // uHabits 标头栏
-                  _buildGlassCard(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                      child: Row(
-                        children: [
-                          const Expanded(
-                            flex: 3,
-                            child: Text('家务 / 习惯事项', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white70, fontSize: 13)),
-                          ),
-                          Expanded(
-                            flex: 5,
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceAround,
-                              children: recentDates.map((date) {
-                                final isToday = date.day == now.day && date.month == now.month;
-                                return Column(
-                                  children: [
-                                    Text(
-                                      DateFormat('E').format(date),
-                                      style: TextStyle(fontSize: 10, color: isToday ? const Color(0xFF818CF8) : Colors.white54),
-                                    ),
-                                    Text(
-                                      '${date.day}',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
-                                        color: isToday ? const Color(0xFF818CF8) : Colors.white,
-                                      ),
-                                    ),
-                                  ],
-                                );
-                              }).toList(),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-
-                  choreProvider.choreItems.isEmpty
-                      ? const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 40),
-                          child: Center(
-                            child: Text('暂无家务事项，点击右上角【+】新建家务', style: TextStyle(color: Colors.grey, fontSize: 13)),
-                          ),
-                        )
-                      : ListView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: choreProvider.choreItems.length,
-                          itemBuilder: (context, index) {
-                            final item = choreProvider.choreItems[index];
-
-                            return Padding(
-                              padding: const EdgeInsets.only(bottom: 12.0),
-                              child: _buildGlassCard(
-                                child: InkWell(
-                                  borderRadius: BorderRadius.circular(20),
-                                  onTap: () {
-                                    Navigator.of(context).push(
-                                      MaterialPageRoute(
-                                        builder: (_) => ChoreDetailScreen(choreItem: item),
-                                      ),
-                                    );
-                                  },
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(14.0),
+                      // uHabits 标头栏
+                      _buildGlassCard(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          child: Row(
+                            children: [
+                              const Expanded(
+                                flex: 4,
+                                child: Text(
+                                  '家务 / 习惯事项',
+                                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white70, fontSize: 13),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              Expanded(
+                                flex: 5,
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  alignment: Alignment.center,
+                                  child: SizedBox(
+                                    width: 190,
                                     child: Row(
-                                      children: [
-                                        Expanded(
-                                          flex: 3,
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Row(
-                                                children: [
-                                                  Icon(
-                                                    item.isQuantifiable ? Icons.monetization_on_outlined : Icons.check_circle_outline,
-                                                    size: 18,
-                                                    color: item.isQuantifiable ? const Color(0xFF34D399) : const Color(0xFF818CF8),
-                                                  ),
-                                                  const SizedBox(width: 8),
-                                                  Flexible(
-                                                    child: Text(
-                                                      item.title,
-                                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white),
-                                                      overflow: TextOverflow.ellipsis,
-                                                    ),
-                                                  ),
-                                                  PopupMenuButton<String>(
-                                                    padding: EdgeInsets.zero,
-                                                    iconSize: 18,
-                                                    icon: const Icon(Icons.more_vert, color: Colors.white38),
-                                                    color: const Color(0xFF0F172A),
-                                                    onSelected: (v) {
-                                                      if (v == 'edit') _showChoreDialog(existing: item);
-                                                      if (v == 'delete') _confirmDeleteChore(item);
-                                                    },
-                                                    itemBuilder: (ctx) => const [
-                                                      PopupMenuItem(
-                                                        value: 'edit',
-                                                        child: Row(
-                                                          children: [
-                                                            Icon(Icons.edit_outlined, size: 16, color: Color(0xFF818CF8)),
-                                                            SizedBox(width: 8),
-                                                            Text('编辑'),
-                                                          ],
-                                                        ),
-                                                      ),
-                                                      PopupMenuItem(
-                                                        value: 'delete',
-                                                        child: Row(
-                                                          children: [
-                                                            Icon(Icons.delete_outline, size: 16, color: Color(0xFFEF4444)),
-                                                            SizedBox(width: 8),
-                                                            Text('删除'),
-                                                          ],
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ],
+                                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                                      children: recentDates.map((date) {
+                                        final isToday = date.day == now.day && date.month == now.month;
+                                        return Column(
+                                          children: [
+                                            Text(
+                                              DateFormat('E').format(date),
+                                              style: TextStyle(fontSize: 10, color: isToday ? const Color(0xFF818CF8) : Colors.white54),
+                                            ),
+                                            Text(
+                                              '${date.day}',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.bold,
+                                                color: isToday ? const Color(0xFF818CF8) : Colors.white,
                                               ),
-                                              const SizedBox(height: 4),
-                                              Text(
-                                                '${item.category} · ${item.isQuantifiable ? "量化(${item.unit})" : "打卡"}',
-                                                style: const TextStyle(fontSize: 11, color: Colors.white54),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-
-                                        // uHabits 矩阵 38x38dp 珍珠触控圈
-                                        Expanded(
-                                          flex: 5,
-                                          child: Row(
-                                            mainAxisAlignment: MainAxisAlignment.spaceAround,
-                                            children: recentDates.map((date) {
-                                              final logs = choreProvider.getLogsForChoreAndDate(item.id!, date);
-                                              final isLogged = logs.isNotEmpty;
-                                              final hasMemo = logs.any((l) => l.memo != null && l.memo!.isNotEmpty);
-
-                                              final double totalValForDate = logs.fold(0.0, (sum, l) => sum + (l.value ?? 1.0));
-                                              final formattedVal = NumberFormatter.formatQuantifiableValue(totalValForDate);
-
-                                              return GestureDetector(
-                                                onTap: () => _showLogDialogForDate(item, date),
-                                                child: Stack(
-                                                  clipBehavior: Clip.none,
-                                                  children: [
-                                                    AnimatedContainer(
-                                                      duration: const Duration(milliseconds: 200),
-                                                      width: 38,
-                                                      height: 38,
-                                                      decoration: BoxDecoration(
-                                                        shape: BoxShape.circle,
-                                                        color: isLogged
-                                                            ? (item.isQuantifiable ? const Color(0xFF059669) : const Color(0xFF4F46E5))
-                                                            : Colors.white.withAlpha(12),
-                                                        boxShadow: isLogged
-                                                            ? [
-                                                                BoxShadow(
-                                                                  color: (item.isQuantifiable ? const Color(0xFF10B981) : const Color(0xFF6366F1)).withAlpha(100),
-                                                                  blurRadius: 8,
-                                                                  spreadRadius: 1,
-                                                                ),
-                                                              ]
-                                                            : [],
-                                                        border: Border.all(
-                                                          color: isLogged
-                                                              ? Colors.transparent
-                                                              : Colors.white.withAlpha(40),
-                                                          width: 1,
-                                                        ),
-                                                      ),
-                                                      child: Center(
-                                                        child: isLogged
-                                                            ? (item.isQuantifiable
-                                                                ? Text(
-                                                                    formattedVal,
-                                                                    style: const TextStyle(
-                                                                      fontSize: 10,
-                                                                      fontWeight: FontWeight.bold,
-                                                                      color: Colors.white,
-                                                                    ),
-                                                                  )
-                                                                : const Icon(Icons.check, size: 20, color: Colors.white))
-                                                            : Text(
-                                                                '${date.day}',
-                                                                style: const TextStyle(fontSize: 11, color: Colors.white60),
-                                                              ),
-                                                      ),
-                                                    ),
-                                                    if (isLogged && hasMemo)
-                                                      Positioned(
-                                                        top: -1,
-                                                        right: -1,
-                                                        child: Container(
-                                                          width: 9,
-                                                          height: 9,
-                                                          decoration: BoxDecoration(
-                                                            color: const Color(0xFFF59E0B),
-                                                            shape: BoxShape.circle,
-                                                            border: Border.all(color: const Color(0xFF0F172A), width: 1.5),
-                                                          ),
-                                                        ),
-                                                      ),
-                                                  ],
-                                                ),
-                                              );
-                                            }).toList(),
-                                          ),
-                                        ),
-                                      ],
+                                            ),
+                                          ],
+                                        );
+                                      }).toList(),
                                     ),
                                   ),
                                 ),
                               ),
-                            );
-                          },
+                            ],
+                          ),
                         ),
-                ],
-              ),
-            ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      choreProvider.choreItems.isEmpty
+                          ? const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 40),
+                              child: Center(
+                                child: Text('暂无家务事项，点击右上角【+】新建家务', style: TextStyle(color: Colors.grey, fontSize: 13)),
+                              ),
+                            )
+                          : ListView.builder(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              itemCount: choreProvider.choreItems.length,
+                              itemBuilder: (context, index) {
+                                final item = choreProvider.choreItems[index];
+
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 12.0),
+                                  child: _buildGlassCard(
+                                    child: InkWell(
+                                      borderRadius: BorderRadius.circular(20),
+                                      onTap: () {
+                                        Navigator.of(context).push(
+                                          MaterialPageRoute(
+                                            builder: (_) => ChoreDetailScreen(choreItem: item),
+                                          ),
+                                        );
+                                      },
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(14.0),
+                                        child: Row(
+                                          children: [
+                                            Expanded(
+                                              flex: 4,
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Row(
+                                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                                    children: [
+                                                      Padding(
+                                                        padding: const EdgeInsets.only(top: 2.0),
+                                                        child: Icon(
+                                                          item.isQuantifiable ? Icons.monetization_on_outlined : Icons.check_circle_outline,
+                                                          size: 18,
+                                                          color: item.isQuantifiable ? const Color(0xFF34D399) : const Color(0xFF818CF8),
+                                                        ),
+                                                      ),
+                                                      const SizedBox(width: 6),
+                                                      Expanded(
+                                                        child: Tooltip(
+                                                          message: item.title,
+                                                          child: Text(
+                                                            item.title,
+                                                            style: TextStyle(
+                                                              fontWeight: FontWeight.bold,
+                                                              fontSize: item.title.length > 7 ? 13.0 : 14.0,
+                                                              color: Colors.white,
+                                                              height: 1.25,
+                                                            ),
+                                                            maxLines: 2,
+                                                            overflow: TextOverflow.ellipsis,
+                                                            softWrap: true,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      PopupMenuButton<String>(
+                                                        padding: EdgeInsets.zero,
+                                                        iconSize: 18,
+                                                        icon: const Icon(Icons.more_vert, color: Colors.white38),
+                                                        color: const Color(0xFF0F172A),
+                                                        onSelected: (v) {
+                                                          if (v == 'edit') _showChoreDialog(existing: item);
+                                                          if (v == 'delete') _confirmDeleteChore(item);
+                                                        },
+                                                        itemBuilder: (ctx) => const [
+                                                          PopupMenuItem(
+                                                            value: 'edit',
+                                                            child: Row(
+                                                              children: [
+                                                                Icon(Icons.edit_outlined, size: 16, color: Color(0xFF818CF8)),
+                                                                SizedBox(width: 8),
+                                                                Text('编辑'),
+                                                              ],
+                                                            ),
+                                                          ),
+                                                          PopupMenuItem(
+                                                            value: 'delete',
+                                                            child: Row(
+                                                              children: [
+                                                                Icon(Icons.delete_outline, size: 16, color: Color(0xFFEF4444)),
+                                                                SizedBox(width: 8),
+                                                                Text('删除'),
+                                                              ],
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  const SizedBox(height: 4),
+                                                  Text(
+                                                    '${item.category} · ${item.isQuantifiable ? "量化(${item.unit})" : "打卡"}',
+                                                    style: const TextStyle(fontSize: 11, color: Colors.white54),
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+
+                                            Expanded(
+                                              flex: 5,
+                                              child: FittedBox(
+                                                fit: BoxFit.scaleDown,
+                                                alignment: Alignment.center,
+                                                child: SizedBox(
+                                                  width: 190,
+                                                  child: Row(
+                                                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                                                    children: recentDates.map((date) {
+                                                      final logs = choreProvider.getLogsForChoreAndDate(item.id!, date);
+                                                      final isLogged = logs.isNotEmpty;
+                                                      final hasMemo = logs.any((l) => l.memo != null && l.memo!.isNotEmpty);
+
+                                                      final double totalValForDate = logs.fold(0.0, (sum, l) => sum + (l.value ?? 1.0));
+                                                      final formattedVal = NumberFormatter.formatQuantifiableValue(totalValForDate);
+
+                                                      return GestureDetector(
+                                                        onTap: () => _showLogDialogForDate(item, date),
+                                                        child: Stack(
+                                                          clipBehavior: Clip.none,
+                                                          children: [
+                                                            AnimatedContainer(
+                                                              duration: const Duration(milliseconds: 200),
+                                                              width: 31,
+                                                              height: 31,
+                                                              decoration: BoxDecoration(
+                                                                shape: BoxShape.circle,
+                                                                color: isLogged
+                                                                    ? (item.isQuantifiable ? const Color(0xFF059669) : const Color(0xFF4F46E5))
+                                                                    : Colors.white.withAlpha(12),
+                                                                boxShadow: isLogged
+                                                                    ? [
+                                                                        BoxShadow(
+                                                                          color: (item.isQuantifiable ? const Color(0xFF10B981) : const Color(0xFF6366F1)).withAlpha(100),
+                                                                          blurRadius: 8,
+                                                                          spreadRadius: 1,
+                                                                        ),
+                                                                      ]
+                                                                    : [],
+                                                                border: Border.all(
+                                                                  color: isLogged
+                                                                      ? Colors.transparent
+                                                                      : Colors.white.withAlpha(40),
+                                                                  width: 1,
+                                                                ),
+                                                              ),
+                                                              child: Center(
+                                                                child: isLogged
+                                                                    ? (item.isQuantifiable
+                                                                        ? Text(
+                                                                            formattedVal,
+                                                                            style: const TextStyle(
+                                                                              fontSize: 9.5,
+                                                                              fontWeight: FontWeight.bold,
+                                                                              color: Colors.white,
+                                                                            ),
+                                                                          )
+                                                                        : const Icon(Icons.check, size: 17, color: Colors.white))
+                                                                    : Text(
+                                                                        '${date.day}',
+                                                                        style: const TextStyle(fontSize: 10.5, color: Colors.white60),
+                                                                      ),
+                                                              ),
+                                                            ),
+                                                            if (isLogged && hasMemo)
+                                                              Positioned(
+                                                                top: -1,
+                                                                right: -1,
+                                                                child: Container(
+                                                                  width: 9,
+                                                                  height: 9,
+                                                                  decoration: BoxDecoration(
+                                                                    color: const Color(0xFFF59E0B),
+                                                                    shape: BoxShape.circle,
+                                                                    border: Border.all(color: const Color(0xFF0F172A), width: 1.5),
+                                                                  ),
+                                                                ),
+                                                              ),
+                                                          ],
+                                                        ),
+                                                      );
+                                                    }).toList(),
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                    ],
+                  ),
+                ),
           ],
         ),
       ),

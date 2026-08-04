@@ -331,43 +331,65 @@ class StoreCheckinDialog extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
 
-                // 分钟级时间选择器 (默认当前时刻 yyyy-MM-dd HH:mm)
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.access_time_filled, color: Color(0xFF10B981)),
-                  title: Text(
-                    '打卡时刻: ${DateFormat('yyyy-MM-dd HH:mm').format(selectedDateTime)}',
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withAlpha(10),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.white12),
                   ),
-                  subtitle: const Text('默认当前时刻，可选历史时刻', style: TextStyle(fontSize: 11, color: Colors.white54)),
-                  trailing: TextButton(
-                    child: const Text('更改时刻'),
-                    onPressed: () async {
-                      final pickedDate = await showDatePicker(
-                        context: dialogCtx,
-                        initialDate: selectedDateTime,
-                        firstDate: DateTime(2020),
-                        lastDate: DateTime(2030),
-                      );
-                      if (pickedDate != null) {
-                        if (!dialogCtx.mounted) return;
-                        final pickedTime = await showTimePicker(
-                          context: dialogCtx,
-                          initialTime: TimeOfDay.fromDateTime(selectedDateTime),
-                        );
-                        if (pickedTime != null) {
-                          setModalState(() {
-                            selectedDateTime = DateTime(
-                              pickedDate.year,
-                              pickedDate.month,
-                              pickedDate.day,
-                              pickedTime.hour,
-                              pickedTime.minute,
+                  child: Row(
+                    children: [
+                      const Icon(Icons.access_time_filled, color: Color(0xFF10B981), size: 20),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '打卡时刻: ${DateFormat('yyyy-MM-dd HH:mm').format(selectedDateTime)}',
+                              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Colors.white),
+                            ),
+                            const SizedBox(height: 2),
+                            const Text('默认当前时刻，可选历史时刻', style: TextStyle(fontSize: 10.5, color: Colors.white54)),
+                          ],
+                        ),
+                      ),
+                      TextButton(
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: const Text('更改时刻', style: TextStyle(fontSize: 12, color: Color(0xFF10B981))),
+                        onPressed: () async {
+                          final pickedDate = await showDatePicker(
+                            context: dialogCtx,
+                            initialDate: selectedDateTime,
+                            firstDate: DateTime(2020),
+                            lastDate: DateTime(2030),
+                          );
+                          if (pickedDate != null) {
+                            if (!dialogCtx.mounted) return;
+                            final pickedTime = await showTimePicker(
+                              context: dialogCtx,
+                              initialTime: TimeOfDay.fromDateTime(selectedDateTime),
                             );
-                          });
-                        }
-                      }
-                    },
+                            if (pickedTime != null) {
+                              setModalState(() {
+                                selectedDateTime = DateTime(
+                                  pickedDate.year,
+                                  pickedDate.month,
+                                  pickedDate.day,
+                                  pickedTime.hour,
+                                  pickedTime.minute,
+                                );
+                              });
+                            }
+                          }
+                        },
+                      ),
+                    ],
                   ),
                 ),
               ],

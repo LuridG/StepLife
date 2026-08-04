@@ -2092,7 +2092,7 @@ class _StoreJournalScreenState extends State<StoreJournalScreen>
                       final isSelected = storeProvider.selectedCategory == c.name;
                       return ListTile(
                         leading: const Icon(Icons.label_outline, color: Color(0xFF10B981)),
-                        title: Text(c.name, style: const TextStyle(color: Colors.white)),
+                        title: Text(c.name, style: const TextStyle(color: Colors.white), overflow: TextOverflow.ellipsis),
                         selected: isSelected,
                         selectedTileColor: const Color(0xFF10B981).withAlpha(40),
                         trailing: Row(
