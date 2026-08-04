@@ -468,8 +468,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildVersionItem(
-                  version: 'v1.6.0 (2026-08-20)',
+                  version: 'v1.6.1 (2026-08-21)',
                   isLatest: true,
+                  changes: [
+                    '📥 生活记录导入导出：单分类/全量 JSON 导出（图片字段预留、share 分享）；模板化导入与模拟导入（dry-run 预览可勾选/编辑/切换策略）；账单 OCR+AI 批量导入（一张图多笔消费）。',
+                    '🔒 导入防误建与合并：详情页导入锁定当前餐厅/分类禁止误建；合并按同项目+同一秒匹配只增补不重复，逐条/批量切换新建或合并，缺时间禁止落库。',
+                    '🕵️ OCR 敏感词脱敏：默认过滤交易单号/商户单号等敏感词，可自定义；脱敏后人工复核再送 AI。',
+                    '📊 打卡历史增强：卡片/紧凑视图一键切换，时间与金额多条件叠加筛选，统计按模板类型差异化展示（菜篮子沿用原图表）。',
+                  ],
+                ),
+                const Divider(color: Colors.white12, height: 24),
+_buildVersionItem(
+                  version: 'v1.6.0 (2026-08-20)',
+                  isLatest: false,
                   changes: [
                     '🧹 家务事项支持编辑与删除：卡片 ⋮ 菜单可改名称/分类/量化单位，删除时连同全部打卡记录一并清理。',
                     '📦 生活记录顶栏收纳：设置/排序/视图切换收进「⋮ 更多」下拉，只留新建打卡，标题不再被按钮挤没。',
