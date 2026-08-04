@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import '../db/database_service.dart';
+import '../export_import/bill_parser.dart';
 
 /// 全局设置状态（app_settings 表读写封装）
 class SettingsProvider extends ChangeNotifier {
@@ -36,6 +38,8 @@ class SettingsProvider extends ChangeNotifier {
   String _storeDefaultFilterCategory = '全部分类';
   // 悬浮筛选按钮常态透明度（0.2 ~ 1.0，用户可调）
   double _storeFilterFabOpacity = 0.5;
+  // 账单 OCR 敏感词（送 AI 前自动删除其后的数字串）
+  List<String> _billSensitiveKeywords = BillParser.defaultSensitiveKeywords;
   bool _loaded = false;
 
   String get themeMode => _themeMode;
@@ -61,6 +65,7 @@ class SettingsProvider extends ChangeNotifier {
   String get storeFilterBarMode => _storeFilterBarMode;
   String get storeDefaultFilterCategory => _storeDefaultFilterCategory;
   double get storeFilterFabOpacity => _storeFilterFabOpacity;
+  List<String> get billSensitiveKeywords => List.unmodifiable(_billSensitiveKeywords);
 
   static const String kThemeMode = 'theme_mode';
   static const String kPreferredViewMode = 'preferredViewMode';
@@ -81,6 +86,7 @@ class SettingsProvider extends ChangeNotifier {
   static const String kStoreFilterBarMode = 'store_filter_bar_mode';
   static const String kStoreDefaultFilterCategory = 'store_default_filter_category';
   static const String kStoreFilterFabOpacity = 'store_filter_fab_opacity';
+  static const String kBillSensitiveKeywords = 'bill_sensitive_keywords';
   static const String kRouteSort = 'route_sort';
 
   /// 从 app_settings 加载全部设置
@@ -224,5 +230,11 @@ class SettingsProvider extends ChangeNotifier {
     _storeFilterFabOpacity = v;
     notifyListeners();
     await _save(kStoreFilterFabOpacity, v.toString());
+  }
+
+  Future<void> setBillSensitiveKeywords(List<String> keywords) async {
+    _billSensitiveKeywords = keywords.where((k) => k.trim().isNotEmpty).toList();
+    notifyListeners();
+    await _save(kBillSensitiveKeywords, jsonEncode(_billSensitiveKeywords));
   }
 }

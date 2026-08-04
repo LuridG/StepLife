@@ -185,9 +185,22 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
       }
       if (!context.mounted) return;
 
+      // 敏感词过滤 + 人工复核（OCR 文本送 AI 前）
+      final redacted = BillParser.redactSensitive(rawText, settings.billSensitiveKeywords);
+      final reviewed = await _askReviewRedactedText(context, redacted.text, redacted.removed);
+      if (reviewed == null) return;
+      if (reviewed.trim().isEmpty) {
+        messenger.showSnackBar(const SnackBar(
+          backgroundColor: Color(0xFFEF4444),
+          content: Text('账单文字为空，已取消导入'),
+        ));
+        return;
+      }
+      if (!context.mounted) return;
+
       messenger.showSnackBar(const SnackBar(content: Text('正在整理账单内容…')));
       final result = await BillParser.structure(
-        rawText: rawText,
+        rawText: reviewed,
         storeName: widget.storeItem.name,
         category: widget.storeItem.category,
         apiKey: settings.deepseekApiKey,
@@ -248,6 +261,54 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
       ),
     );
     return ok == true ? ctrl.text.trim() : '';
+  }
+
+  Future<String?> _askReviewRedactedText(
+    BuildContext context,
+    String text,
+    int removed,
+  ) async {
+    final ctrl = TextEditingController(text: text);
+    final ok = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('复核账单文字'),
+        backgroundColor: const Color(0xFF111C38),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                removed > 0
+                    ? '已自动删除 $removed 处敏感信息（如交易单号/商户单号），可继续手动删除内容。'
+                    : '未发现默认敏感词，可直接删除不需要的内容后确认。',
+                style: const TextStyle(fontSize: 12, color: Colors.white54),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: ctrl,
+                maxLines: 12,
+                style: const TextStyle(color: Colors.white, fontSize: 13),
+                decoration: const InputDecoration(
+                  hintText: '确认无误后点击「确认，交给 AI 整理」',
+                  hintStyle: TextStyle(color: Colors.white24),
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+            child: const Text('确认，交给 AI 整理'),
+          ),
+        ],
+      ),
+    );
+    return ok;
   }
 
   void _confirmDeleteLog(BuildContext context, StoreLog log) {

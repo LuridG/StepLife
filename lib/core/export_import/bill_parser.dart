@@ -46,6 +46,35 @@ class BillParser {
   static bool get isOcrSupported =>
       !kIsWeb && (Platform.isAndroid || Platform.isIOS);
 
+  /// 默认敏感词：OCR 账单送 AI 前自动删除其后的数字串（可在设置中心增删）。
+  static const List<String> defaultSensitiveKeywords = [
+    '交易单号',
+    '商户单号',
+    '商户号',
+    '订单号',
+    '流水号',
+    '支付单号',
+    '参考号',
+  ];
+
+  /// 删除文本中的敏感词及其后的数字串，返回清理后的文本与删除处数。
+  static ({String text, int removed}) redactSensitive(
+    String text,
+    List<String> keywords,
+  ) {
+    var result = text;
+    var removed = 0;
+    for (final k in keywords) {
+      if (k.trim().isEmpty) continue;
+      final re = RegExp('${RegExp.escape(k.trim())}(?:[:：]?${r'\s*[A-Za-z0-9\-]{4,40}'})?');
+      result = result.replaceAllMapped(re, (m) {
+        removed++;
+        return '';
+      });
+    }
+    return (text: result, removed: removed);
+  }
+
   /// 用 ML Kit 离线识别图片中的文字（仅 Android/iOS；桌面端抛异常由调用方兜底）。
   static Future<String> ocrImage(String imagePath) async {
     if (!isOcrSupported) {

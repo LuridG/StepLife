@@ -205,13 +205,13 @@ class StoreImporter {
     final svc = DatabaseService.instance;
     final categories = await svc.getStoreCategories();
     final items = await svc.getStoreItems();
-    final catByName = {for (final c in categories) c.name: c};
+    final catByName = {for (final c in categories) c.name.trim(): c};
     final itemByKey = {
-      for (final i in items) '${i.category}\u0000${i.name}': i,
+      for (final i in items) '${i.category.trim()}\u0000${i.name.trim()}': i,
     };
 
     for (final c in draft.categories) {
-      final existingCat = catByName[c.name];
+      final existingCat = catByName[c.name.trim()];
       if (existingCat != null) {
         c.targetCategoryId = existingCat.id;
         if (c.strategy == ImportStrategy.create) {
@@ -226,7 +226,17 @@ class StoreImporter {
       }
       for (final it in c.items) {
         it.resolvedCategory = c.resolvedName;
-        final key = '${it.resolvedCategory}\u0000${it.name}';
+        // 调用方已显式指定合并目标（账单/纯打卡导入）时按 id 定位，避免名称/分类微差异被误判为新建
+        if (it.strategy == ImportStrategy.merge && it.targetItemId != null) {
+          final byId = items.where((i) => i.id == it.targetItemId).toList();
+          if (byId.isNotEmpty) {
+            it.resolvedName = byId.first.name;
+            it.resolvedCategory = byId.first.category;
+            continue;
+          }
+          it.targetItemId = null;
+        }
+        final key = '${it.resolvedCategory.trim()}\u0000${it.name.trim()}';
         final existing = itemByKey[key];
         if (existing != null) {
           it.targetItemId = existing.id;
@@ -234,10 +244,11 @@ class StoreImporter {
             it.resolvedName = '${it.name} (导入)';
           } else {
             it.resolvedName = existing.name;
+            it.resolvedCategory = existing.category;
           }
         } else {
           it.targetItemId = null;
-          it.resolvedName = it.name;
+          it.resolvedName = it.name.trim();
           it.strategy = ImportStrategy.create;
         }
       }

@@ -9,6 +9,7 @@ import '../db/database_service.dart';
 import '../update/app_updater.dart';
 import '../update/update_dialog.dart';
 import 'settings_provider.dart';
+import '../export_import/bill_parser.dart';
 import '../../features/step_tracker/providers/step_provider.dart';
 import '../../features/chore_tracker/providers/chore_provider.dart';
 import '../../features/store_journal/providers/store_provider.dart';
@@ -31,12 +32,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String _appVersion = '';
   final TextEditingController _tmdbKeyController = TextEditingController();
   final TextEditingController _deepseekKeyController = TextEditingController();
+  final TextEditingController _sensitiveKwCtrl = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _tmdbKeyController.text = context.read<SettingsProvider>().tmdbApiKey;
     _deepseekKeyController.text = context.read<SettingsProvider>().deepseekApiKey;
+    _sensitiveKwCtrl.text = context.read<SettingsProvider>().billSensitiveKeywords.join('\n');
     _refreshCacheStats();
     _loadAppVersion();
   }
@@ -45,6 +48,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void dispose() {
     _tmdbKeyController.dispose();
     _deepseekKeyController.dispose();
+    _sensitiveKwCtrl.dispose();
     super.dispose();
   }
 
@@ -87,6 +91,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
         backgroundColor: error ? Colors.redAccent : const Color(0xFF10B981),
       ),
     );
+  }
+
+  void _saveSensitiveKeywords() {
+    final keywords = _sensitiveKwCtrl.text
+        .split(RegExp(r'[\n,，、;；]'))
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
+    context.read<SettingsProvider>().setBillSensitiveKeywords(keywords);
+    _toast('敏感词已保存');
+  }
+
+  void _resetSensitiveKeywords() {
+    _sensitiveKwCtrl.text = BillParser.defaultSensitiveKeywords.join('\n');
+    context.read<SettingsProvider>().setBillSensitiveKeywords(
+          List.of(BillParser.defaultSensitiveKeywords),
+        );
+    _toast('已恢复默认敏感词');
   }
 
   Future<void> _showWebdavConfigDialog() async {
@@ -1174,6 +1196,48 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     const SizedBox(height: 8),
                     const Text('旧图不受质量设置影响，仅影响新选图压缩', style: TextStyle(fontSize: 11, color: Colors.white38)),
+                  ],
+                )),
+
+                // 账单导入（OCR 敏感词过滤）
+                _section('账单导入（OCR 敏感词）', Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('OCR 账单送 AI 前，自动删除以下敏感词及其后的数字串；每行一个关键词。', style: TextStyle(fontSize: 11, color: Colors.white54)),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _sensitiveKwCtrl,
+                      maxLines: 6,
+                      style: const TextStyle(color: Colors.white, fontSize: 13),
+                      decoration: const InputDecoration(
+                        labelText: '敏感词（每行一个）',
+                        labelStyle: TextStyle(color: Colors.white54),
+                        hintText: '交易单号\n商户单号\n订单号',
+                        hintStyle: TextStyle(color: Colors.white24),
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _resetSensitiveKeywords,
+                            icon: const Icon(Icons.restart_alt, size: 18),
+                            label: _btnLabel('恢复默认'),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: FilledButton.icon(
+                            onPressed: _saveSensitiveKeywords,
+                            icon: const Icon(Icons.save_outlined, size: 18),
+                            label: _btnLabel('保存'),
+                            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF10B981)),
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
                 )),
 

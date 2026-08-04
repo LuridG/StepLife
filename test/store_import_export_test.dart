@@ -158,5 +158,22 @@ void main() {
       final result = BillParser.parseBillJson('{"records":[{"amount":8.0,"time":"2026年8月3日 16:16:12"}]}');
       expect(result.records.single.time, DateTime(2026, 8, 3, 16, 16));
     });
+
+    test('redactSensitive 删除默认敏感词及其后数字串', () {
+      final r = BillParser.redactSensitive(
+        '交易单号 4200000120240803\n商户单号：123456789012345\n糖灶 -8.00',
+        BillParser.defaultSensitiveKeywords,
+      );
+      expect(r.removed, 2);
+      expect(r.text.contains('交易单号'), isFalse);
+      expect(r.text.contains('商户单号'), isFalse);
+      expect(r.text.contains('糖灶'), isTrue);
+    });
+
+    test('redactSensitive 支持自定义敏感词', () {
+      final r = BillParser.redactSensitive('会员卡号：88888888 消费 20 元', ['会员卡号']);
+      expect(r.removed, 1);
+      expect(r.text.contains('88888888'), isFalse);
+    });
   });
 }
